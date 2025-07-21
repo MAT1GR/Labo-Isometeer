@@ -5,7 +5,6 @@ import { useAuth } from '../contexts/AuthContext';
 import Card from '../components/ui/Card';
 import { formatCurrency, formatDate } from '../lib/utils';
 import { FileText, Users, DollarSign, AlertCircle, TrendingUp, Smile, CheckCircle, Clock } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import axiosInstance from '../api/axiosInstance';
 
 // --- Interfaces ---

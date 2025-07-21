@@ -103,7 +103,7 @@ const ClienteDetail: React.FC = () => {
           />
           <Input label="Empresa *" {...register("name", { required: true })} />
           <Input label="Dirección" {...register("address")} />
-          <Input label="Contacto" {...register("contacts")} />
+          <Input label="Contacto" {...register("contacts.0.name")} />
           <div className="flex items-end gap-4">
             <div className="flex-1">
               <label className="text-sm font-medium text-gray-700">

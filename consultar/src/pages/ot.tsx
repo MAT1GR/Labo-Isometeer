@@ -6,18 +6,26 @@ import { otService, WorkOrder } from "../services/otService";
 import { useAuth } from "../contexts/AuthContext";
 import Card from "../components/ui/Card";
 import Button from "../components/ui/Button";
-import { PlusCircle, Briefcase, Trash2, Edit } from "lucide-react";
+import {
+  PlusCircle,
+  Briefcase,
+  Trash2,
+  Edit,
+  CheckSquare,
+  XSquare,
+} from "lucide-react";
 import useSWR, { mutate } from "swr";
-import { fetcher } from "../api/axiosInstance";
 
 const OT: React.FC = () => {
   const { user, isDirectorOrAdmin } = useAuth();
   const navigate = useNavigate();
 
-  // La URL para SWR cambia dependiendo del rol del usuario
-  const swrUrl =
-    user && !isDirectorOrAdmin() ? `/ots?assigned_to=${user.id}` : "/ots";
-  const { data: ots, error, isLoading } = useSWR<WorkOrder[]>(swrUrl, fetcher);
+  // El hook useSWR ahora depende del usuario para re-evaluarse si el usuario cambia
+  const {
+    data: ots,
+    error,
+    isLoading,
+  } = useSWR(user ? ["/ots", user] : null, () => otService.getAllOTs(user));
 
   const handleDelete = async (otId: number) => {
     if (
@@ -27,7 +35,7 @@ const OT: React.FC = () => {
     ) {
       try {
         await otService.deleteOT(otId);
-        mutate(swrUrl); // Refresca los datos para la URL actual
+        mutate(["/ots", user]);
       } catch (err: any) {
         alert(err.message || "Error al eliminar la OT.");
       }
@@ -53,6 +61,11 @@ const OT: React.FC = () => {
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
+              {isDirectorOrAdmin() && (
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                  Auth
+                </th>
+              )}
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                 ID de OT
               </th>
@@ -75,7 +88,21 @@ const OT: React.FC = () => {
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
             {ots?.map((ot) => (
-              <tr key={ot.id}>
+              <tr
+                key={ot.id}
+                className={`${
+                  !ot.authorized && isDirectorOrAdmin() ? "bg-orange-50" : ""
+                }`}
+              >
+                {isDirectorOrAdmin() && (
+                  <td className="px-6 py-4">
+                    {ot.authorized ? (
+                      <CheckSquare className="h-5 w-5 text-green-500" />
+                    ) : (
+                      <XSquare className="h-5 w-5 text-red-500" />
+                    )}
+                  </td>
+                )}
                 <td className="px-6 py-4 font-medium">
                   {ot.custom_id || `Interno #${ot.id}`}
                 </td>
@@ -93,7 +120,7 @@ const OT: React.FC = () => {
                     variant="outline"
                     onClick={() => navigate(`/ot/editar/${ot.id}`)}
                   >
-                    <Edit className="h-4 w-4" />
+                    {isDirectorOrAdmin() ? <Edit className="h-4 w-4" /> : "Ver"}
                   </Button>
                   {isDirectorOrAdmin() && (
                     <Button

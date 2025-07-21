@@ -16,65 +16,11 @@ const db = new Database("laboratorio.db");
 db.pragma("foreign_keys = ON");
 
 // --- Creación/Actualización de Tablas ---
-// Borramos las tablas para recrearlas con la nueva estructura de contactos
-db.exec("DROP TABLE IF EXISTS work_order_items");
-db.exec("DROP TABLE IF EXISTS work_orders");
-db.exec("DROP TABLE IF EXISTS contacts");
-db.exec("DROP TABLE IF EXISTS clients");
-
 db.exec(`
-  CREATE TABLE IF NOT EXISTS users (
-    id INTEGER PRIMARY KEY AUTOINCREMENT, 
-    email TEXT UNIQUE NOT NULL, 
-    password TEXT NOT NULL, 
-    name TEXT NOT NULL,
-    role TEXT NOT NULL CHECK (role IN ('empleado', 'director', 'administrador'))
-  );
-
-  CREATE TABLE IF NOT EXISTS clients (
-    id INTEGER PRIMARY KEY AUTOINCREMENT, 
-    name TEXT NOT NULL, 
-    code TEXT UNIQUE NOT NULL, 
-    address TEXT, 
-    fiscal_id_type TEXT, 
-    fiscal_id TEXT
-  );
-  
-  CREATE TABLE IF NOT EXISTS contacts (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    client_id INTEGER NOT NULL,
-    type TEXT,
-    name TEXT,
-    email TEXT,
-    phone TEXT,
-    FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE
-  );
-
-  CREATE TABLE IF NOT EXISTS work_orders (
-    id INTEGER PRIMARY KEY AUTOINCREMENT, 
-    custom_id TEXT UNIQUE,
-    date TEXT NOT NULL, 
-    type TEXT NOT NULL, 
-    client_id INTEGER NOT NULL,
-    contract TEXT, 
-    product TEXT NOT NULL, 
-    brand TEXT,
-    model TEXT,
-    seal_number TEXT,
-    observations TEXT,
-    certificate_expiry TEXT,
-    status TEXT NOT NULL DEFAULT 'pendiente' CHECK(status IN ('pendiente', 'en_progreso', 'finalizada', 'facturada', 'cierre')),
-    created_by INTEGER NOT NULL, 
-    assigned_to INTEGER,
-    quotation_amount REAL,
-    quotation_details TEXT,
-    disposition TEXT,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE,
-    FOREIGN KEY (created_by) REFERENCES users(id),
-    FOREIGN KEY (assigned_to) REFERENCES users(id)
-  );
+  CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY AUTOINCREMENT, email TEXT UNIQUE NOT NULL, password TEXT NOT NULL, name TEXT NOT NULL, role TEXT NOT NULL CHECK (role IN ('empleado', 'director', 'administrador')));
+  CREATE TABLE IF NOT EXISTS clients (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, code TEXT UNIQUE NOT NULL, address TEXT, fiscal_id_type TEXT, fiscal_id TEXT);
+  CREATE TABLE IF NOT EXISTS contacts (id INTEGER PRIMARY KEY AUTOINCREMENT, client_id INTEGER NOT NULL, type TEXT, name TEXT, email TEXT, phone TEXT, FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE);
+  CREATE TABLE IF NOT EXISTS work_orders (id INTEGER PRIMARY KEY AUTOINCREMENT, custom_id TEXT UNIQUE, date TEXT NOT NULL, type TEXT NOT NULL, client_id INTEGER NOT NULL, contract TEXT, product TEXT NOT NULL, brand TEXT, model TEXT, seal_number TEXT, observations TEXT, certificate_expiry TEXT, status TEXT NOT NULL DEFAULT 'pendiente' CHECK(status IN ('pendiente', 'en_progreso', 'finalizada', 'facturada', 'cierre')), created_by INTEGER NOT NULL, assigned_to INTEGER, quotation_amount REAL, quotation_details TEXT, disposition TEXT, created_at DATETIME DEFAULT CURRENT_TIMESTAMP, updated_at DATETIME DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE, FOREIGN KEY (created_by) REFERENCES users(id), FOREIGN KEY (assigned_to) REFERENCES users(id));
 `);
 
 // --- Lógica de Usuario Admin ---
@@ -111,40 +57,139 @@ apiRouter.post("/auth/login", (req: Request, res: Response) => {
   }
 });
 
-// [GET] /dashboard/stats
-apiRouter.get("/dashboard/stats", (req: Request, res: Response) => {
+// [GET] /clients
+apiRouter.get("/clients", (req: Request, res: Response) => {
   try {
-    const getCount = (table: string, whereClause: string = "1 = 1") =>
-      (
-        db
-          .prepare(
-            `SELECT COUNT(*) as count FROM ${table} WHERE ${whereClause}`
-          )
-          .get() as { count: number }
-      ).count;
-    const statsData = {
-      stats: {
-        totalOT: getCount("work_orders"),
-        totalClients: getCount("clients"),
-        pendingOT: getCount("work_orders", "status = 'pendiente'"),
-        inProgressOT: getCount("work_orders", "status = 'en_progreso'"),
-        completedOT: getCount("work_orders", "status = 'finalizada'"),
-        billedOT: getCount("work_orders", "status = 'facturada'"),
-        totalRevenue: 2450000,
-        paidInvoices: 89,
-        unpaidInvoices: 23,
-        overdueInvoices: 8,
-      },
-      recentOrders: db
-        .prepare(
-          `SELECT ot.id, ot.product, ot.status, ot.date, c.name as client_name FROM work_orders ot JOIN clients c ON ot.client_id = c.id ORDER BY ot.created_at DESC LIMIT 5`
-        )
-        .all(),
-    };
-    res.status(200).json(statsData);
+    const clients = db
+      .prepare("SELECT id, name, code, fiscal_id FROM clients ORDER BY name")
+      .all();
+    res.status(200).json(clients);
   } catch (error) {
-    console.error("Error en /dashboard/stats:", error);
-    res.status(500).json({ error: "Error al obtener las estadísticas." });
+    res.status(500).json({ error: "Error al obtener clientes." });
+  }
+});
+
+// [POST] /clients
+apiRouter.post("/clients", (req: Request, res: Response) => {
+  const {
+    name,
+    code,
+    address,
+    fiscal_id_type,
+    fiscal_id,
+    contacts = [],
+  } = req.body;
+  if (!code || !name)
+    return res
+      .status(400)
+      .json({ error: "El Nº Cliente y la Empresa son requeridos." });
+  const clientInsertStmt = db.prepare(
+    "INSERT INTO clients (name, code, address, fiscal_id_type, fiscal_id) VALUES (?, ?, ?, ?, ?)"
+  );
+  const contactInsertStmt = db.prepare(
+    "INSERT INTO contacts (client_id, type, name, email, phone) VALUES (?, ?, ?, ?, ?)"
+  );
+  const createTransaction = db.transaction((clientData) => {
+    const info = clientInsertStmt.run(
+      clientData.name,
+      clientData.code,
+      clientData.address,
+      clientData.fiscal_id_type,
+      clientData.fiscal_id
+    );
+    const clientId = info.lastInsertRowid;
+    for (const contact of clientData.contacts) {
+      if (contact.type || contact.name || contact.email || contact.phone) {
+        contactInsertStmt.run(
+          clientId,
+          contact.type,
+          contact.name,
+          contact.email,
+          contact.phone
+        );
+      }
+    }
+    return { id: clientId };
+  });
+  try {
+    const result = createTransaction({
+      name,
+      code,
+      address,
+      fiscal_id_type,
+      fiscal_id,
+      contacts,
+    });
+    res.status(201).json(result);
+  } catch (error: any) {
+    if (error.code === "SQLITE_CONSTRAINT_UNIQUE")
+      return res.status(409).json({ error: "El Nº Cliente ya existe." });
+    res.status(500).json({ error: "Error al crear el cliente." });
+  }
+});
+
+// [GET] /clients/:id
+apiRouter.get("/clients/:id", (req: Request, res: Response) => {
+  try {
+    const client = db
+      .prepare("SELECT * FROM clients WHERE id = ?")
+      .get(req.params.id);
+    if (client) {
+      const contacts = db
+        .prepare("SELECT * FROM contacts WHERE client_id = ?")
+        .all(req.params.id);
+      res.status(200).json({ ...client, contacts });
+    } else {
+      res.status(404).json({ error: "Cliente no encontrado." });
+    }
+  } catch (error) {
+    res.status(500).json({ error: "Error al obtener el cliente." });
+  }
+});
+
+// [PUT] /clients/:id
+apiRouter.put("/clients/:id", (req: Request, res: Response) => {
+  const { id } = req.params;
+  const {
+    name,
+    code,
+    address,
+    fiscal_id_type,
+    fiscal_id,
+    contacts = [],
+  } = req.body;
+  const updateStmt = db.prepare(
+    "UPDATE clients SET name=?, code=?, address=?, fiscal_id_type=?, fiscal_id=? WHERE id = ?"
+  );
+  const deleteContactsStmt = db.prepare(
+    "DELETE FROM contacts WHERE client_id = ?"
+  );
+  const insertContactStmt = db.prepare(
+    "INSERT INTO contacts (client_id, type, name, email, phone) VALUES (?, ?, ?, ?, ?)"
+  );
+  const updateTransaction = db.transaction(() => {
+    updateStmt.run(name, code, address, fiscal_id_type, fiscal_id, id);
+    deleteContactsStmt.run(id);
+    for (const contact of contacts) {
+      if (contact.type || contact.name || contact.email || contact.phone) {
+        insertContactStmt.run(
+          id,
+          contact.type,
+          contact.name,
+          contact.email,
+          contact.phone
+        );
+      }
+    }
+  });
+  try {
+    updateTransaction();
+    const updatedClient = db
+      .prepare("SELECT * FROM clients WHERE id = ?")
+      .get(id);
+    res.status(200).json(updatedClient);
+  } catch (error: any) {
+    res.status(500).json({ error: "Error al actualizar el cliente." });
   }
 });
 
@@ -206,147 +251,6 @@ apiRouter.delete("/users/:id", (req: Request, res: Response) => {
             "No se puede eliminar el usuario porque ha creado Órdenes de Trabajo.",
         });
     res.status(500).json({ error: "Error interno del servidor." });
-  }
-});
-
-// [GET] /clients
-apiRouter.get("/clients", (req: Request, res: Response) => {
-  try {
-    const clients = db
-      .prepare("SELECT id, name, code FROM clients ORDER BY name")
-      .all();
-    res.status(200).json(clients);
-  } catch (error) {
-    res.status(500).json({ error: "Error al obtener clientes." });
-  }
-});
-
-// [POST] /clients
-apiRouter.post("/clients", (req: Request, res: Response) => {
-  const {
-    name,
-    code,
-    address,
-    fiscal_id_type,
-    fiscal_id,
-    contacts = [],
-  } = req.body;
-  if (!code || !name)
-    return res
-      .status(400)
-      .json({ error: "El Nº Cliente y la Empresa son requeridos." });
-
-  const clientInsertStmt = db.prepare(
-    "INSERT INTO clients (name, code, address, fiscal_id_type, fiscal_id) VALUES (?, ?, ?, ?, ?)"
-  );
-  const contactInsertStmt = db.prepare(
-    "INSERT INTO contacts (client_id, type, name, email, phone) VALUES (?, ?, ?, ?, ?)"
-  );
-
-  const createTransaction = db.transaction((clientData) => {
-    const info = clientInsertStmt.run(
-      clientData.name,
-      clientData.code,
-      clientData.address,
-      clientData.fiscal_id_type,
-      clientData.fiscal_id
-    );
-    const clientId = info.lastInsertRowid;
-    for (const contact of clientData.contacts) {
-      if (contact.type || contact.name || contact.email || contact.phone) {
-        contactInsertStmt.run(
-          clientId,
-          contact.type,
-          contact.name,
-          contact.email,
-          contact.phone
-        );
-      }
-    }
-    return { id: clientId };
-  });
-
-  try {
-    const result = createTransaction({
-      name,
-      code,
-      address,
-      fiscal_id_type,
-      fiscal_id,
-      contacts,
-    });
-    res.status(201).json(result);
-  } catch (error: any) {
-    if (error.code === "SQLITE_CONSTRAINT_UNIQUE")
-      return res.status(409).json({ error: "El Nº Cliente ya existe." });
-    res.status(500).json({ error: "Error al crear el cliente." });
-  }
-});
-
-// [GET] /clients/:id
-apiRouter.get("/clients/:id", (req: Request, res: Response) => {
-  try {
-    const client = db
-      .prepare("SELECT * FROM clients WHERE id = ?")
-      .get(req.params.id);
-    if (client) {
-      const contacts = db
-        .prepare("SELECT * FROM contacts WHERE client_id = ?")
-        .all(req.params.id);
-      res.status(200).json({ ...client, contacts });
-    } else {
-      res.status(404).json({ error: "Cliente no encontrado." });
-    }
-  } catch (error) {
-    res.status(500).json({ error: "Error al obtener el cliente." });
-  }
-});
-
-// [PUT] /clients/:id
-apiRouter.put("/clients/:id", (req: Request, res: Response) => {
-  const { id } = req.params;
-  const {
-    name,
-    code,
-    address,
-    fiscal_id_type,
-    fiscal_id,
-    contacts = [],
-  } = req.body;
-  const updateStmt = db.prepare(
-    "UPDATE clients SET name=?, code=?, address=?, fiscal_id_type=?, fiscal_id=? WHERE id = ?"
-  );
-  const deleteContactsStmt = db.prepare(
-    "DELETE FROM contacts WHERE client_id = ?"
-  );
-  const insertContactStmt = db.prepare(
-    "INSERT INTO contacts (client_id, type, name, email, phone) VALUES (?, ?, ?, ?, ?)"
-  );
-
-  const updateTransaction = db.transaction(() => {
-    updateStmt.run(name, code, address, fiscal_id_type, fiscal_id, id);
-    deleteContactsStmt.run(id);
-    for (const contact of contacts) {
-      if (contact.type || contact.name || contact.email || contact.phone) {
-        insertContactStmt.run(
-          id,
-          contact.type,
-          contact.name,
-          contact.email,
-          contact.phone
-        );
-      }
-    }
-  });
-
-  try {
-    updateTransaction();
-    const updatedClient = db
-      .prepare("SELECT * FROM clients WHERE id = ?")
-      .get(id);
-    res.status(200).json(updatedClient);
-  } catch (error: any) {
-    res.status(500).json({ error: "Error al actualizar el cliente." });
   }
 });
 
@@ -417,7 +321,7 @@ apiRouter.get("/ots/generate-id", (req, res) => {
     const sequentialNumber = otsTodayCount + 1;
     const typeLetter = (type as string).charAt(0).toUpperCase();
     const clientCode = client.code;
-    const custom_id = `${datePrefix}${sequentialNumber}${typeLetter}${clientCode}`;
+    const custom_id = `${datePrefix}${sequentialNumber} ${typeLetter} ${clientCode}`;
     res.status(200).json({ previewId: custom_id });
   } catch (error) {
     res.status(500).json({ error: "Error al generar el ID" });
@@ -466,7 +370,7 @@ apiRouter.post("/ots", (req, res) => {
     const sequentialNumber = otsTodayCount + 1;
     const typeLetter = type.charAt(0).toUpperCase();
     const clientCode = client.code;
-    const custom_id = `${datePrefix}${sequentialNumber}${typeLetter}${clientCode}`;
+    const custom_id = `${datePrefix}${sequentialNumber} ${typeLetter} ${clientCode}`;
     const stmt = db.prepare(
       `INSERT INTO work_orders (custom_id, date, type, client_id, created_by, product, brand, model, contract, seal_number, observations, certificate_expiry, assigned_to) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     );
@@ -499,7 +403,7 @@ apiRouter.get("/ots/:id", (req, res) => {
     const { id } = req.params;
     const ot = db
       .prepare(
-        `SELECT ot.*, c.name as client_name, c.code as client_code, c.contact as client_contact FROM work_orders ot JOIN clients c ON ot.client_id = c.id WHERE ot.id = ?`
+        `SELECT ot.*, c.name as client_name, c.code as client_code FROM work_orders ot JOIN clients c ON ot.client_id = c.id WHERE ot.id = ?`
       )
       .get(id);
     if (!ot) return res.status(404).json({ error: "OT no encontrada." });

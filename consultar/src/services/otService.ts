@@ -1,6 +1,7 @@
 // RUTA: /cliente/src/services/otService.ts
 
 import axiosInstance from "../api/axiosInstance";
+import { User } from "./auth";
 
 export interface WorkOrder {
   id: number;
@@ -21,73 +22,61 @@ export interface WorkOrder {
   quotation_amount?: number;
   quotation_details?: string;
   disposition?: string;
+  authorized: boolean;
+  started_at?: string | null;
+  completed_at?: string | null;
+  duration_minutes?: number | null;
   created_at: string;
   updated_at?: string;
   // Campos que vienen de JOINS
   client_name?: string;
   client_code?: string;
-  client_contact?: string;
   assigned_to_name?: string;
 }
 
 class OTService {
-  async getAllOTs(): Promise<WorkOrder[]> {
-    try {
-      const response = await axiosInstance.get("/ots");
-      return response.data;
-    } catch (error) {
-      throw new Error("No se pudieron cargar las órdenes de trabajo.");
-    }
-  }
-
-  async getMyOTs(userId: number): Promise<WorkOrder[]> {
-    try {
-      const response = await axiosInstance.get(`/ots?assigned_to=${userId}`);
-      return response.data;
-    } catch (error) {
-      throw new Error(
-        "No se pudieron cargar tus órdenes de trabajo asignadas."
-      );
-    }
+  async getAllOTs(user: User | null): Promise<WorkOrder[]> {
+    if (!user) return [];
+    // Enviamos el rol para que el backend decida qué OTs mostrar
+    const response = await axiosInstance.get("/ots", {
+      params: { role: user.role, assigned_to: user.id },
+    });
+    return response.data;
   }
 
   async getOTById(id: number): Promise<WorkOrder> {
-    try {
-      const response = await axiosInstance.get(`/ots/${id}`);
-      return response.data;
-    } catch (error) {
-      throw new Error("No se pudo cargar la orden de trabajo.");
-    }
+    const response = await axiosInstance.get(`/ots/${id}`);
+    return response.data;
   }
 
   async createOT(otData: Partial<WorkOrder>): Promise<{ id: number }> {
-    try {
-      const response = await axiosInstance.post("/ots", otData);
-      return response.data;
-    } catch (error: any) {
-      throw new Error(error.response?.data?.error || "Error al crear la OT.");
-    }
+    const response = await axiosInstance.post("/ots", otData);
+    return response.data;
   }
 
   async updateOT(id: number, otData: Partial<WorkOrder>): Promise<WorkOrder> {
-    try {
-      const response = await axiosInstance.put(`/ots/${id}`, otData);
-      return response.data;
-    } catch (error: any) {
-      throw new Error(
-        error.response?.data?.error || "Error al actualizar la OT."
-      );
-    }
+    const response = await axiosInstance.put(`/ots/${id}`, otData);
+    return response.data;
   }
 
   async deleteOT(otId: number): Promise<void> {
-    try {
-      await axiosInstance.delete(`/ots/${otId}`);
-    } catch (error: any) {
-      throw new Error(
-        error.response?.data?.error || "Error al eliminar la OT."
-      );
-    }
+    await axiosInstance.delete(`/ots/${otId}`);
+  }
+
+  // --- NUEVAS ACCIONES ---
+  async authorizeOT(id: number): Promise<WorkOrder> {
+    const response = await axiosInstance.put(`/ots/${id}/authorize`);
+    return response.data;
+  }
+
+  async startOT(id: number): Promise<WorkOrder> {
+    const response = await axiosInstance.put(`/ots/${id}/start`);
+    return response.data;
+  }
+
+  async stopOT(id: number): Promise<WorkOrder> {
+    const response = await axiosInstance.put(`/ots/${id}/stop`);
+    return response.data;
   }
 }
 

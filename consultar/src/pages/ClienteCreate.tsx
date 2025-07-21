@@ -1,155 +1,97 @@
 // RUTA: /cliente/src/pages/ClienteCreate.tsx
 
-import React from "react";
-import { useNavigate } from "react-router-dom";
-import { useForm, useFieldArray } from "react-hook-form";
-import { clientService, Client } from "../services/clientService";
-import Input from "../components/ui/Input";
-import Button from "../components/ui/Button";
-import { ArrowLeft, Save, PlusCircle, Trash2 } from "lucide-react";
-import { mutate } from "swr";
+import React from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useForm, useFieldArray } from 'react-hook-form';
+import { clientService, Client } from '../services/clientService';
+import Input from '../components/ui/Input';
+import Button from '../components/ui/Button';
+import { ArrowLeft, Save, PlusCircle, Trash2 } from 'lucide-react';
+import { mutate } from 'swr';
 
 const ClienteCreate: React.FC = () => {
-  const navigate = useNavigate();
-  const {
-    register,
-    handleSubmit,
-    control,
-    formState: { isSubmitting },
-  } = useForm<Client>({
-    defaultValues: {
-      contacts: [{ type: "", name: "", email: "", phone: "" }],
-    },
-  });
-  const { fields, append, remove } = useFieldArray({
-    control,
-    name: "contacts",
-  });
+    const navigate = useNavigate();
+    const { register, handleSubmit, control, formState: { isSubmitting } } = useForm<Client>({
+        defaultValues: {
+            contacts: [{ type: '', name: '', email: '', phone: '' }]
+        }
+    });
+    const { fields, append, remove } = useFieldArray({ control, name: "contacts" });
 
-  const onSubmit = async (data: Client) => {
-    try {
-      // Filtramos los contactos que están completamente vacíos antes de enviar
-      const nonEmptyContacts = data.contacts.filter(
-        (contact) =>
-          contact.type || contact.name || contact.email || contact.phone
-      );
-      const dataToSubmit = { ...data, contacts: nonEmptyContacts };
+    const onSubmit = async (data: Client) => {
+        try {
+            const nonEmptyContacts = data.contacts.filter(contact => 
+                contact.type || contact.name || contact.email || contact.phone
+            );
+            const dataToSubmit = { ...data, contacts: nonEmptyContacts };
 
-      const newClient = await clientService.createClient(dataToSubmit);
-      mutate("/clients"); // Actualiza la lista en segundo plano
-      navigate(`/clientes/editar/${newClient.id}`);
-    } catch (error) {
-      alert("Hubo un error al crear el cliente.");
-    }
-  };
+            const newClient = await clientService.createClient(dataToSubmit);
+            mutate('/clients');
+            navigate(`/clientes/editar/${newClient.id}`);
+        } catch (error) {
+            alert('Hubo un error al crear el cliente.');
+        }
+    };
 
-  return (
-    <form
-      onSubmit={handleSubmit(onSubmit)}
-      className="space-y-8 bg-gray-50 p-6 rounded-lg"
-    >
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold">Agregar Nuevo Cliente</h1>
-        <div className="flex gap-4">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => navigate("/clientes")}
-          >
-            Cancelar
-          </Button>
-          <Button
-            type="submit"
-            disabled={isSubmitting}
-            className="flex items-center gap-2"
-          >
-            <Save className="h-5 w-5" />
-            {isSubmitting ? "Guardando..." : "Guardar y Editar"}
-          </Button>
-        </div>
-      </div>
-      <div className="bg-white p-6 rounded-lg shadow-sm space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <Input
-            label="ID / Nº Cliente *"
-            {...register("code", { required: true })}
-          />
-          <Input
-            label="Nombre / Empresa *"
-            {...register("name", { required: true })}
-          />
-          <Input label="Dirección" {...register("address")} />
-          <div className="flex items-end gap-4 col-span-2">
-            <div className="flex-1">
-              <label className="text-sm font-medium">Tipo ID Fiscal</label>
-              <select
-                {...register("fiscal_id_type")}
-                className="w-full mt-1 p-2 border rounded-md"
-              >
-                <option value="">Ninguno</option>
-                <option value="CUIT">CUIT</option>
-                <option value="CUIL">CUIL</option>
-                <option value="DNI">DNI</option>
-              </select>
+    return (
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-8 bg-gray-50 p-6 rounded-lg">
+            <div className="flex justify-between items-center">
+                <h1 className="text-2xl font-bold">Agregar Nuevo Cliente</h1>
+                <div className="flex gap-4">
+                    <Button type="button" variant="outline" onClick={() => navigate('/clientes')}>Cancelar</Button>
+                    <Button type="submit" disabled={isSubmitting} className="flex items-center gap-2">
+                        <Save className="h-5 w-5" />
+                        {isSubmitting ? 'Guardando...' : 'Guardar y Editar'}
+                    </Button>
+                </div>
             </div>
-            <div className="flex-1">
-              <Input label="Número ID Fiscal" {...register("fiscal_id")} />
-            </div>
-          </div>
-        </div>
+            <div className="bg-white p-6 rounded-lg shadow-sm space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <Input label="ID / Nº Cliente *" {...register('code', { required: true })} />
+                    <Input label="Nombre / Empresa *" {...register('name', { required: true })} />
+                    <Input label="Dirección" {...register('address')} />
+                    <div className="flex items-end gap-4 col-span-2">
+                        <div className="flex-1">
+                            <label className="text-sm font-medium">Tipo ID Fiscal</label>
+                            <select {...register('fiscal_id_type')} className="w-full mt-1 p-2 border rounded-md">
+                                <option value="">Ninguno</option>
+                                <option value="CUIT">CUIT</option>
+                                <option value="CUIL">CUIL</option>
+                                <option value="DNI">DNI</option>
+                            </select>
+                        </div>
+                        <div className="flex-1">
+                            <Input label="Número ID Fiscal" {...register('fiscal_id')} />
+                        </div>
+                    </div>
+                </div>
 
-        <div className="border-t pt-6">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-lg font-semibold text-blue-700">Contactos</h2>
-            <Button
-              type="button"
-              size="sm"
-              onClick={() =>
-                append({ type: "", name: "", email: "", phone: "" })
-              }
-            >
-              <PlusCircle className="h-4 w-4 mr-2" />
-              Agregar Contacto
-            </Button>
-          </div>
-          <div className="space-y-4">
-            {fields.map((field, index) => (
-              <div
-                key={field.id}
-                className="grid grid-cols-1 md:grid-cols-5 gap-4 items-center bg-gray-50 p-4 rounded-md"
-              >
-                <Input
-                  placeholder="Tipo (Ej: Admin)"
-                  {...register(`contacts.${index}.type`)}
-                />
-                <Input
-                  placeholder="Contacto"
-                  {...register(`contacts.${index}.name`)}
-                />
-                <Input
-                  placeholder="Email"
-                  type="email"
-                  {...register(`contacts.${index}.email`)}
-                />
-                <Input
-                  placeholder="Teléfono"
-                  {...register(`contacts.${index}.phone`)}
-                />
-                <Button
-                  type="button"
-                  variant="danger"
-                  size="sm"
-                  onClick={() => remove(index)}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    </form>
-  );
+                <div className="border-t pt-6">
+                    <div className="flex justify-between items-center mb-4">
+                        <h2 className="text-lg font-semibold text-blue-700">Contactos</h2>
+                        <Button type="button" size="sm" onClick={() => append({ type: '', name: '', email: '', phone: '' })}>
+                            <PlusCircle className="h-4 w-4 mr-2" />
+                            Agregar Contacto
+                        </Button>
+                    </div>
+                    <div className="space-y-4">
+                        {fields.map((field, index) => (
+                            <div key={field.id} className="grid grid-cols-1 md:grid-cols-5 gap-4 items-center bg-gray-50 p-4 rounded-md">
+                                <Input placeholder="Tipo (Ej: Admin)" {...register(`contacts.${index}.type`)} />
+                                {/* --- CAMBIO AQUÍ: QUITAMOS EL REQUIRED --- */}
+                                <Input placeholder="Contacto" {...register(`contacts.${index}.name`)} />
+                                <Input placeholder="Email" type="email" {...register(`contacts.${index}.email`)} />
+                                <Input placeholder="Teléfono" {...register(`contacts.${index}.phone`)} />
+                                <Button type="button" variant="danger" size="sm" onClick={() => remove(index)}>
+                                    <Trash2 className="h-4 w-4" />
+                                </Button>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </div>
+        </form>
+    );
 };
 
 export default ClienteCreate;
