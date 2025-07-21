@@ -1,13 +1,13 @@
 // src/api/axiosInstance.ts
-import axios from 'axios';
+import axios from "axios";
 
 // La URL base de tu servidor backend
-const API_BASE_URL = 'http://localhost:4000/api';
+const API_BASE_URL = "http://localhost:4000/api";
 
 const axiosInstance = axios.create({
   baseURL: API_BASE_URL,
   headers: {
-    'Content-Type': 'application/json',
+    "Content-Type": "application/json",
   },
 });
 
@@ -19,5 +19,9 @@ axiosInstance.interceptors.request.use((config) => {
   // }
   return config;
 });
+
+// Esta es la función que SWR usará para todas las peticiones GET
+export const fetcher = (url: string) =>
+  axiosInstance.get(url).then((res) => res.data);
 
 export default axiosInstance;
