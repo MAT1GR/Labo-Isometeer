@@ -1,49 +1,58 @@
 // RUTA: /cliente/src/services/clientService.ts
 
-import axiosInstance from '../api/axiosInstance';
+import axiosInstance from "../api/axiosInstance";
+
+export interface Contact {
+  id?: number;
+  client_id?: number;
+  type?: string;
+  name: string;
+  email?: string;
+  phone?: string;
+}
 
 export interface Client {
   id: number;
-  code: string;
-  unique_code: string;
   name: string;
+  code: string;
   address?: string;
   fiscal_id_type?: string;
   fiscal_id?: string;
+  contacts: Contact[];
 }
 
 class ClientService {
   async getAllClients(): Promise<Client[]> {
-    try {
-      const response = await axiosInstance.get('/clients');
-      return response.data;
-    } catch (error) {
-      console.error('Error fetching clients:', error);
-      throw new Error('No se pudieron cargar los clientes.');
-    }
+    const response = await axiosInstance.get("/clients");
+    return response.data;
   }
 
-  async createClient(clientData: Omit<Client, 'id' | 'unique_code'>): Promise<Client> {
-    try {
-      const response = await axiosInstance.post('/clients', clientData);
-      return response.data;
-    } catch (error: any) {
-      if (error.response && error.response.data && error.response.data.error) {
-        throw new Error(error.response.data.error);
-      }
-      throw new Error('Error al crear el cliente.');
-    }
+  async getClientById(id: number): Promise<Client> {
+    const response = await axiosInstance.get(`/clients/${id}`);
+    return response.data;
+  }
+
+  async createClient(clientData: Partial<Client>): Promise<{ id: number }> {
+    const response = await axiosInstance.post("/clients", clientData);
+    return response.data;
+  }
+
+  async updateClient(id: number, clientData: Partial<Client>): Promise<Client> {
+    const response = await axiosInstance.put(`/clients/${id}`, clientData);
+    return response.data;
   }
 
   async deleteClient(clientId: number): Promise<void> {
-    try {
-        await axiosInstance.delete(`/clients/${clientId}`);
-    } catch (error: any) {
-        if (error.response && error.response.data && error.response.data.error) {
-            throw new Error(error.response.data.error);
-        }
-        throw new Error('Error al eliminar el cliente.');
-    }
+    await axiosInstance.delete(`/clients/${clientId}`);
+  }
+
+  async bulkCreateClients(
+    clients: Partial<Client>[]
+  ): Promise<{ imported: number; duplicates: number }> {
+    const response = await axiosInstance.post("/clients/bulk-import", {
+      clients,
+    });
+    return response.data;
   }
 }
 

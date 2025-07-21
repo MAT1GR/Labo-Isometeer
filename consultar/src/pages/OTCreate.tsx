@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { otService, WorkOrder } from "../services/otService";
 import { clientService, Client } from "../services/clientService";
 import { authService, User } from "../services/auth";
@@ -10,20 +10,21 @@ import { useAuth } from "../contexts/AuthContext";
 import Input from "../components/ui/Input";
 import Button from "../components/ui/Button";
 import { ArrowLeft, Save } from "lucide-react";
+import axiosInstance from "../api/axiosInstance";
 
 type OTCreateFormData = Omit<
   WorkOrder,
   | "id"
+  | "custom_id"
   | "created_at"
   | "updated_at"
   | "client_name"
   | "client_code"
   | "client_contact"
   | "assigned_to_name"
-  | "items"
-  | "invoices"
-  | "receipts"
->;
+> & {
+  contact?: string;
+};
 
 const OTCreate: React.FC = () => {
   const { user } = useAuth();
@@ -31,6 +32,7 @@ const OTCreate: React.FC = () => {
   const {
     register,
     handleSubmit,
+    control,
     formState: { isSubmitting },
   } = useForm<OTCreateFormData>({
     defaultValues: {
@@ -40,6 +42,13 @@ const OTCreate: React.FC = () => {
   });
   const [clients, setClients] = useState<Client[]>([]);
   const [users, setUsers] = useState<User[]>([]);
+  const [idPreview, setIdPreview] = useState("Completar campos...");
+
+  // Observamos los campos que afectan al ID personalizado
+  const watchedFields = useWatch({
+    control,
+    name: ["date", "type", "client_id"],
+  });
 
   useEffect(() => {
     const loadPrerequisites = async () => {
@@ -57,6 +66,25 @@ const OTCreate: React.FC = () => {
     loadPrerequisites();
   }, []);
 
+  // Efecto para actualizar el ID en tiempo real
+  useEffect(() => {
+    const [date, type, clientId] = watchedFields;
+    if (date && type && clientId) {
+      const params = new URLSearchParams({
+        date,
+        type,
+        client_id: clientId.toString(),
+      });
+      axiosInstance
+        .get(`/ots/generate-id?${params.toString()}`)
+        .then((response) => {
+          setIdPreview(response.data.previewId);
+        });
+    } else {
+      setIdPreview("Completar campos...");
+    }
+  }, [watchedFields]);
+
   const onSubmit = async (data: OTCreateFormData) => {
     if (!user) return;
     try {
@@ -67,9 +95,8 @@ const OTCreate: React.FC = () => {
         created_by: user.id,
       };
       const newOt = await otService.createOT(dataToSubmit);
-      navigate(`/ot/editar/${newOt.id}`); // Redirige a la edición de la nueva OT
+      navigate(`/ot/editar/${newOt.id}`);
     } catch (error) {
-      console.error("Error al crear la OT:", error);
       alert("Hubo un error al crear la Orden de Trabajo.");
     }
   };
@@ -80,9 +107,7 @@ const OTCreate: React.FC = () => {
       className="space-y-8 bg-gray-50 p-6 rounded-lg"
     >
       <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold text-gray-800">
-          Crear Nueva Orden de Trabajo
-        </h1>
+        <h1 className="text-2xl font-bold">Crear Nueva Orden de Trabajo</h1>
         <div className="flex gap-4">
           <Button
             type="button"
@@ -102,23 +127,44 @@ const OTCreate: React.FC = () => {
         </div>
       </div>
 
-      <div className="bg-white p-6 rounded-lg shadow-sm space-y-6">
+      <div className="bg-white p-6 rounded-lg shadow-sm space-y-8">
+        {/* --- SECCIÓN OT SELECCIONADA --- */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 border-b pb-6">
           <h2 className="text-lg font-semibold text-blue-700 col-span-full">
-            Detalles Generales
+            OT Seleccionada
           </h2>
           <Input
             label="Fecha *"
             type="date"
             {...register("date", { required: true })}
           />
-          <Input
-            label="Tipo de OT *"
-            {...register("type", { required: true })}
-          />
-          <div className="md:col-span-2">
+          <div>
             <label className="text-sm font-medium text-gray-700">
-              Cliente *
+              Tipo de OT *
+            </label>
+            <select
+              {...register("type", { required: true })}
+              className="w-full mt-1 p-2 border rounded-md"
+            >
+              <option value="">Seleccionar tipo...</option>
+              <option value="Produccion">Producción</option>
+              <option value="Calibracion">Calibración</option>
+              <option value="Ensayo SE">Ensayo SE</option>
+              <option value="Ensayo EE">Ensayo EE</option>
+              <option value="Otros Servicios">Otros Servicios</option>
+            </select>
+          </div>
+          <Input label="ID de OT" value={idPreview} disabled readOnly />
+          <Input label="Contrato" {...register("contract")} />
+        </div>
+        {/* --- SECCIÓN CLIENTE --- */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 border-b pb-6">
+          <h2 className="text-lg font-semibold text-blue-700 col-span-full">
+            Información del Cliente
+          </h2>
+          <div>
+            <label className="text-sm font-medium text-gray-700">
+              Empresa (Nº Cliente) *
             </label>
             <select
               {...register("client_id", { required: true })}
@@ -127,13 +173,14 @@ const OTCreate: React.FC = () => {
               <option value="">Seleccionar cliente...</option>
               {clients.map((c) => (
                 <option key={c.id} value={c.id}>
-                  {c.name}
+                  {c.name} ({c.code})
                 </option>
               ))}
             </select>
           </div>
-          <Input label="Contrato" {...register("contract")} />
+          <Input label="Contacto" {...register("contact")} />
         </div>
+        {/* --- SECCIÓN PRODUCTO --- */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 border-b pb-6">
           <h2 className="text-lg font-semibold text-blue-700 col-span-full">
             Producto
@@ -159,7 +206,10 @@ const OTCreate: React.FC = () => {
             ></textarea>
           </div>
         </div>
+
+        {/* --- SECCIONES FINALES --- */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          {/* --- SECCIÓN ACTIVIDADES --- */}
           <div>
             <h2 className="text-lg font-semibold text-blue-700 mb-4">
               Actividades

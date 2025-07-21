@@ -13,9 +13,11 @@ import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import Usuarios from "./pages/Usuarios";
 import Clientes from "./pages/Clientes";
+import ClienteCreate from "./pages/ClienteCreate";
+import ClienteDetail from "./pages/ClienteDetail";
 import OT from "./pages/ot";
 import OTDetail from "./pages/OTdetail";
-import OTCreate from "./pages/OTCreate"; // Importamos la nueva página de creación
+import OTCreate from "./pages/OTCreate";
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({
   children,
@@ -67,9 +69,10 @@ function App() {
             <Route index element={<Dashboard />} />
             <Route path="ot" element={<OT />} />
             <Route path="ot/crear" element={<OTCreate />} />
-            <Route path="ot/editar/:id" element={<OTDetail />} />{" "}
-            {/* Renombramos la ruta para claridad */}
+            <Route path="ot/editar/:id" element={<OTDetail />} />
             <Route path="clientes" element={<Clientes />} />
+            <Route path="clientes/crear" element={<ClienteCreate />} />
+            <Route path="clientes/editar/:id" element={<ClienteDetail />} />
             <Route path="usuarios" element={<Usuarios />} />
           </Route>
         </Routes>

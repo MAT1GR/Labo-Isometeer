@@ -1,16 +1,14 @@
 // RUTA: /cliente/src/pages/Clientes.tsx
 
-import React, { useState } from "react";
-import { useForm } from "react-hook-form";
+import React, { useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import { clientService, Client } from "../services/clientService";
 import Card from "../components/ui/Card";
-import Input from "../components/ui/Input";
 import Button from "../components/ui/Button";
-import { PlusCircle, Users, Trash2 } from "lucide-react";
+import { PlusCircle, Users, Trash2, Upload, Edit } from "lucide-react";
 import useSWR, { mutate } from "swr";
 import { fetcher } from "../api/axiosInstance";
-
-type ClientFormData = Omit<Client, "id" | "unique_code">;
+import * as XLSX from "xlsx";
 
 const Clientes: React.FC = () => {
   const {
@@ -18,25 +16,8 @@ const Clientes: React.FC = () => {
     error,
     isLoading,
   } = useSWR<Client[]>("/clients", fetcher);
-
-  const [formError, setFormError] = useState<string | null>(null);
-  const {
-    register,
-    handleSubmit,
-    reset,
-    formState: { isSubmitting },
-  } = useForm<ClientFormData>();
-
-  const onSubmit = async (data: ClientFormData) => {
-    try {
-      setFormError(null);
-      await clientService.createClient(data);
-      reset();
-      mutate("/clients");
-    } catch (err: any) {
-      setFormError(err.message);
-    }
-  };
+  const navigate = useNavigate();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleDelete = async (clientId: number) => {
     if (
@@ -53,102 +34,115 @@ const Clientes: React.FC = () => {
     }
   };
 
+  const handleFileImport = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      try {
+        const data = new Uint8Array(e.target?.result as ArrayBuffer);
+        const workbook = XLSX.read(data, { type: "array" });
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        const json = XLSX.utils.sheet_to_json(worksheet) as any[];
+
+        const clientsToImport = json.map((row) => ({
+          code: row["nro de cliente"] || row["Nro de Cliente"],
+          name: row["empresa"] || row["Empresa"],
+          fiscal_id: row["cuit"] || row["CUIT"],
+          contact: row["contacto"] || row["Contacto"],
+          address: row["direccion"] || row["Direccion"] || "",
+          fiscal_id_type: row["cuit"] || row["CUIT"] ? "CUIT" : "",
+        }));
+
+        if (clientsToImport.length > 0) {
+          const response = await clientService.bulkCreateClients(
+            clientsToImport
+          );
+          alert(
+            `Importación completada: ${response.imported} clientes nuevos, ${response.duplicates} duplicados ignorados.`
+          );
+          mutate("/clients");
+        }
+      } catch (error) {
+        alert("Hubo un error al procesar el archivo.");
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  };
+
   if (error) return <div>Error al cargar los clientes.</div>;
   if (isLoading) return <div>Cargando...</div>;
 
   return (
     <div className="space-y-6">
-      <h1 className="text-3xl font-bold text-gray-900">Gestión de Clientes</h1>
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2">
-          <Card>
-            <h2 className="text-xl font-semibold flex items-center gap-2 mb-4">
-              <Users /> Lista de Clientes
-            </h2>
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                      Código
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                      Nombre
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                      ID Fiscal
-                    </th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">
-                      Acciones
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {clients?.map((client) => (
-                    <tr key={client.id}>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {client.code}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                        {client.name}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {client.fiscal_id_type} {client.fiscal_id}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        <Button
-                          variant="danger"
-                          size="sm"
-                          onClick={() => handleDelete(client.id)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </Card>
-        </div>
-        <div>
-          <Card>
-            <h2 className="text-xl font-semibold flex items-center gap-2 mb-4">
-              <PlusCircle /> Crear Nuevo Cliente
-            </h2>
-            <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-              <Input
-                label="Código *"
-                {...register("code", { required: true })}
-              />
-              <Input
-                label="Nombre / Razón Social *"
-                {...register("name", { required: true })}
-              />
-              <Input label="Dirección" {...register("address")} />
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-700">
-                  Tipo ID Fiscal
-                </label>
-                <select
-                  {...register("fiscal_id_type")}
-                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
-                >
-                  <option value="">Ninguno</option>
-                  <option value="CUIT">CUIT</option>
-                  <option value="CUIL">CUIL</option>
-                  <option value="DNI">DNI</option>
-                </select>
-              </div>
-              <Input label="Número ID Fiscal" {...register("fiscal_id")} />
-              {formError && <p className="text-sm text-red-600">{formError}</p>}
-              <Button type="submit" disabled={isSubmitting} className="w-full">
-                {isSubmitting ? "Creando..." : "Crear Cliente"}
-              </Button>
-            </form>
-          </Card>
+      <div className="flex justify-between items-center">
+        <h1 className="text-3xl font-bold">Gestión de Clientes</h1>
+        <div className="flex gap-2">
+          <Button
+            variant="secondary"
+            onClick={() => fileInputRef.current?.click()}
+          >
+            <Upload className="mr-2 h-4 w-4" /> Importar
+          </Button>
+          <Button onClick={() => navigate("/clientes/crear")}>
+            <PlusCircle className="mr-2 h-4 w-4" /> Agregar Cliente
+          </Button>
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleFileImport}
+            className="hidden"
+            accept=".xlsx, .xls"
+          />
         </div>
       </div>
+      <Card>
+        <table className="min-w-full divide-y divide-gray-200">
+          <thead className="bg-gray-50">
+            <tr>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                Nº Cliente
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                Empresa
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                ID Fiscal
+              </th>
+              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                Acciones
+              </th>
+            </tr>
+          </thead>
+          <tbody className="bg-white divide-y divide-gray-200">
+            {clients?.map((client) => (
+              <tr key={client.id}>
+                <td className="px-6 py-4">{client.code}</td>
+                <td className="px-6 py-4 font-medium">{client.name}</td>
+                <td className="px-6 py-4">{client.fiscal_id}</td>
+                <td className="px-6 py-4 text-right space-x-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => navigate(`/clientes/editar/${client.id}`)}
+                  >
+                    <Edit className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="danger"
+                    size="sm"
+                    onClick={() => handleDelete(client.id)}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </Card>
     </div>
   );
 };
