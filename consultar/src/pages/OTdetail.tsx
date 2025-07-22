@@ -26,11 +26,10 @@ const OTDetail: React.FC = () => {
   const [users, setUsers] = useState<User[]>([]);
 
   const otType = useWatch({ control, name: "type" });
-  const isLacreDisabled = !(
+  const isLacreEnabled =
     otType === "Ensayo SE" ||
     otType === "Ensayo EE" ||
-    otType === "Otros Servicios"
-  );
+    otType === "Otros Servicios";
 
   const loadData = async () => {
     if (id) {
@@ -57,31 +56,30 @@ const OTDetail: React.FC = () => {
 
   useEffect(() => {
     loadData();
-  }, [id]);
+  }, [id, reset]);
 
   const onSubmit = async (data: WorkOrder) => {
     try {
-      await otService.updateOT(Number(id), data);
+      const dataToSubmit = { ...data, role: user?.role }; // Incluimos el rol para la lógica del backend
+      await otService.updateOT(Number(id), dataToSubmit);
+      mutate(["/ots", user]); // Refresca la lista principal
       navigate("/ot");
-    } catch (error) {
-      alert("Hubo un error al guardar los cambios.");
+    } catch (error: any) {
+      alert(error.message || "Hubo un error al guardar los cambios.");
     }
   };
 
-  // --- Nuevas Funciones de Acción ---
   const handleAuthorize = async () => {
     if (!id) return;
     await otService.authorizeOT(Number(id));
-    await loadData(); // Recargar datos para ver el cambio
-    mutate(["/ots", user]); // Refrescar la lista principal en segundo plano
+    await loadData();
+    mutate(["/ots", user]);
   };
-
   const handleStartWork = async () => {
     if (!id) return;
     await otService.startOT(Number(id));
     await loadData();
   };
-
   const handleStopWork = async () => {
     if (!id) return;
     await otService.stopOT(Number(id));
@@ -91,6 +89,13 @@ const OTDetail: React.FC = () => {
   if (!otData) return <div className="p-8">Cargando datos...</div>;
 
   const isEmployee = user?.role === "empleado";
+  const isWorkInProgressOrDone = otData.status !== "pendiente";
+  const isClosed = otData.status === "cierre";
+
+  // El empleado puede editar solo sus observaciones y solo si la OT no está cerrada.
+  const canEmployeeEdit = !isClosed;
+  // El admin puede editar la sección de admin siempre, pero los datos principales solo si está pendiente.
+  const canAdminEditMainData = !isWorkInProgressOrDone;
 
   return (
     <form
@@ -105,23 +110,25 @@ const OTDetail: React.FC = () => {
         <h1 className="text-2xl font-bold">
           Detalle de OT: {otData.custom_id || `#${otData.id}`}
         </h1>
-        {isDirectorOrAdmin() && (
-          <Button type="submit" disabled={isSubmitting || !isDirty}>
-            <Save className="mr-2 h-5 w-5" />
-            Guardar Cambios
-          </Button>
-        )}
+        <Button
+          type="submit"
+          disabled={
+            isSubmitting || !isDirty || (isEmployee && !canEmployeeEdit)
+          }
+        >
+          <Save className="mr-2 h-5 w-5" />
+          Guardar Cambios
+        </Button>
       </div>
 
-      {/* --- Barra de Acciones Condicional --- */}
-      <div className="bg-white p-4 rounded-lg shadow-sm flex justify-center items-center gap-4">
+      <div className="bg-white p-4 rounded-lg shadow-sm flex flex-wrap justify-center items-center gap-4">
         {isDirectorOrAdmin() && !otData.authorized && (
           <Button
             type="button"
             onClick={handleAuthorize}
             className="bg-green-600 hover:bg-green-700"
           >
-            <CheckSquare className="mr-2 h-5 w-5" /> Autorizar OT para Empleado
+            <CheckSquare className="mr-2 h-5 w-5" /> Autorizar OT
           </Button>
         )}
         {isEmployee && otData.authorized && !otData.started_at && (
@@ -143,159 +150,195 @@ const OTDetail: React.FC = () => {
           </Button>
         )}
         {otData.completed_at && (
-          <div className="text-center">
-            <p className="font-semibold text-green-700">Trabajo Finalizado</p>
-            <p className="text-sm text-gray-600">
+          <div className="text-center p-2 rounded-md bg-green-50 text-green-800">
+            <p className="font-semibold">Trabajo Finalizado</p>
+            <p className="text-sm">
               Duración: {otData.duration_minutes} minutos
             </p>
           </div>
         )}
       </div>
 
-      <fieldset
-        disabled={isEmployee}
-        className="bg-white p-6 rounded-lg shadow-sm space-y-8"
-      >
-        {/* --- SECCIÓN OT SELECCIONADA --- */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 border-b pb-6">
-          <h2 className="text-lg font-semibold text-blue-700 col-span-full">
-            OT Seleccionada
-          </h2>
-          <Input label="Fecha" type="date" {...register("date")} />
-          <div>
-            <label className="text-sm font-medium">Tipo de OT</label>
-            <select
-              {...register("type")}
-              className="w-full mt-1 p-2 border rounded-md"
-            >
-              <option value="Produccion">Producción</option>
-              <option value="Calibracion">Calibración</option>
-              <option value="Ensayo SE">Ensayo SE</option>
-              <option value="Ensayo EE">Ensayo EE</option>
-              <option value="Otros Servicios">Otros Servicios</option>
-            </select>
-          </div>
-          <Input
-            label="ID de OT"
-            value={otData.custom_id || `Interno #${id}`}
-            readOnly
-          />
-          <Input label="Contrato" {...register("contract")} />
+      {isDirectorOrAdmin() && !canAdminEditMainData && (
+        <div className="p-4 bg-yellow-50 text-yellow-800 rounded-md text-center font-semibold">
+          Los datos principales de esta OT no se pueden editar porque ya está en
+          progreso o finalizada. Solo se puede modificar la sección de
+          Administración.
         </div>
-        {/* --- SECCIÓN CLIENTE --- */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 border-b pb-6">
-          <h2 className="text-lg font-semibold text-blue-700 col-span-full">
-            Información del Cliente
-          </h2>
-          <Input label="Empresa" value={otData.client_name} readOnly />
-          <Input label="Nº Cliente" value={otData.client_code} readOnly />
-        </div>
-        {/* --- SECCIÓN PRODUCTO --- */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 border-b pb-6">
-          <h2 className="text-lg font-semibold text-blue-700 col-span-full">
-            Producto
-          </h2>
-          <Input label="Nombre" {...register("product")} />
-          <Input label="Marca" {...register("brand")} />
-          <Input label="Modelo" {...register("model")} />
-          <Input
-            label="Nº de Lacre"
-            {...register("seal_number")}
-            disabled={isLacreDisabled}
-          />
-          <Input
-            label="Vto. del Certificado"
-            type="date"
-            {...register("certificate_expiry")}
-            disabled={isLacreDisabled}
-          />
-          <div className="col-span-full">
-            <label className="text-sm font-medium">Observaciones</label>
-            <textarea
-              {...register("observations")}
-              className="w-full mt-1 p-2 border rounded-md"
-              rows={3}
-            ></textarea>
-          </div>
-        </div>
-        {/* --- SECCIONES FINALES --- */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          <div>
-            <h2 className="text-lg font-semibold text-blue-700 mb-4">
-              Actividades
+      )}
+
+      <div className="bg-white p-6 rounded-lg shadow-sm space-y-8">
+        <fieldset
+          disabled={isDirectorOrAdmin() && !canAdminEditMainData}
+          className="disabled:opacity-70"
+        >
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 border-b pb-6">
+            <h2 className="text-lg font-semibold text-blue-700 col-span-full">
+              OT Seleccionada
             </h2>
+            <Input label="Fecha" type="date" {...register("date")} />
             <div>
-              <label className="text-sm font-medium">Asignar a</label>
+              <label className="text-sm font-medium">Tipo de OT</label>
               <select
-                {...register("assigned_to")}
+                {...register("type")}
                 className="w-full mt-1 p-2 border rounded-md"
               >
-                <option value="">Sin asignar</option>
-                {users.map((u) => (
-                  <option key={u.id} value={u.id}>
-                    {u.name}
-                  </option>
-                ))}
+                <option value="Produccion">Producción</option>
+                <option value="Calibracion">Calibración</option>
+                <option value="Ensayo SE">Ensayo SE</option>
+                <option value="Ensayo EE">Ensayo EE</option>
+                <option value="Otros Servicios">Otros Servicios</option>
               </select>
             </div>
+            <Input
+              label="ID de OT"
+              value={otData.custom_id || `Interno #${id}`}
+              readOnly
+            />
+            <Input label="Contrato" {...register("contract")} />
           </div>
-          {isDirectorOrAdmin() && (
-            <div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 border-b pb-6">
+            <h2 className="text-lg font-semibold text-blue-700 col-span-full">
+              Información del Cliente
+            </h2>
+            <Input label="Empresa" value={otData.client_name} readOnly />
+            <Input label="Nº Cliente" value={otData.client_code} readOnly />
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 border-b pb-6">
+            <h2 className="text-lg font-semibold text-blue-700 col-span-full">
+              Producto
+            </h2>
+            <Input label="Nombre" {...register("product")} />
+            <Input label="Marca" {...register("brand")} />
+            <Input label="Modelo" {...register("model")} />
+            <Input
+              label="Nº de Lacre"
+              {...register("seal_number")}
+              disabled={!isLacreEnabled}
+            />
+            <Input
+              label="Vto. del Certificado"
+              type="date"
+              {...register("certificate_expiry")}
+              disabled={!isLacreEnabled}
+            />
+            <div className="col-span-full">
+              <label className="text-sm font-medium">
+                Observaciones (Generales)
+              </label>
+              <textarea
+                {...register("observations")}
+                className="w-full mt-1 p-2 border rounded-md"
+                rows={3}
+              ></textarea>
+            </div>
+          </div>
+        </fieldset>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          {isEmployee && (
+            <div className="col-span-full">
               <h2 className="text-lg font-semibold text-blue-700 mb-4">
-                Administración
+                Mis Observaciones
               </h2>
-              <div className="space-y-4">
-                <Input
-                  label="Cotización (Detalles)"
-                  {...register("quotation_details")}
-                />
-                <Input
-                  label="Cotización (Monto)"
-                  type="number"
-                  step="0.01"
-                  {...register("quotation_amount")}
-                />
-                <Input label="Disposición" {...register("disposition")} />
-                <div className="grid grid-cols-2 gap-4 pt-4">
-                  <div className="bg-gray-100 p-3 rounded">
-                    <p className="text-sm font-medium">Saldo a Facturar</p>
-                    <p className="text-lg font-bold">$0.00</p>
-                  </div>
-                  <div className="bg-gray-100 p-3 rounded">
-                    <p className="text-sm font-medium">Saldo a Cobrar</p>
-                    <p className="text-lg font-bold">$0.00</p>
-                  </div>
-                </div>
-                <div className="mt-4 flex gap-4">
-                  <Button type="button" disabled>
-                    Cargar Factura
-                  </Button>
-                  <Button type="button" disabled>
-                    Cargar Recibo
-                  </Button>
-                </div>
-                <div>
-                  <h3 className="text-md font-semibold mt-4">Archivos</h3>
-                  <p className="text-sm text-gray-500">(Próximamente)</p>
-                </div>
-                <div>
-                  <label className="text-sm font-medium">Estado Final</label>
-                  <select
-                    {...register("status")}
-                    className="w-full mt-1 p-2 border rounded-md"
-                  >
-                    <option value="pendiente">Pendiente</option>
-                    <option value="en_progreso">En Progreso</option>
-                    <option value="finalizada">Finalizada</option>
-                    <option value="facturada">Facturada</option>
-                    <option value="cierre">Cierre</option>
-                  </select>
-                </div>
-              </div>
+              <textarea
+                {...register("collaborator_observations")}
+                disabled={!canEmployeeEdit}
+                className="w-full mt-1 p-2 border rounded-md"
+                rows={4}
+              ></textarea>
             </div>
           )}
+
+          {isDirectorOrAdmin() && (
+            <>
+              <div>
+                <h2 className="text-lg font-semibold text-blue-700 mb-4">
+                  Actividades
+                </h2>
+                <div>
+                  <label className="text-sm font-medium">Asignar a</label>
+                  <select
+                    {...register("assigned_to")}
+                    className="w-full mt-1 p-2 border rounded-md"
+                  >
+                    <option value="">Sin asignar</option>
+                    {users.map((u) => (
+                      <option key={u.id} value={u.id}>
+                        {u.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="mt-4">
+                  <label className="text-sm font-medium">
+                    Observaciones del Colaborador
+                  </label>
+                  <textarea
+                    {...register("collaborator_observations")}
+                    readOnly
+                    className="w-full mt-1 p-2 border rounded-md bg-gray-100"
+                    rows={3}
+                  ></textarea>
+                </div>
+              </div>
+              <div>
+                <h2 className="text-lg font-semibold text-blue-700 mb-4">
+                  Administración
+                </h2>
+                <div className="space-y-4">
+                  <Input
+                    label="Cotización (Detalles)"
+                    {...register("quotation_details")}
+                  />
+                  <Input
+                    label="Cotización (Monto)"
+                    type="number"
+                    step="0.01"
+                    {...register("quotation_amount")}
+                  />
+                  <Input label="Disposición" {...register("disposition")} />
+                  <div className="grid grid-cols-2 gap-4 pt-4">
+                    <div className="bg-gray-100 p-3 rounded">
+                      <p className="text-sm font-medium">Saldo a Facturar</p>
+                      <p className="text-lg font-bold">$0.00</p>
+                    </div>
+                    <div className="bg-gray-100 p-3 rounded">
+                      <p className="text-sm font-medium">Saldo a Cobrar</p>
+                      <p className="text-lg font-bold">$0.00</p>
+                    </div>
+                  </div>
+                  <div className="mt-4 flex gap-4">
+                    <Button type="button" disabled>
+                      Cargar Factura
+                    </Button>
+                    <Button type="button" disabled>
+                      Cargar Recibo
+                    </Button>
+                  </div>
+                  <div>
+                    <h3 className="text-md font-semibold mt-4">Archivos</h3>
+                    <p className="text-sm text-gray-500">(Próximamente)</p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium">Estado Final</label>
+                    <select
+                      {...register("status")}
+                      className="w-full mt-1 p-2 border rounded-md"
+                    >
+                      <option value="pendiente">Pendiente</option>
+                      <option value="en_progreso">En Progreso</option>
+                      <option value="finalizada">Finalizada</option>
+                      <option value="facturada">Facturada</option>
+                      <option value="cierre">Cierre</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
         </div>
-      </fieldset>
+      </div>
     </form>
   );
 };

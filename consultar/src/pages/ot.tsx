@@ -20,7 +20,6 @@ const OT: React.FC = () => {
   const { user, isDirectorOrAdmin } = useAuth();
   const navigate = useNavigate();
 
-  // El hook useSWR ahora depende del usuario para re-evaluarse si el usuario cambia
   const {
     data: ots,
     error,
@@ -39,6 +38,25 @@ const OT: React.FC = () => {
       } catch (err: any) {
         alert(err.message || "Error al eliminar la OT.");
       }
+    }
+  };
+
+  const handleToggleAuthorization = async (ot: WorkOrder) => {
+    try {
+      if (ot.authorized) {
+        if (ot.status !== "pendiente") {
+          alert(
+            "No se puede desautorizar una OT que ya está en progreso o finalizada."
+          );
+          return;
+        }
+        await otService.deauthorizeOT(ot.id);
+      } else {
+        await otService.authorizeOT(ot.id);
+      }
+      mutate(["/ots", user]);
+    } catch (error: any) {
+      alert(error.message || "Error al cambiar el estado de autorización.");
     }
   };
 
@@ -96,11 +114,16 @@ const OT: React.FC = () => {
               >
                 {isDirectorOrAdmin() && (
                   <td className="px-6 py-4">
-                    {ot.authorized ? (
-                      <CheckSquare className="h-5 w-5 text-green-500" />
-                    ) : (
-                      <XSquare className="h-5 w-5 text-red-500" />
-                    )}
+                    <button
+                      onClick={() => handleToggleAuthorization(ot)}
+                      title={ot.authorized ? "Desautorizar" : "Autorizar"}
+                    >
+                      {ot.authorized ? (
+                        <CheckSquare className="h-5 w-5 text-green-500" />
+                      ) : (
+                        <XSquare className="h-5 w-5 text-red-500" />
+                      )}
+                    </button>
                   </td>
                 )}
                 <td className="px-6 py-4 font-medium">

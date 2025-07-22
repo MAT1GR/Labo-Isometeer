@@ -15,6 +15,7 @@ export interface WorkOrder {
   model?: string;
   seal_number?: string;
   observations?: string;
+  collaborator_observations?: string; // <-- CAMBIO AQUÍ: AÑADIDO EL CAMPO QUE FALTABA
   certificate_expiry?: string;
   status: string;
   created_by: number;
@@ -37,7 +38,6 @@ export interface WorkOrder {
 class OTService {
   async getAllOTs(user: User | null): Promise<WorkOrder[]> {
     if (!user) return [];
-    // Enviamos el rol para que el backend decida qué OTs mostrar
     const response = await axiosInstance.get("/ots", {
       params: { role: user.role, assigned_to: user.id },
     });
@@ -63,10 +63,13 @@ class OTService {
     await axiosInstance.delete(`/ots/${otId}`);
   }
 
-  // --- NUEVAS ACCIONES ---
   async authorizeOT(id: number): Promise<WorkOrder> {
     const response = await axiosInstance.put(`/ots/${id}/authorize`);
     return response.data;
+  }
+
+  async deauthorizeOT(id: number): Promise<void> {
+    await axiosInstance.put(`/ots/${id}/deauthorize`);
   }
 
   async startOT(id: number): Promise<WorkOrder> {
