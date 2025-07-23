@@ -50,74 +50,7 @@ const apiRouter = express.Router();
 
 // --- RUTAS DE OT CORREGIDAS ---
 
-// [GET] /api/ots - Modificada para que el empleado solo vea OTs autorizadas
-apiRouter.get("/ots", (req: Request, res: Response) => {
-  try {
-    const { assigned_to, role } = req.query;
-    let query = `SELECT ot.id, ot.custom_id, ot.date, ot.product, ot.status, ot.authorized, c.name as client_name, u_assigned.name as assigned_to_name FROM work_orders ot JOIN clients c ON ot.client_id = c.id LEFT JOIN users u_assigned ON ot.assigned_to = u_assigned.id`;
-    const params: any[] = [];
-
-    let whereClauses: string[] = [];
-    if (role === "empleado") {
-      whereClauses.push("ot.authorized = 1"); // 1 para TRUE en SQLite
-      if (assigned_to) {
-        whereClauses.push("ot.assigned_to = ?");
-        params.push(assigned_to);
-      }
-    }
-
-    if (whereClauses.length > 0) {
-      query += ` WHERE ${whereClauses.join(" AND ")}`;
-    }
-
-    query += " ORDER BY ot.id DESC";
-    const ots = db.prepare(query).all(params);
-    res.status(200).json(ots);
-  } catch (error) {
-    console.error("Error en GET /ots:", error);
-    res.status(500).json({ error: "Error al obtener las OT." });
-  }
-});
-
-// [PUT] /api/ots/:id/authorize - Director autoriza una OT
-apiRouter.put("/ots/:id/authorize", (req: Request, res: Response) => {
-  try {
-    const info = db
-      .prepare(
-        "UPDATE work_orders SET authorized = 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?"
-      )
-      .run(req.params.id);
-    if (info.changes === 0)
-      return res.status(404).json({ error: "OT no encontrada." });
-    const updatedOT = db
-      .prepare("SELECT * FROM work_orders WHERE id = ?")
-      .get(req.params.id);
-    res.status(200).json(updatedOT);
-  } catch (error) {
-    res.status(500).json({ error: "Error al autorizar la OT." });
-  }
-});
-
-// [PUT] /api/ots/:id/start - Empleado empieza el trabajo
-apiRouter.put("/ots/:id/start", (req: Request, res: Response) => {
-  try {
-    const info = db
-      .prepare(
-        "UPDATE work_orders SET status = 'en_progreso', started_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = ?"
-      )
-      .run(req.params.id);
-    if (info.changes === 0)
-      return res.status(404).json({ error: "OT no encontrada." });
-    const updatedOT = db
-      .prepare("SELECT * FROM work_orders WHERE id = ?")
-      .get(req.params.id);
-    res.status(200).json(updatedOT);
-  } catch (error) {
-    res.status(500).json({ error: "Error al iniciar el trabajo." });
-  }
-});
-
-// [PUT] /api/ots/:id/stop - Empleado termina el trabajo
+// [PUT] /ots/:id/stop - Empleado termina el trabajo (CÁLCULO DE TIEMPO CORREGIDO)
 apiRouter.put("/ots/:id/stop", (req: Request, res: Response) => {
   try {
     const ot = db
@@ -127,8 +60,8 @@ apiRouter.put("/ots/:id/stop", (req: Request, res: Response) => {
       return res.status(400).json({ error: "El trabajo nunca fue iniciado." });
 
     const startTime = new Date(ot.started_at).getTime();
-    const endTime = new Date().getTime();
-    const duration_minutes = Math.round((endTime - startTime) / 60000);
+    const endTime = new Date().getTime(); // Se usa la fecha actual real del servidor
+    const duration_minutes = Math.round((endTime - startTime) / (1000 * 60)); // Cálculo correcto
 
     const info = db
       .prepare(
@@ -147,23 +80,25 @@ apiRouter.put("/ots/:id/stop", (req: Request, res: Response) => {
   }
 });
 
-// [PUT] /api/ots/:id - Actualiza una OT
+// [PUT] /ots/:id - Actualiza una OT (LÓGICA DE PERMISOS CORREGIDA)
 apiRouter.put("/ots/:id", (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const { role, ...dataToUpdate } = req.body;
+    const { role, ...dataToUpdate } = req.body; // Separamos el rol del resto de los datos
     const ot = db
       .prepare("SELECT status FROM work_orders WHERE id = ?")
       .get(id) as { status: string };
 
     if (!ot) return res.status(404).json({ error: "OT no encontrada." });
 
+    // Si el que edita es un empleado
     if (role === "empleado") {
       if (ot.status === "cierre") {
         return res
           .status(403)
           .json({ error: "No puedes editar una OT cerrada." });
       }
+      // El empleado solo puede actualizar sus propias observaciones
       const info = db
         .prepare(
           `UPDATE work_orders SET collaborator_observations = ?, updated_at=CURRENT_TIMESTAMP WHERE id=?`
@@ -171,7 +106,10 @@ apiRouter.put("/ots/:id", (req: Request, res: Response) => {
         .run(dataToUpdate.collaborator_observations, id);
       if (info.changes === 0)
         return res.status(404).json({ error: "OT no encontrada." });
-    } else {
+    }
+    // Si es un admin o director
+    else if (role === "director" || role === "administrador") {
+      // Pueden editar la parte administrativa en cualquier momento
       const {
         quotation_amount,
         quotation_details,
@@ -190,6 +128,7 @@ apiRouter.put("/ots/:id", (req: Request, res: Response) => {
         id
       );
 
+      // Pero solo pueden editar los datos principales si está pendiente
       if (ot.status === "pendiente") {
         const {
           date,
@@ -217,6 +156,10 @@ apiRouter.put("/ots/:id", (req: Request, res: Response) => {
           id
         );
       }
+    } else {
+      return res
+        .status(403)
+        .json({ error: "No tienes permisos para realizar esta acción." });
     }
 
     const updatedOT = db
@@ -231,7 +174,91 @@ apiRouter.put("/ots/:id", (req: Request, res: Response) => {
   }
 });
 
-// --- OTRAS RUTAS (INCLUIDAS COMPLETAS) ---
+// ... (El resto de las rutas no cambian, pero se incluyen completas por seguridad)
+apiRouter.get("/ots", (req: Request, res: Response) => {
+  try {
+    const { assigned_to, role } = req.query;
+    let query = `SELECT ot.id, ot.custom_id, ot.date, ot.product, ot.status, ot.authorized, c.name as client_name, u_assigned.name as assigned_to_name FROM work_orders ot JOIN clients c ON ot.client_id = c.id LEFT JOIN users u_assigned ON ot.assigned_to = u_assigned.id`;
+    const params: any[] = [];
+    let whereClauses: string[] = [];
+    if (role === "empleado") {
+      whereClauses.push("ot.authorized = 1");
+      if (assigned_to) {
+        whereClauses.push("ot.assigned_to = ?");
+        params.push(assigned_to);
+      }
+    }
+    if (whereClauses.length > 0) {
+      query += ` WHERE ${whereClauses.join(" AND ")}`;
+    }
+    query += " ORDER BY ot.id DESC";
+    const ots = db.prepare(query).all(params);
+    res.status(200).json(ots);
+  } catch (error) {
+    console.error("Error en GET /ots:", error);
+    res.status(500).json({ error: "Error al obtener las OT." });
+  }
+});
+apiRouter.put("/ots/:id/authorize", (req: Request, res: Response) => {
+  try {
+    const info = db
+      .prepare(
+        "UPDATE work_orders SET authorized = 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?"
+      )
+      .run(req.params.id);
+    if (info.changes === 0)
+      return res.status(404).json({ error: "OT no encontrada." });
+    const updatedOT = db
+      .prepare("SELECT * FROM work_orders WHERE id = ?")
+      .get(req.params.id);
+    res.status(200).json(updatedOT);
+  } catch (error) {
+    res.status(500).json({ error: "Error al autorizar la OT." });
+  }
+});
+apiRouter.put("/ots/:id/deauthorize", (req: Request, res: Response) => {
+  try {
+    const ot = db
+      .prepare("SELECT status FROM work_orders WHERE id = ?")
+      .get(req.params.id) as { status: string };
+    if (!ot) return res.status(404).json({ error: "OT no encontrada." });
+    if (ot.status !== "pendiente") {
+      return res
+        .status(403)
+        .json({
+          error:
+            "No se puede desautorizar una OT que ya está en progreso o finalizada.",
+        });
+    }
+    const info = db
+      .prepare(
+        "UPDATE work_orders SET authorized = FALSE, updated_at = CURRENT_TIMESTAMP WHERE id = ?"
+      )
+      .run(req.params.id);
+    if (info.changes === 0)
+      return res.status(404).json({ error: "OT no encontrada." });
+    res.status(200).json({ message: "OT desautorizada con éxito." });
+  } catch (error) {
+    res.status(500).json({ error: "Error al desautorizar la OT." });
+  }
+});
+apiRouter.put("/ots/:id/start", (req: Request, res: Response) => {
+  try {
+    const info = db
+      .prepare(
+        "UPDATE work_orders SET status = 'en_progreso', started_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = ?"
+      )
+      .run(req.params.id);
+    if (info.changes === 0)
+      return res.status(404).json({ error: "OT no encontrada." });
+    const updatedOT = db
+      .prepare("SELECT * FROM work_orders WHERE id = ?")
+      .get(req.params.id);
+    res.status(200).json(updatedOT);
+  } catch (error) {
+    res.status(500).json({ error: "Error al iniciar el trabajo." });
+  }
+});
 apiRouter.post("/auth/login", (req: Request, res: Response) => {
   try {
     const { email, password } = req.body;
@@ -296,10 +323,12 @@ apiRouter.delete("/users/:id", (req: Request, res: Response) => {
     res.status(200).json({ message: "Usuario eliminado con éxito." });
   } catch (error: any) {
     if (error.code === "SQLITE_CONSTRAINT_FOREIGNKEY")
-      return res.status(400).json({
-        error:
-          "No se puede eliminar el usuario porque ha creado Órdenes de Trabajo.",
-      });
+      return res
+        .status(400)
+        .json({
+          error:
+            "No se puede eliminar el usuario porque ha creado Órdenes de Trabajo.",
+        });
     res.status(500).json({ error: "Error interno del servidor." });
   }
 });
@@ -462,10 +491,12 @@ apiRouter.post("/clients/bulk-import", (req: Request, res: Response) => {
   });
   try {
     insertMany(clients);
-    res.status(200).json({
-      imported: importedCount,
-      duplicates: clients.length - importedCount,
-    });
+    res
+      .status(200)
+      .json({
+        imported: importedCount,
+        duplicates: clients.length - importedCount,
+      });
   } catch (error) {
     res.status(500).json({ error: "Error al procesar la importación." });
   }

@@ -89,13 +89,12 @@ const OTDetail: React.FC = () => {
   if (!otData) return <div className="p-8">Cargando datos...</div>;
 
   const isEmployee = user?.role === "empleado";
-  const isWorkInProgressOrDone = otData.status !== "pendiente";
   const isClosed = otData.status === "cierre";
 
   // El empleado puede editar solo sus observaciones y solo si la OT no está cerrada.
   const canEmployeeEdit = !isClosed;
   // El admin puede editar la sección de admin siempre, pero los datos principales solo si está pendiente.
-  const canAdminEditMainData = !isWorkInProgressOrDone;
+  const canAdminEditMainData = otData.status === "pendiente";
 
   return (
     <form
@@ -110,6 +109,7 @@ const OTDetail: React.FC = () => {
         <h1 className="text-2xl font-bold">
           Detalle de OT: {otData.custom_id || `#${otData.id}`}
         </h1>
+        {/* El botón de guardar es visible para todos, pero la lógica de envío se encarga de los permisos */}
         <Button
           type="submit"
           disabled={
@@ -169,7 +169,9 @@ const OTDetail: React.FC = () => {
 
       <div className="bg-white p-6 rounded-lg shadow-sm space-y-8">
         <fieldset
-          disabled={isDirectorOrAdmin() && !canAdminEditMainData}
+          disabled={
+            isEmployee || (isDirectorOrAdmin() && !canAdminEditMainData)
+          }
           className="disabled:opacity-70"
         >
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6 border-b pb-6">
@@ -195,15 +197,33 @@ const OTDetail: React.FC = () => {
               value={otData.custom_id || `Interno #${id}`}
               readOnly
             />
-            <Input label="Contrato" {...register("contract")} />
+            {!isEmployee && (
+              <Input label="Contrato" {...register("contract")} />
+            )}
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 border-b pb-6">
-            <h2 className="text-lg font-semibold text-blue-700 col-span-full">
-              Información del Cliente
-            </h2>
-            <Input label="Empresa" value={otData.client_name} readOnly />
-            <Input label="Nº Cliente" value={otData.client_code} readOnly />
-          </div>
+        </fieldset>
+
+        {!isEmployee && (
+          <fieldset
+            disabled={isDirectorOrAdmin() && !canAdminEditMainData}
+            className="disabled:opacity-70"
+          >
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 border-b pb-6">
+              <h2 className="text-lg font-semibold text-blue-700 col-span-full">
+                Información del Cliente
+              </h2>
+              <Input label="Empresa" value={otData.client_name} readOnly />
+              <Input label="Nº Cliente" value={otData.client_code} readOnly />
+            </div>
+          </fieldset>
+        )}
+
+        <fieldset
+          disabled={
+            isEmployee || (isDirectorOrAdmin() && !canAdminEditMainData)
+          }
+          className="disabled:opacity-70"
+        >
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 border-b pb-6">
             <h2 className="text-lg font-semibold text-blue-700 col-span-full">
               Producto
@@ -256,26 +276,28 @@ const OTDetail: React.FC = () => {
                 <h2 className="text-lg font-semibold text-blue-700 mb-4">
                   Actividades
                 </h2>
-                <div>
-                  <label className="text-sm font-medium">Asignar a</label>
-                  <select
-                    {...register("assigned_to")}
-                    className="w-full mt-1 p-2 border rounded-md"
-                  >
-                    <option value="">Sin asignar</option>
-                    {users.map((u) => (
-                      <option key={u.id} value={u.id}>
-                        {u.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                <fieldset disabled={isClosed}>
+                  <div>
+                    <label className="text-sm font-medium">Asignar a</label>
+                    <select
+                      {...register("assigned_to")}
+                      className="w-full mt-1 p-2 border rounded-md"
+                    >
+                      <option value="">Sin asignar</option>
+                      {users.map((u) => (
+                        <option key={u.id} value={u.id}>
+                          {u.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </fieldset>
                 <div className="mt-4">
                   <label className="text-sm font-medium">
                     Observaciones del Colaborador
                   </label>
                   <textarea
-                    {...register("collaborator_observations")}
+                    value={otData.collaborator_observations || ""}
                     readOnly
                     className="w-full mt-1 p-2 border rounded-md bg-gray-100"
                     rows={3}
@@ -286,7 +308,7 @@ const OTDetail: React.FC = () => {
                 <h2 className="text-lg font-semibold text-blue-700 mb-4">
                   Administración
                 </h2>
-                <div className="space-y-4">
+                <fieldset disabled={isClosed} className="space-y-4">
                   <Input
                     label="Cotización (Detalles)"
                     {...register("quotation_details")}
@@ -333,7 +355,7 @@ const OTDetail: React.FC = () => {
                       <option value="cierre">Cierre</option>
                     </select>
                   </div>
-                </div>
+                </fieldset>
               </div>
             </>
           )}

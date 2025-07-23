@@ -2,11 +2,9 @@
 
 import axios from "axios";
 
-// --- CAMBIO IMPORTANTE AQUÍ ---
-// Reemplaza 'TU_DIRECCION_IP_LOCAL' con la IP real de la computadora
-// donde corre el servidor (ej: '192.168.1.105').
-// Puedes encontrarla escribiendo 'ipconfig' en la terminal de Windows.
-const API_BASE_URL = "http://192.168.0.219:4000/api";
+// --- CAMBIO AQUÍ ---
+// Usamos el nombre de tu computadora en lugar de la IP.
+const API_BASE_URL = "http://DESKTOP-HU53VB2:4000/api";
 
 const axiosInstance = axios.create({
   baseURL: API_BASE_URL,
