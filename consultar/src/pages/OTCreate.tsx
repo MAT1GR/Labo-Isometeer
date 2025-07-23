@@ -20,7 +20,11 @@ type OTCreateFormData = Omit<
   | "updated_at"
   | "client_name"
   | "client_code"
+  | "client_contact"
   | "assigned_to_name"
+  | "items"
+  | "invoices"
+  | "receipts"
 >;
 
 const OTCreate: React.FC = () => {
@@ -102,10 +106,7 @@ const OTCreate: React.FC = () => {
   };
 
   return (
-    <form
-      onSubmit={handleSubmit(onSubmit)}
-      className="space-y-8 bg-gray-50 p-6 rounded-lg"
-    >
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold">Crear Nueva Orden de Trabajo</h1>
         <div className="flex gap-4">
@@ -126,11 +127,9 @@ const OTCreate: React.FC = () => {
           </Button>
         </div>
       </div>
-
-      <div className="bg-white p-6 rounded-lg shadow-sm space-y-8">
-        {/* --- SECCIÓN OT SELECCIONADA --- */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 border-b pb-6">
-          <h2 className="text-lg font-semibold text-blue-700 col-span-full">
+      <div className="bg-white dark:bg-gray-800 dark:border dark:border-gray-700 p-6 rounded-lg shadow-sm space-y-8">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 border-b dark:border-gray-700 pb-6">
+          <h2 className="text-lg font-semibold text-blue-700 dark:text-blue-400 col-span-full">
             OT Seleccionada
           </h2>
           <Input
@@ -139,12 +138,12 @@ const OTCreate: React.FC = () => {
             {...register("date", { required: true })}
           />
           <div>
-            <label className="text-sm font-medium text-gray-700">
+            <label className="text-sm font-medium dark:text-gray-300">
               Tipo de OT *
             </label>
             <select
               {...register("type", { required: true })}
-              className="w-full mt-1 p-2 border rounded-md"
+              className="w-full mt-1 p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
             >
               <option value="">Seleccionar tipo...</option>
               <option value="Produccion">Producción</option>
@@ -157,18 +156,17 @@ const OTCreate: React.FC = () => {
           <Input label="ID de OT" value={idPreview} disabled readOnly />
           <Input label="Contrato" {...register("contract")} />
         </div>
-        {/* --- SECCIÓN CLIENTE --- */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 border-b pb-6">
-          <h2 className="text-lg font-semibold text-blue-700 col-span-full">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 border-b dark:border-gray-700 pb-6">
+          <h2 className="text-lg font-semibold text-blue-700 dark:text-blue-400 col-span-full">
             Información del Cliente
           </h2>
           <div>
-            <label className="text-sm font-medium text-gray-700">
+            <label className="text-sm font-medium dark:text-gray-300">
               Empresa (Nº Cliente) *
             </label>
             <select
               {...register("client_id", { required: true })}
-              className="w-full mt-1 p-2 border rounded-md"
+              className="w-full mt-1 p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
             >
               <option value="">Seleccionar cliente...</option>
               {clients.map((c) => (
@@ -179,9 +177,8 @@ const OTCreate: React.FC = () => {
             </select>
           </div>
         </div>
-        {/* --- SECCIÓN PRODUCTO --- */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 border-b pb-6">
-          <h2 className="text-lg font-semibold text-blue-700 col-span-full">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 border-b dark:border-gray-700 pb-6">
+          <h2 className="text-lg font-semibold text-blue-700 dark:text-blue-400 col-span-full">
             Producto
           </h2>
           <Input
@@ -202,28 +199,27 @@ const OTCreate: React.FC = () => {
             disabled={!isLacreEnabled}
           />
           <div className="col-span-full">
-            <label className="text-sm font-medium">Observaciones</label>
+            <label className="text-sm font-medium dark:text-gray-300">
+              Observaciones
+            </label>
             <textarea
               {...register("observations")}
-              className="w-full mt-1 p-2 border rounded-md"
+              className="w-full mt-1 p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
               rows={3}
             ></textarea>
           </div>
         </div>
-
-        {/* --- SECCIONES FINALES --- */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          {/* --- SECCIÓN ACTIVIDADES --- */}
           <div>
-            <h2 className="text-lg font-semibold text-blue-700 mb-4">
+            <h2 className="text-lg font-semibold text-blue-700 dark:text-blue-400 mb-4">
               Actividades
             </h2>
-            <label className="text-sm font-medium text-gray-700">
+            <label className="text-sm font-medium dark:text-gray-300">
               Asignar a
             </label>
             <select
               {...register("assigned_to")}
-              className="w-full mt-1 p-2 border rounded-md"
+              className="w-full mt-1 p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
             >
               <option value="">Sin asignar</option>
               {users.map((u) => (
@@ -233,10 +229,9 @@ const OTCreate: React.FC = () => {
               ))}
             </select>
           </div>
-          {/* --- SECCIÓN ADMINISTRACIÓN --- */}
           {isDirectorOrAdmin() && (
             <div>
-              <h2 className="text-lg font-semibold text-blue-700 mb-4">
+              <h2 className="text-lg font-semibold text-blue-700 dark:text-blue-400 mb-4">
                 Administración
               </h2>
               <div className="space-y-4">
@@ -252,12 +247,12 @@ const OTCreate: React.FC = () => {
                 />
                 <Input label="Disposición" {...register("disposition")} />
                 <div>
-                  <label className="text-sm font-medium text-gray-700">
+                  <label className="text-sm font-medium dark:text-gray-300">
                     Estado Final
                   </label>
                   <select
                     {...register("status")}
-                    className="w-full mt-1 p-2 border rounded-md"
+                    className="w-full mt-1 p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
                   >
                     <option value="pendiente">Pendiente</option>
                     <option value="en_progreso">En Progreso</option>

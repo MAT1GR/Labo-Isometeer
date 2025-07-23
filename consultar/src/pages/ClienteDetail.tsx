@@ -1,12 +1,12 @@
-// RUTA: /cliente/src/pages/ClienteDetail.tsx (VERSIÓN DE DIAGNÓSTICO)
+// RUTA: /cliente/src/pages/ClienteDetail.tsx
 
 import React, { useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { useForm } from "react-hook-form";
+import { useForm, useFieldArray } from "react-hook-form";
 import { clientService, Client } from "../services/clientService";
 import Input from "../components/ui/Input";
 import Button from "../components/ui/Button";
-import { ArrowLeft, Save } from "lucide-react";
+import { ArrowLeft, Save, PlusCircle, Trash2 } from "lucide-react";
 import { mutate } from "swr";
 
 const ClienteDetail: React.FC = () => {
@@ -15,65 +15,35 @@ const ClienteDetail: React.FC = () => {
   const {
     register,
     handleSubmit,
+    control,
     reset,
-    formState: { isSubmitting, isDirty, errors },
+    formState: { isSubmitting, isDirty },
   } = useForm<Client>();
-
-  console.log("--- RENDERIZANDO Componente ClienteDetail ---");
-  console.log("¿El formulario está 'sucio' (modificado)?", isDirty);
-  console.log("¿El formulario se está enviando?", isSubmitting);
-  if (Object.keys(errors).length > 0) {
-    console.error("Errores de validación en el formulario:", errors);
-  }
+  const { fields, append, remove } = useFieldArray({
+    control,
+    name: "contacts",
+  });
 
   useEffect(() => {
-    console.log("useEffect: Se detectó un ID, buscando datos del cliente...");
     if (id) {
-      clientService
-        .getClientById(Number(id))
-        .then((data) => {
-          console.log(
-            "useEffect: Datos del cliente recibidos del servidor:",
-            data
-          );
-          reset(data);
-          console.log(
-            "useEffect: El formulario se ha reseteado con los datos del servidor."
-          );
-        })
-        .catch((err) => {
-          console.error(
-            "useEffect: ERROR al buscar los datos del cliente:",
-            err
-          );
-        });
+      clientService.getClientById(Number(id)).then((data) => {
+        reset(data);
+      });
     }
   }, [id, reset]);
 
   const onSubmit = async (data: Client) => {
-    console.log("--- onSubmit: Se ha disparado el envío del formulario ---");
-    console.log("Datos que se van a enviar:", data);
     try {
       await clientService.updateClient(Number(id), data);
-      console.log(
-        "onSubmit: El cliente se actualizó con éxito en el servidor."
-      );
       mutate("/clients");
-      console.log(
-        "onSubmit: Se ha pedido a SWR que refresque la lista de clientes."
-      );
       navigate("/clientes");
     } catch (error) {
-      console.error("onSubmit: ERROR al actualizar el cliente:", error);
       alert("Hubo un error al actualizar el cliente.");
     }
   };
 
   return (
-    <form
-      onSubmit={handleSubmit(onSubmit)}
-      className="space-y-8 bg-gray-50 p-6 rounded-lg"
-    >
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold">Editando Cliente</h1>
         <div className="flex gap-4">
@@ -82,12 +52,11 @@ const ClienteDetail: React.FC = () => {
             variant="outline"
             onClick={() => navigate("/clientes")}
           >
-            Cancelar
+            Volver
           </Button>
-          {/* He quitado !isDirty temporalmente para asegurarnos de que el botón siempre esté activo */}
           <Button
             type="submit"
-            disabled={isSubmitting}
+            disabled={isSubmitting || !isDirty}
             className="flex items-center gap-2"
           >
             <Save className="h-5 w-5" />
@@ -95,7 +64,7 @@ const ClienteDetail: React.FC = () => {
           </Button>
         </div>
       </div>
-      <div className="bg-white p-6 rounded-lg shadow-sm space-y-6">
+      <div className="bg-white dark:bg-gray-800 dark:border dark:border-gray-700 p-6 rounded-lg shadow-sm space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <Input
             label="Nº Cliente *"
@@ -103,15 +72,14 @@ const ClienteDetail: React.FC = () => {
           />
           <Input label="Empresa *" {...register("name", { required: true })} />
           <Input label="Dirección" {...register("address")} />
-          <Input label="Contacto" {...register("contacts.0.name")} />
-          <div className="flex items-end gap-4">
+          <div className="flex items-end gap-4 col-span-2">
             <div className="flex-1">
-              <label className="text-sm font-medium text-gray-700">
+              <label className="text-sm font-medium dark:text-gray-300">
                 Tipo ID Fiscal
               </label>
               <select
                 {...register("fiscal_id_type")}
-                className="w-full mt-1 p-2 border rounded-md"
+                className="w-full mt-1 p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
               >
                 <option value="">Ninguno</option>
                 <option value="CUIT">CUIT</option>
@@ -122,6 +90,58 @@ const ClienteDetail: React.FC = () => {
             <div className="flex-1">
               <Input label="Número ID Fiscal" {...register("fiscal_id")} />
             </div>
+          </div>
+        </div>
+
+        <div className="border-t dark:border-gray-700 pt-6">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-lg font-semibold text-blue-700 dark:text-blue-400">
+              Contactos
+            </h2>
+            <Button
+              type="button"
+              size="sm"
+              onClick={() =>
+                append({ type: "", name: "", email: "", phone: "" })
+              }
+            >
+              <PlusCircle className="h-4 w-4 mr-2" />
+              Agregar Contacto
+            </Button>
+          </div>
+          <div className="space-y-4">
+            {fields.map((field, index) => (
+              <div
+                key={field.id}
+                className="grid grid-cols-1 md:grid-cols-5 gap-4 items-center bg-gray-50 dark:bg-gray-700/50 p-4 rounded-md"
+              >
+                <Input
+                  placeholder="Tipo (Ej: Admin)"
+                  {...register(`contacts.${index}.type`)}
+                />
+                <Input
+                  placeholder="Contacto"
+                  {...register(`contacts.${index}.name`)}
+                />
+                <Input
+                  placeholder="Email"
+                  type="email"
+                  {...register(`contacts.${index}.email`)}
+                />
+                <Input
+                  placeholder="Teléfono"
+                  {...register(`contacts.${index}.phone`)}
+                />
+                <Button
+                  type="button"
+                  variant="danger"
+                  size="sm"
+                  onClick={() => remove(index)}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
+            ))}
           </div>
         </div>
       </div>

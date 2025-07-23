@@ -121,7 +121,17 @@ const Clientes: React.FC = () => {
               <tr key={client.id}>
                 <td className="px-6 py-4">{client.code}</td>
                 <td className="px-6 py-4 font-medium">{client.name}</td>
-                <td className="px-6 py-4">{client.contact || "N/A"}</td>
+                <td className="px-6 py-4">
+                  {Array.isArray(client.contacts) && client.contacts.length > 0
+                    ? client.contacts
+                        .map((contact: any, idx: number) =>
+                          typeof contact === "string"
+                            ? contact
+                            : contact.name || contact.email || "Contacto"
+                        )
+                        .join(", ")
+                    : "N/A"}
+                </td>
                 <td className="px-6 py-4 text-right space-x-2">
                   <Button
                     size="sm"
