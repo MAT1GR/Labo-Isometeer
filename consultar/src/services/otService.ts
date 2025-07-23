@@ -29,18 +29,10 @@ export interface WorkOrder {
   duration_minutes?: number | null;
   created_at: string;
   updated_at?: string;
+  // Campos que vienen de JOINS
   client_name?: string;
   client_code?: string;
   assigned_to_name?: string;
-}
-
-export interface TimelineOt {
-  id: number;
-  custom_id?: string;
-  product: string;
-  started_at: string;
-  completed_at: string | null;
-  duration_minutes?: number | null;
 }
 
 class OTService {
@@ -52,43 +44,39 @@ class OTService {
     return response.data;
   }
 
-  // --- NUEVO MÉTODO PARA EL GRÁFICO ---
-  async getTimelineData(params: {
-    year: number;
-    month: number;
-    assigned_to: number;
-  }): Promise<TimelineOt[]> {
-    const response = await axiosInstance.get("/ots/timeline", { params });
-    return response.data;
-  }
-
-  // ... (El resto de los métodos no cambian)
   async getOTById(id: number): Promise<WorkOrder> {
     const response = await axiosInstance.get(`/ots/${id}`);
     return response.data;
   }
+
   async createOT(otData: Partial<WorkOrder>): Promise<{ id: number }> {
     const response = await axiosInstance.post("/ots", otData);
     return response.data;
   }
+
   async updateOT(id: number, otData: Partial<WorkOrder>): Promise<WorkOrder> {
     const response = await axiosInstance.put(`/ots/${id}`, otData);
     return response.data;
   }
+
   async deleteOT(otId: number): Promise<void> {
     await axiosInstance.delete(`/ots/${otId}`);
   }
+
   async authorizeOT(id: number): Promise<WorkOrder> {
     const response = await axiosInstance.put(`/ots/${id}/authorize`);
     return response.data;
   }
+
   async deauthorizeOT(id: number): Promise<void> {
     await axiosInstance.put(`/ots/${id}/deauthorize`);
   }
+
   async startOT(id: number): Promise<WorkOrder> {
     const response = await axiosInstance.put(`/ots/${id}/start`);
     return response.data;
   }
+
   async stopOT(id: number): Promise<WorkOrder> {
     const response = await axiosInstance.put(`/ots/${id}/stop`);
     return response.data;

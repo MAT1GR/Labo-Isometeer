@@ -21,9 +21,8 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  Legend,
-  ReferenceLine,
   LabelList,
+  ReferenceLine,
 } from "recharts";
 import { otService, TimelineOt } from "../services/otService";
 import useSWR from "swr";
@@ -52,24 +51,9 @@ interface RecentOrder {
 
 // --- VISTA PARA ADMINISTRADORES Y DIRECTORES ---
 const AdminDirectorDashboard: React.FC = () => {
-  const [stats, setStats] = useState<DashboardStats | null>(null);
-  const [recentOrders, setRecentOrders] = useState<RecentOrder[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const fetchDashboardData = async () => {
-      try {
-        const response = await axiosInstance.get("/dashboard/stats");
-        setStats(response.data.stats);
-        setRecentOrders(response.data.recentOrders);
-      } catch (error) {
-        console.error("Error fetching dashboard data:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchDashboardData();
-  }, []);
+  const { data, error, isLoading } = useSWR("/dashboard/stats", (url) =>
+    axiosInstance.get(url).then((res) => res.data)
+  );
 
   const getStatusColor = (status: string) => {
     switch (status.toLowerCase()) {
@@ -88,13 +72,16 @@ const AdminDirectorDashboard: React.FC = () => {
     }
   };
 
-  if (loading)
+  if (isLoading)
     return (
       <div className="flex justify-center p-8">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
       </div>
     );
-  if (!stats) return <p>No se pudieron cargar los datos del dashboard.</p>;
+  if (error || !data)
+    return <p>No se pudieron cargar los datos del dashboard.</p>;
+
+  const { stats, recentOrders } = data;
 
   return (
     <div className="space-y-6">
@@ -136,7 +123,7 @@ const AdminDirectorDashboard: React.FC = () => {
           <h2 className="text-xl font-semibold mb-4">Órdenes Recientes</h2>
           <div className="space-y-2">
             {recentOrders.length > 0 ? (
-              recentOrders.map((order) => (
+              recentOrders.map((order: RecentOrder) => (
                 <div
                   key={order.id}
                   className="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg"
@@ -228,13 +215,13 @@ const EmpleadoDashboard: React.FC = () => {
   const getStatusColor = (status: string) => {
     switch (status) {
       case "finalizada":
-        return "#22c55e"; // Verde
+        return "#22c55e";
       case "en_progreso":
-        return "#3b82f6"; // Azul
+        return "#3b82f6";
       case "pendiente":
-        return "#f59e0b"; // Ámbar
+        return "#f59e0b";
       default:
-        return "#6b7280"; // Gris
+        return "#6b7280";
     }
   };
 
@@ -244,7 +231,6 @@ const EmpleadoDashboard: React.FC = () => {
       .map((ot) => {
         const start = new Date(ot.started_at);
         const end = ot.completed_at ? new Date(ot.completed_at) : today;
-
         let startDay =
           start.getUTCFullYear() === date.year &&
           start.getUTCMonth() + 1 === date.month
@@ -255,10 +241,8 @@ const EmpleadoDashboard: React.FC = () => {
           end.getUTCMonth() + 1 === date.month
             ? end.getUTCDate()
             : daysInMonth;
-
         endDay = Math.min(endDay, daysInMonth);
         startDay = Math.max(startDay, 1);
-
         return {
           name: ot.custom_id || `OT #${ot.id}`,
           product: ot.product,

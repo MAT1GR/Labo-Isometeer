@@ -43,7 +43,7 @@ if (!adminCheckStmt.get(adminEmail)) {
   ).run(adminEmail, hashedPassword, "Administrador", "administrador");
 }
 
-// --- Función para obtener puntos por tipo de CONTRATO ---
+// --- Función para obtener puntos ---
 const getPointsForContract = (contractType: string | null): number => {
   if (!contractType) return 0;
   const pointsMap: { [key: string]: number } = {
@@ -62,7 +62,44 @@ const getPointsForContract = (contractType: string | null): number => {
 
 const apiRouter = express.Router();
 
-// --- RUTAS DE OT ---
+// --- RUTA PARA EL GRÁFICO DEL DASHBOARD (CON DEPURACIÓN) ---
+apiRouter.get("/ots/timeline", (req: Request, res: Response) => {
+  const { year, month, assigned_to } = req.query;
+
+  if (!year || !month || !assigned_to) {
+    return res.status(400).json({
+      error: "Faltan parámetros: año, mes y usuario asignado son requeridos.",
+    });
+  }
+
+  try {
+    const startDate = new Date(Date.UTC(Number(year), Number(month) - 1, 1));
+    const endDate = new Date(Date.UTC(Number(year), Number(month), 1));
+
+    const query = `
+            SELECT id, custom_id, product, started_at, completed_at, status, duration_minutes
+            FROM work_orders
+            WHERE assigned_to = ? 
+              AND authorized = 1
+              AND started_at IS NOT NULL
+              AND started_at < ?
+              AND (completed_at >= ? OR completed_at IS NULL)
+        `;
+
+    const ots = db
+      .prepare(query)
+      .all(assigned_to, endDate.toISOString(), startDate.toISOString());
+    res.status(200).json(ots);
+  } catch (error) {
+    // --- LÍNEA DE DEPURACIÓN AÑADIDA ---
+    console.error("🚨 ERROR DETALLADO en GET /ots/timeline:", error);
+    res
+      .status(500)
+      .json({ error: "Error al obtener los datos para la línea de tiempo." });
+  }
+});
+
+// --- RUTAS EXISTENTES (INCLUIDAS COMPLETAS) ---
 apiRouter.put("/ots/:id/stop", (req: Request, res: Response) => {
   try {
     const ot = db
@@ -76,24 +113,21 @@ apiRouter.put("/ots/:id/stop", (req: Request, res: Response) => {
     };
     if (!ot || !ot.started_at)
       return res.status(400).json({ error: "El trabajo nunca fue iniciado." });
-
     const startTime = new Date(ot.started_at).getTime();
     const endTime = new Date().getTime();
     const duration_minutes = Math.round((endTime - startTime) / (1000 * 60));
     const points = getPointsForContract(ot.contract);
-
     const stopTransaction = db.transaction(() => {
       db.prepare(
         "UPDATE work_orders SET status = 'finalizada', completed_at = CURRENT_TIMESTAMP, duration_minutes = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?"
       ).run(duration_minutes, req.params.id);
-      if (ot.assigned_to && points > 0) {
+      if (ot.assigned_to) {
         db.prepare("UPDATE users SET points = points + ? WHERE id = ?").run(
           points,
           ot.assigned_to
         );
       }
     });
-
     stopTransaction();
     const updatedOT = db
       .prepare("SELECT * FROM work_orders WHERE id = ?")
@@ -101,27 +135,6 @@ apiRouter.put("/ots/:id/stop", (req: Request, res: Response) => {
     res.status(200).json(updatedOT);
   } catch (error) {
     res.status(500).json({ error: "Error al finalizar el trabajo." });
-  }
-});
-
-// --- OTRAS RUTAS (INCLUIDAS COMPLETAS) ---
-apiRouter.get("/ots/timeline", (req: Request, res: Response) => {
-  const { year, month, assigned_to } = req.query;
-  if (!year || !month || !assigned_to) {
-    return res.status(400).json({ error: "Faltan parámetros." });
-  }
-  try {
-    const startDate = new Date(Date.UTC(Number(year), Number(month) - 1, 1));
-    const endDate = new Date(Date.UTC(Number(year), Number(month), 1));
-    const query = ` SELECT id, custom_id, product, started_at, completed_at, status, duration_minutes FROM work_orders WHERE assigned_to = ? AND authorized = 1 AND started_at IS NOT NULL AND started_at < ? AND (completed_at >= ? OR completed_at IS NULL) `;
-    const ots = db
-      .prepare(query)
-      .all(assigned_to, endDate.toISOString(), startDate.toISOString());
-    res.status(200).json(ots);
-  } catch (error) {
-    res
-      .status(500)
-      .json({ error: "Error al obtener datos para la línea de tiempo." });
   }
 });
 apiRouter.put("/ots/:id", (req: Request, res: Response) => {
@@ -254,12 +267,10 @@ apiRouter.put("/ots/:id/deauthorize", (req: Request, res: Response) => {
       .get(req.params.id) as { status: string };
     if (!ot) return res.status(404).json({ error: "OT no encontrada." });
     if (ot.status !== "pendiente") {
-      return res
-        .status(403)
-        .json({
-          error:
-            "No se puede desautorizar una OT que ya está en progreso o finalizada.",
-        });
+      return res.status(403).json({
+        error:
+          "No se puede desautorizar una OT que ya está en progreso o finalizada.",
+      });
     }
     const info = db
       .prepare(
@@ -354,12 +365,10 @@ apiRouter.delete("/users/:id", (req: Request, res: Response) => {
     res.status(200).json({ message: "Usuario eliminado con éxito." });
   } catch (error: any) {
     if (error.code === "SQLITE_CONSTRAINT_FOREIGNKEY")
-      return res
-        .status(400)
-        .json({
-          error:
-            "No se puede eliminar el usuario porque ha creado Órdenes de Trabajo.",
-        });
+      return res.status(400).json({
+        error:
+          "No se puede eliminar el usuario porque ha creado Órdenes de Trabajo.",
+      });
     res.status(500).json({ error: "Error interno del servidor." });
   }
 });
@@ -522,12 +531,10 @@ apiRouter.post("/clients/bulk-import", (req: Request, res: Response) => {
   });
   try {
     insertMany(clients);
-    res
-      .status(200)
-      .json({
-        imported: importedCount,
-        duplicates: clients.length - importedCount,
-      });
+    res.status(200).json({
+      imported: importedCount,
+      duplicates: clients.length - importedCount,
+    });
   } catch (error) {
     res.status(500).json({ error: "Error al procesar la importación." });
   }

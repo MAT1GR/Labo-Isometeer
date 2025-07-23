@@ -34,16 +34,22 @@ const ClienteCreate: React.FC = () => {
       );
       const dataToSubmit = { ...data, contacts: nonEmptyContacts };
 
-      const newClient = await clientService.createClient(dataToSubmit);
-      mutate("/clients");
-      navigate(`/clientes/editar/${newClient.id}`);
+      await clientService.createClient(dataToSubmit);
+      mutate("/clients"); // Le decimos a la app que los datos de la lista de clientes cambiaron
+
+      // --- CAMBIO AQUÍ ---
+      // Redirigimos a la lista de clientes en lugar de a la página de edición
+      navigate("/clientes");
     } catch (error) {
       alert("Hubo un error al crear el cliente.");
     }
   };
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
+    <form
+      onSubmit={handleSubmit(onSubmit)}
+      className="space-y-8 bg-gray-50 dark:bg-gray-900 p-6 rounded-lg"
+    >
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold">Agregar Nuevo Cliente</h1>
         <div className="flex gap-4">
@@ -60,18 +66,20 @@ const ClienteCreate: React.FC = () => {
             className="flex items-center gap-2"
           >
             <Save className="h-5 w-5" />
-            {isSubmitting ? "Guardando..." : "Guardar y Editar"}
+            {isSubmitting ? "Guardando..." : "Guardar Cliente"}
           </Button>
         </div>
       </div>
-      {/* --- CAMBIO AQUÍ: AÑADIMOS CLASES PARA MODO OSCURO --- */}
       <div className="bg-white dark:bg-gray-800 dark:border dark:border-gray-700 p-6 rounded-lg shadow-sm space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <Input
-            label="Nº Cliente *"
+            label="ID / Nº Cliente *"
             {...register("code", { required: true })}
           />
-          <Input label="Empresa *" {...register("name", { required: true })} />
+          <Input
+            label="Nombre / Empresa *"
+            {...register("name", { required: true })}
+          />
           <Input label="Dirección" {...register("address")} />
           <div className="flex items-end gap-4 col-span-2">
             <div className="flex-1">
