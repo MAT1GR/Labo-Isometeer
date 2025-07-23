@@ -9,8 +9,8 @@ import Card from "../components/ui/Card";
 import Input from "../components/ui/Input";
 import Button from "../components/ui/Button";
 import { PlusCircle, Users, Trash2 } from "lucide-react";
-import useSWR, { mutate } from "swr"; // Importamos useSWR y mutate
-import { fetcher } from "../api/axiosInstance"; // Importamos el fetcher
+import useSWR, { mutate } from "swr";
+import { fetcher } from "../api/axiosInstance";
 
 const userSchema = z.object({
   name: z.string().min(3, "El nombre es requerido"),
@@ -22,9 +22,7 @@ const userSchema = z.object({
 type UserFormData = z.infer<typeof userSchema>;
 
 const Usuarios: React.FC = () => {
-  // Usamos SWR para obtener y manejar los datos de los usuarios
   const { data: users, error, isLoading } = useSWR<User[]>("/users", fetcher);
-
   const [formError, setFormError] = useState<string | null>(null);
   const {
     register,
@@ -41,7 +39,6 @@ const Usuarios: React.FC = () => {
       setFormError(null);
       await authService.createUser(data);
       reset();
-      // Le decimos a SWR que los datos de '/users' han cambiado y que los vuelva a pedir
       mutate("/users");
     } catch (err: any) {
       setFormError(err.message);
@@ -52,7 +49,6 @@ const Usuarios: React.FC = () => {
     if (window.confirm("¿Estás seguro de que quieres eliminar este usuario?")) {
       try {
         await authService.deleteUser(userId);
-        // Igual que al crear, refrescamos los datos
         mutate("/users");
       } catch (err: any) {
         alert(err.message || "Error al eliminar el usuario.");
@@ -65,7 +61,7 @@ const Usuarios: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-3xl font-bold text-gray-900">Gestión de Usuarios</h1>
+      <h1 className="text-3xl font-bold">Gestión de Usuarios</h1>
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2">
           <Card>
@@ -73,33 +69,33 @@ const Usuarios: React.FC = () => {
               <Users /> Lista de Usuarios
             </h2>
             <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
+              <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                <thead className="bg-gray-50 dark:bg-gray-700">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                       Nombre
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                       Email
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                       Rol
                     </th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                       Acciones
                     </th>
                   </tr>
                 </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
+                <tbody className="bg-white divide-y divide-gray-200 dark:bg-gray-800 dark:divide-gray-700">
                   {users?.map((user) => (
                     <tr key={user.id}>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                         {user.name}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm">
                         {user.email}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 capitalize">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm capitalize">
                         {user.role}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
@@ -143,10 +139,10 @@ const Usuarios: React.FC = () => {
                 error={errors.password?.message}
               />
               <div>
-                <label className="text-sm font-medium text-gray-700">Rol</label>
+                <label className="text-sm font-medium">Rol</label>
                 <select
                   {...register("role")}
-                  className="w-full rounded-md border border-gray-300 px-3 py-2 mt-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full rounded-md border border-gray-300 dark:border-gray-600 dark:bg-gray-700 px-3 py-2 mt-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="empleado">Empleado</option>
                   <option value="director">Director</option>

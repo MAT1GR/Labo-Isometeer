@@ -8,7 +8,14 @@ import { authService, User } from "../services/auth";
 import { useAuth } from "../contexts/AuthContext";
 import Input from "../components/ui/Input";
 import Button from "../components/ui/Button";
-import { ArrowLeft, Save, Play, StopCircle, CheckSquare } from "lucide-react";
+import {
+  ArrowLeft,
+  Save,
+  Play,
+  StopCircle,
+  CheckSquare,
+  Edit,
+} from "lucide-react";
 import { mutate } from "swr";
 
 const OTDetail: React.FC = () => {
@@ -89,12 +96,13 @@ const OTDetail: React.FC = () => {
   if (!otData) return <div className="p-8">Cargando datos...</div>;
 
   const isEmployee = user?.role === "empleado";
+  const isWorkInProgressOrDone = otData.status !== "pendiente";
   const isClosed = otData.status === "cierre";
 
   // El empleado puede editar solo sus observaciones y solo si la OT no está cerrada.
   const canEmployeeEdit = !isClosed;
   // El admin puede editar la sección de admin siempre, pero los datos principales solo si está pendiente.
-  const canAdminEditMainData = otData.status === "pendiente";
+  const canAdminEditMainData = !isWorkInProgressOrDone;
 
   return (
     <form
