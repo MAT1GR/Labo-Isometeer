@@ -8,9 +8,10 @@ import { authService, User } from "../services/auth";
 import Card from "../components/ui/Card";
 import Input from "../components/ui/Input";
 import Button from "../components/ui/Button";
-import { PlusCircle, Users, Trash2 } from "lucide-react";
+import { PlusCircle, Users, Trash2, BarChart2 } from "lucide-react";
 import useSWR, { mutate } from "swr";
 import { fetcher } from "../api/axiosInstance";
+import { useNavigate } from "react-router-dom";
 
 const userSchema = z.object({
   name: z.string().min(3, "El nombre es requerido"),
@@ -23,6 +24,7 @@ type UserFormData = z.infer<typeof userSchema>;
 
 const Usuarios: React.FC = () => {
   const { data: users, error, isLoading } = useSWR<User[]>("/users", fetcher);
+  const navigate = useNavigate();
   const [formError, setFormError] = useState<string | null>(null);
   const {
     register,
@@ -61,7 +63,13 @@ const Usuarios: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-3xl font-bold">Gestión de Usuarios</h1>
+      <div className="flex justify-between items-center">
+        <h1 className="text-3xl font-bold">Gestión de Usuarios</h1>
+        <Button onClick={() => navigate("/usuarios/grafico")}>
+          <BarChart2 className="mr-2 h-4 w-4" />
+          Ver Gráfico de Puntos
+        </Button>
+      </div>
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2">
           <Card>
@@ -72,16 +80,19 @@ const Usuarios: React.FC = () => {
               <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
                 <thead className="bg-gray-50 dark:bg-gray-700">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">
                       Nombre
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">
                       Email
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">
                       Rol
                     </th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">
+                      Puntos
+                    </th>
+                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">
                       Acciones
                     </th>
                   </tr>
@@ -89,16 +100,13 @@ const Usuarios: React.FC = () => {
                 <tbody className="bg-white divide-y divide-gray-200 dark:bg-gray-800 dark:divide-gray-700">
                   {users?.map((user) => (
                     <tr key={user.id}>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                        {user.name}
+                      <td className="px-6 py-4 font-medium">{user.name}</td>
+                      <td className="px-6 py-4">{user.email}</td>
+                      <td className="px-6 py-4 capitalize">{user.role}</td>
+                      <td className="px-6 py-4 font-semibold text-blue-600 dark:text-blue-400">
+                        {user.points}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm">
-                        {user.email}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm capitalize">
-                        {user.role}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                      <td className="px-6 py-4 text-right">
                         <Button
                           variant="danger"
                           size="sm"
@@ -142,7 +150,7 @@ const Usuarios: React.FC = () => {
                 <label className="text-sm font-medium">Rol</label>
                 <select
                   {...register("role")}
-                  className="w-full rounded-md border border-gray-300 dark:border-gray-600 dark:bg-gray-700 px-3 py-2 mt-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full rounded-md border border-gray-300 dark:border-gray-600 dark:bg-gray-700 px-3 py-2 mt-2"
                 >
                   <option value="empleado">Empleado</option>
                   <option value="director">Director</option>

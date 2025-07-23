@@ -20,11 +20,7 @@ type OTCreateFormData = Omit<
   | "updated_at"
   | "client_name"
   | "client_code"
-  | "client_contact"
   | "assigned_to_name"
-  | "items"
-  | "invoices"
-  | "receipts"
 >;
 
 const OTCreate: React.FC = () => {
@@ -106,7 +102,10 @@ const OTCreate: React.FC = () => {
   };
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
+    <form
+      onSubmit={handleSubmit(onSubmit)}
+      className="space-y-8 bg-gray-50 dark:bg-gray-900 p-6 rounded-lg"
+    >
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold">Crear Nueva Orden de Trabajo</h1>
         <div className="flex gap-4">
@@ -127,6 +126,7 @@ const OTCreate: React.FC = () => {
           </Button>
         </div>
       </div>
+
       <div className="bg-white dark:bg-gray-800 dark:border dark:border-gray-700 p-6 rounded-lg shadow-sm space-y-8">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 border-b dark:border-gray-700 pb-6">
           <h2 className="text-lg font-semibold text-blue-700 dark:text-blue-400 col-span-full">
@@ -154,8 +154,31 @@ const OTCreate: React.FC = () => {
             </select>
           </div>
           <Input label="ID de OT" value={idPreview} disabled readOnly />
-          <Input label="Contrato" {...register("contract")} />
+          {/* --- CAMBIO AQUÍ: CONTRATO ES UN SELECT --- */}
+          <div>
+            <label className="text-sm font-medium dark:text-gray-300">
+              Contrato
+            </label>
+            <select
+              {...register("contract")}
+              className="w-full mt-1 p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
+            >
+              <option value="">Ninguno</option>
+              <option value="Calibracion">Calibración</option>
+              <option value="Completo">Completo</option>
+              <option value="Ampliado">Ampliado</option>
+              <option value="Refurbished">Refurbished</option>
+              <option value="Fabricacion">Fabricación</option>
+              <option value="Verificacion de identidad">
+                Verificación de Identidad
+              </option>
+              <option value="Reducido">Reducido</option>
+              <option value="Servicio tecnico">Servicio Técnico</option>
+              <option value="Capacitacion">Capacitación</option>
+            </select>
+          </div>
         </div>
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 border-b dark:border-gray-700 pb-6">
           <h2 className="text-lg font-semibold text-blue-700 dark:text-blue-400 col-span-full">
             Información del Cliente
@@ -165,7 +188,10 @@ const OTCreate: React.FC = () => {
               Empresa (Nº Cliente) *
             </label>
             <select
-              {...register("client_id", { required: true })}
+              {...register("client_id", {
+                required: true,
+                valueAsNumber: true,
+              })}
               className="w-full mt-1 p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
             >
               <option value="">Seleccionar cliente...</option>
@@ -177,6 +203,7 @@ const OTCreate: React.FC = () => {
             </select>
           </div>
         </div>
+
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 border-b dark:border-gray-700 pb-6">
           <h2 className="text-lg font-semibold text-blue-700 dark:text-blue-400 col-span-full">
             Producto
@@ -209,6 +236,7 @@ const OTCreate: React.FC = () => {
             ></textarea>
           </div>
         </div>
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
           <div>
             <h2 className="text-lg font-semibold text-blue-700 dark:text-blue-400 mb-4">
@@ -218,7 +246,7 @@ const OTCreate: React.FC = () => {
               Asignar a
             </label>
             <select
-              {...register("assigned_to")}
+              {...register("assigned_to", { valueAsNumber: true })}
               className="w-full mt-1 p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
             >
               <option value="">Sin asignar</option>
@@ -243,7 +271,7 @@ const OTCreate: React.FC = () => {
                   label="Cotización (Monto)"
                   type="number"
                   step="0.01"
-                  {...register("quotation_amount")}
+                  {...register("quotation_amount", { valueAsNumber: true })}
                 />
                 <Input label="Disposición" {...register("disposition")} />
                 <div>

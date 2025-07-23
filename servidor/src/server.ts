@@ -15,8 +15,8 @@ db.pragma("foreign_keys = ON");
 
 // --- Creación de Tablas ---
 db.exec(`
-  CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY AUTOINCREMENT, email TEXT UNIQUE NOT NULL, password TEXT NOT NULL, name TEXT NOT NULL, role TEXT NOT NULL CHECK (role IN ('empleado', 'director', 'administrador')));
-  CREATE TABLE IF NOT EXISTS clients (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, code TEXT UNIQUE NOT NULL, address TEXT, fiscal_id_type TEXT, fiscal_id TEXT, contact TEXT);
+  CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY AUTOINCREMENT, email TEXT UNIQUE NOT NULL, password TEXT NOT NULL, name TEXT NOT NULL, role TEXT NOT NULL CHECK (role IN ('empleado', 'director', 'administrador')), points REAL NOT NULL DEFAULT 0);
+  CREATE TABLE IF NOT EXISTS clients (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, code TEXT UNIQUE NOT NULL, address TEXT, fiscal_id_type TEXT, fiscal_id TEXT);
   CREATE TABLE IF NOT EXISTS contacts (id INTEGER PRIMARY KEY AUTOINCREMENT, client_id INTEGER NOT NULL, type TEXT, name TEXT, email TEXT, phone TEXT, FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE);
   CREATE TABLE IF NOT EXISTS work_orders (
     id INTEGER PRIMARY KEY AUTOINCREMENT, custom_id TEXT UNIQUE, date TEXT NOT NULL, type TEXT NOT NULL, client_id INTEGER NOT NULL,
@@ -24,10 +24,7 @@ db.exec(`
     collaborator_observations TEXT,
     status TEXT NOT NULL DEFAULT 'pendiente' CHECK(status IN ('pendiente', 'en_progreso', 'finalizada', 'facturada', 'cierre')),
     created_by INTEGER NOT NULL, assigned_to INTEGER, quotation_amount REAL, quotation_details TEXT, disposition TEXT,
-    authorized BOOLEAN NOT NULL DEFAULT FALSE,
-    started_at DATETIME,
-    completed_at DATETIME,
-    duration_minutes INTEGER,
+    authorized BOOLEAN NOT NULL DEFAULT FALSE, started_at DATETIME, completed_at DATETIME, duration_minutes INTEGER,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP, updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE,
     FOREIGN KEY (created_by) REFERENCES users(id),
@@ -46,31 +43,58 @@ if (!adminCheckStmt.get(adminEmail)) {
   ).run(adminEmail, hashedPassword, "Administrador", "administrador");
 }
 
+// --- Función para obtener puntos por tipo de CONTRATO ---
+const getPointsForContract = (contractType: string | null): number => {
+  if (!contractType) return 0;
+  const pointsMap: { [key: string]: number } = {
+    Calibracion: 1,
+    Completo: 1,
+    Ampliado: 0.5,
+    Refurbished: 0.5,
+    Fabricacion: 1,
+    "Verificacion de identidad": 0.1,
+    Reducido: 0.2,
+    "Servicio tecnico": 0.2,
+    Capacitacion: 1,
+  };
+  return pointsMap[contractType] || 0;
+};
+
 const apiRouter = express.Router();
 
-// --- RUTAS DE OT CORREGIDAS ---
-
-// [PUT] /ots/:id/stop - Empleado termina el trabajo (CÁLCULO DE TIEMPO CORREGIDO)
+// --- RUTAS DE OT ---
 apiRouter.put("/ots/:id/stop", (req: Request, res: Response) => {
   try {
     const ot = db
-      .prepare("SELECT started_at FROM work_orders WHERE id = ?")
-      .get(req.params.id) as { started_at: string };
+      .prepare(
+        "SELECT started_at, assigned_to, contract FROM work_orders WHERE id = ?"
+      )
+      .get(req.params.id) as {
+      started_at: string;
+      assigned_to: number;
+      contract: string;
+    };
     if (!ot || !ot.started_at)
       return res.status(400).json({ error: "El trabajo nunca fue iniciado." });
 
     const startTime = new Date(ot.started_at).getTime();
-    const endTime = new Date().getTime(); // Se usa la fecha actual real del servidor
-    const duration_minutes = Math.round((endTime - startTime) / (1000 * 60)); // Cálculo correcto
+    const endTime = new Date().getTime();
+    const duration_minutes = Math.round((endTime - startTime) / (1000 * 60));
+    const points = getPointsForContract(ot.contract);
 
-    const info = db
-      .prepare(
+    const stopTransaction = db.transaction(() => {
+      db.prepare(
         "UPDATE work_orders SET status = 'finalizada', completed_at = CURRENT_TIMESTAMP, duration_minutes = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?"
-      )
-      .run(duration_minutes, req.params.id);
+      ).run(duration_minutes, req.params.id);
+      if (ot.assigned_to && points > 0) {
+        db.prepare("UPDATE users SET points = points + ? WHERE id = ?").run(
+          points,
+          ot.assigned_to
+        );
+      }
+    });
 
-    if (info.changes === 0)
-      return res.status(404).json({ error: "OT no encontrada." });
+    stopTransaction();
     const updatedOT = db
       .prepare("SELECT * FROM work_orders WHERE id = ?")
       .get(req.params.id);
@@ -80,25 +104,40 @@ apiRouter.put("/ots/:id/stop", (req: Request, res: Response) => {
   }
 });
 
-// [PUT] /ots/:id - Actualiza una OT (LÓGICA DE PERMISOS CORREGIDA)
+// --- OTRAS RUTAS (INCLUIDAS COMPLETAS) ---
+apiRouter.get("/ots/timeline", (req: Request, res: Response) => {
+  const { year, month, assigned_to } = req.query;
+  if (!year || !month || !assigned_to) {
+    return res.status(400).json({ error: "Faltan parámetros." });
+  }
+  try {
+    const startDate = new Date(Date.UTC(Number(year), Number(month) - 1, 1));
+    const endDate = new Date(Date.UTC(Number(year), Number(month), 1));
+    const query = ` SELECT id, custom_id, product, started_at, completed_at, status, duration_minutes FROM work_orders WHERE assigned_to = ? AND authorized = 1 AND started_at IS NOT NULL AND started_at < ? AND (completed_at >= ? OR completed_at IS NULL) `;
+    const ots = db
+      .prepare(query)
+      .all(assigned_to, endDate.toISOString(), startDate.toISOString());
+    res.status(200).json(ots);
+  } catch (error) {
+    res
+      .status(500)
+      .json({ error: "Error al obtener datos para la línea de tiempo." });
+  }
+});
 apiRouter.put("/ots/:id", (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const { role, ...dataToUpdate } = req.body; // Separamos el rol del resto de los datos
+    const { role, ...dataToUpdate } = req.body;
     const ot = db
       .prepare("SELECT status FROM work_orders WHERE id = ?")
       .get(id) as { status: string };
-
     if (!ot) return res.status(404).json({ error: "OT no encontrada." });
-
-    // Si el que edita es un empleado
     if (role === "empleado") {
       if (ot.status === "cierre") {
         return res
           .status(403)
           .json({ error: "No puedes editar una OT cerrada." });
       }
-      // El empleado solo puede actualizar sus propias observaciones
       const info = db
         .prepare(
           `UPDATE work_orders SET collaborator_observations = ?, updated_at=CURRENT_TIMESTAMP WHERE id=?`
@@ -106,10 +145,7 @@ apiRouter.put("/ots/:id", (req: Request, res: Response) => {
         .run(dataToUpdate.collaborator_observations, id);
       if (info.changes === 0)
         return res.status(404).json({ error: "OT no encontrada." });
-    }
-    // Si es un admin o director
-    else if (role === "director" || role === "administrador") {
-      // Pueden editar la parte administrativa en cualquier momento
+    } else if (role === "director" || role === "administrador") {
       const {
         quotation_amount,
         quotation_details,
@@ -127,8 +163,6 @@ apiRouter.put("/ots/:id", (req: Request, res: Response) => {
         assigned_to,
         id
       );
-
-      // Pero solo pueden editar los datos principales si está pendiente
       if (ot.status === "pendiente") {
         const {
           date,
@@ -161,7 +195,6 @@ apiRouter.put("/ots/:id", (req: Request, res: Response) => {
         .status(403)
         .json({ error: "No tienes permisos para realizar esta acción." });
     }
-
     const updatedOT = db
       .prepare("SELECT * FROM work_orders WHERE id = ?")
       .get(id);
@@ -173,8 +206,6 @@ apiRouter.put("/ots/:id", (req: Request, res: Response) => {
       .json({ error: "Error interno del servidor al actualizar la OT." });
   }
 });
-
-// ... (El resto de las rutas no cambian, pero se incluyen completas por seguridad)
 apiRouter.get("/ots", (req: Request, res: Response) => {
   try {
     const { assigned_to, role } = req.query;
@@ -280,7 +311,7 @@ apiRouter.post("/auth/login", (req: Request, res: Response) => {
 apiRouter.get("/users", (req: Request, res: Response) => {
   try {
     const users = db
-      .prepare("SELECT id, email, name, role FROM users ORDER BY name")
+      .prepare("SELECT id, email, name, role, points FROM users ORDER BY name")
       .all();
     res.status(200).json(users);
   } catch (error) {
@@ -301,7 +332,7 @@ apiRouter.post("/users", (req: Request, res: Response) => {
       )
       .run(email, hashedPassword, name, role);
     const newUser = db
-      .prepare("SELECT id, email, name, role FROM users WHERE id = ?")
+      .prepare("SELECT id, email, name, role, points FROM users WHERE id = ?")
       .get(info.lastInsertRowid);
     res.status(201).json(newUser);
   } catch (error: any) {

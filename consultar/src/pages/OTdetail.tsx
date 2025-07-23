@@ -94,7 +94,10 @@ const OTDetail: React.FC = () => {
   const canAdminEditMainData = otData.status === "pendiente";
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
+    <form
+      onSubmit={handleSubmit(onSubmit)}
+      className="space-y-8 bg-gray-50 dark:bg-gray-900 p-6 rounded-lg"
+    >
       <div className="flex justify-between items-center">
         <Button type="button" variant="ghost" onClick={() => navigate("/ot")}>
           <ArrowLeft className="mr-2 h-5 w-5" />
@@ -192,26 +195,46 @@ const OTDetail: React.FC = () => {
               value={otData.custom_id || `Interno #${id}`}
               readOnly
             />
-            {!isEmployee && (
-              <Input label="Contrato" {...register("contract")} />
-            )}
+            {/* --- CAMBIO AQUÍ: CONTRATO ES UN SELECT --- */}
+            <div>
+              <label className="text-sm font-medium dark:text-gray-300">
+                Contrato
+              </label>
+              <select
+                {...register("contract")}
+                className="w-full mt-1 p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
+              >
+                <option value="">Ninguno</option>
+                <option value="Calibracion">Calibración</option>
+                <option value="Completo">Completo</option>
+                <option value="Ampliado">Ampliado</option>
+                <option value="Refurbished">Refurbished</option>
+                <option value="Fabricacion">Fabricación</option>
+                <option value="Verificacion de identidad">
+                  Verificación de Identidad
+                </option>
+                <option value="Reducido">Reducido</option>
+                <option value="Servicio tecnico">Servicio Técnico</option>
+                <option value="Capacitacion">Capacitación</option>
+              </select>
+            </div>
           </div>
         </fieldset>
 
-        {!isEmployee && (
-          <fieldset
-            disabled={isDirectorOrAdmin() && !canAdminEditMainData}
-            className="disabled:opacity-70"
-          >
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 border-b dark:border-gray-700 pb-6">
-              <h2 className="text-lg font-semibold text-blue-700 dark:text-blue-400 col-span-full">
-                Información del Cliente
-              </h2>
-              <Input label="Empresa" value={otData.client_name} readOnly />
-              <Input label="Nº Cliente" value={otData.client_code} readOnly />
-            </div>
-          </fieldset>
-        )}
+        <fieldset
+          disabled={
+            isEmployee || (isDirectorOrAdmin() && !canAdminEditMainData)
+          }
+          className="disabled:opacity-70"
+        >
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 border-b dark:border-gray-700 pb-6">
+            <h2 className="text-lg font-semibold text-blue-700 dark:text-blue-400 col-span-full">
+              Información del Cliente
+            </h2>
+            <Input label="Empresa" value={otData.client_name} readOnly />
+            <Input label="Nº Cliente" value={otData.client_code} readOnly />
+          </div>
+        </fieldset>
 
         <fieldset
           disabled={

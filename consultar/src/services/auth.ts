@@ -1,14 +1,14 @@
-// RUTA: /cliente/src/services/auth.ts (CORREGIDO)
+// RUTA: /cliente/src/services/auth.ts
 
-import axiosInstance from '../api/axiosInstance';
+import axiosInstance from "../api/axiosInstance";
 
-// --- Interfaces ---
 export interface User {
   id: number;
   email: string;
   name: string;
-  role: 'empleado' | 'director' | 'administrador';
-  created_at?: string; // Hacemos opcional lo que puede no venir siempre
+  role: "empleado" | "director" | "administrador";
+  points: number; // CAMBIO: AÑADIDO
+  created_at?: string;
 }
 
 export interface LoginCredentials {
@@ -16,52 +16,26 @@ export interface LoginCredentials {
   password: string;
 }
 
-// --- Clase de Servicio ---
 class AuthService {
   async login(credentials: LoginCredentials): Promise<User> {
-    try {
-      const response = await axiosInstance.post('/auth/login', credentials);
-      return response.data;
-    } catch (error: any) {
-      if (error.response && error.response.data && error.response.data.error) {
-        throw new Error(error.response.data.error);
-      }
-      throw new Error('Error de conexión con el servidor.');
-    }
+    const response = await axiosInstance.post("/auth/login", credentials);
+    return response.data;
   }
 
   async getAllUsers(): Promise<User[]> {
-    try {
-      const response = await axiosInstance.get('/users');
-      return response.data;
-    } catch (error) {
-      console.error('Error fetching users:', error);
-      throw new Error('No se pudieron cargar los usuarios.');
-    }
+    const response = await axiosInstance.get("/users");
+    return response.data;
   }
 
-  async createUser(userData: Omit<User, 'id' | 'created_at'> & { password?: string }): Promise<User> {
-    try {
-      const response = await axiosInstance.post('/users', userData);
-      return response.data;
-    } catch (error: any) {
-      if (error.response && error.response.data && error.response.data.error) {
-        throw new Error(error.response.data.error);
-      }
-      throw new Error('Error al crear el usuario.');
-    }
+  async createUser(
+    userData: Omit<User, "id" | "created_at" | "points"> & { password?: string }
+  ): Promise<User> {
+    const response = await axiosInstance.post("/users", userData);
+    return response.data;
   }
 
-  // --- MÉTODO DELETEUSER MOVIDO AQUÍ DENTRO ---
   async deleteUser(userId: number): Promise<void> {
-    try {
-      await axiosInstance.delete(`/users/${userId}`);
-    } catch (error: any) {
-      if (error.response && error.response.data && error.response.data.error) {
-        throw new Error(error.response.data.error);
-      }
-      throw new Error('Error al eliminar el usuario.');
-    }
+    await axiosInstance.delete(`/users/${userId}`);
   }
 }
 
