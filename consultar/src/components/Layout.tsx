@@ -12,6 +12,7 @@ import {
   Menu,
   X,
   FlaskConical,
+  Bot,
 } from "lucide-react";
 import ThemeToggle from "./ui/ThemeToggle";
 
@@ -46,6 +47,12 @@ const Layout: React.FC = () => {
       path: "/usuarios",
       roles: ["administrador"],
     },
+    {
+      icon: Bot,
+      label: "Asistente IA",
+      path: "/asistente",
+      roles: ["empleado", "director", "administrador"],
+    }, // AÑADIDO
   ];
 
   const filteredMenuItems = menuItems.filter((item) =>
@@ -91,7 +98,6 @@ const Layout: React.FC = () => {
                     <li key={item.path}>
                       <button
                         onClick={() => navigate(item.path)}
-                        // --- CAMBIO AQUÍ: AÑADIMOS CLASES PARA MODO OSCURO ---
                         className={`group flex w-full gap-x-3 rounded-md p-3 text-left text-base font-medium leading-6 transition-colors ${
                           isActivePath(item.path)
                             ? "bg-blue-50 text-blue-700 dark:bg-blue-900/50 dark:text-white"

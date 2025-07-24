@@ -12,37 +12,36 @@ import Layout from "./components/Layout";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import Usuarios from "./pages/Usuarios";
-import UserChart from "./pages/UserChart"; // 1. IMPORTAMOS la nueva página
+import UserChart from "./pages/UserChart";
 import Clientes from "./pages/Clientes";
 import ClienteCreate from "./pages/ClienteCreate";
 import ClienteDetail from "./pages/ClienteDetail";
 import OT from "./pages/ot";
 import OTCreate from "./pages/OTCreate";
 import OTDetail from "./pages/OTdetail";
+import Asistente from "./pages/Asistente"; // 1. IMPORTAMOS la nueva página
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
   const { user, loading } = useAuth();
-  if (loading) {
+  if (loading)
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
       </div>
     );
-  }
   return user ? <>{children}</> : <Navigate to="/login" />;
 };
 
 const PublicRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, loading } = useAuth();
-  if (loading) {
+  if (loading)
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
       </div>
     );
-  }
   return user ? <Navigate to="/" /> : <>{children}</>;
 };
 
@@ -75,7 +74,8 @@ function App() {
             <Route path="clientes/crear" element={<ClienteCreate />} />
             <Route path="clientes/editar/:id" element={<ClienteDetail />} />
             <Route path="usuarios" element={<Usuarios />} />
-            <Route path="usuarios/grafico" element={<UserChart />} />{" "}
+            <Route path="usuarios/grafico" element={<UserChart />} />
+            <Route path="asistente" element={<Asistente />} />{" "}
             {/* 2. AÑADIMOS la nueva ruta */}
           </Route>
         </Routes>

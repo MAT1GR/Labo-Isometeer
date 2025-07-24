@@ -26,6 +26,8 @@ export interface WorkOrder {
   authorized: boolean;
   started_at?: string | null;
   completed_at?: string | null;
+  paused_at?: string | null;
+  total_pause_duration?: number;
   duration_minutes?: number | null;
   created_at: string;
   updated_at?: string;
@@ -35,12 +37,31 @@ export interface WorkOrder {
   assigned_to_name?: string;
 }
 
+export interface TimelineOt {
+  id: number;
+  custom_id?: string;
+  product: string;
+  started_at: string;
+  completed_at: string | null;
+  status: string;
+  duration_minutes?: number | null;
+}
+
 class OTService {
   async getAllOTs(user: User | null): Promise<WorkOrder[]> {
     if (!user) return [];
     const response = await axiosInstance.get("/ots", {
       params: { role: user.role, assigned_to: user.id },
     });
+    return response.data;
+  }
+
+  async getTimelineData(params: {
+    year: number;
+    month: number;
+    assigned_to: number;
+  }): Promise<TimelineOt[]> {
+    const response = await axiosInstance.get("/ots/timeline", { params });
     return response.data;
   }
 
@@ -79,6 +100,16 @@ class OTService {
 
   async stopOT(id: number): Promise<WorkOrder> {
     const response = await axiosInstance.put(`/ots/${id}/stop`);
+    return response.data;
+  }
+
+  async pauseOT(id: number): Promise<WorkOrder> {
+    const response = await axiosInstance.put(`/ots/${id}/pause`);
+    return response.data;
+  }
+
+  async resumeOT(id: number): Promise<WorkOrder> {
+    const response = await axiosInstance.put(`/ots/${id}/resume`);
     return response.data;
   }
 }

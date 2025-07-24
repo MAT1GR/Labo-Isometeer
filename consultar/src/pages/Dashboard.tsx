@@ -24,7 +24,7 @@ import {
   LabelList,
   ReferenceLine,
 } from "recharts";
-import { otService, TimelineOt } from "../services/otService";
+import { otService, TimelineOt } from "../services/otService"; // <-- IMPORTACIÓN CORREGIDA
 import useSWR from "swr";
 import axiosInstance from "../api/axiosInstance";
 

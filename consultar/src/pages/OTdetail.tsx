@@ -8,7 +8,15 @@ import { authService, User } from "../services/auth";
 import { useAuth } from "../contexts/AuthContext";
 import Input from "../components/ui/Input";
 import Button from "../components/ui/Button";
-import { ArrowLeft, Save, Play, StopCircle, CheckSquare } from "lucide-react";
+import {
+  ArrowLeft,
+  Save,
+  Play,
+  StopCircle,
+  CheckSquare,
+  Pause,
+  PlayCircle,
+} from "lucide-react";
 import { mutate } from "swr";
 
 const OTDetail: React.FC = () => {
@@ -85,12 +93,22 @@ const OTDetail: React.FC = () => {
     await otService.stopOT(Number(id));
     await loadData();
   };
+  const handlePauseWork = async () => {
+    if (!id) return;
+    await otService.pauseOT(Number(id));
+    await loadData();
+  };
+  const handleResumeWork = async () => {
+    if (!id) return;
+    await otService.resumeOT(Number(id));
+    await loadData();
+  };
 
   if (!otData) return <div className="p-8">Cargando datos...</div>;
 
   const isEmployee = user?.role === "empleado";
   const isClosed = otData.status === "cierre";
-  const canEmployeeEdit = !isClosed;
+  const canEmployeeEditObservations = !isClosed;
   const canAdminEditMainData = otData.status === "pendiente";
 
   return (
@@ -106,15 +124,20 @@ const OTDetail: React.FC = () => {
         <h1 className="text-2xl font-bold">
           Detalle de OT: {otData.custom_id || `#${otData.id}`}
         </h1>
-        <Button
-          type="submit"
-          disabled={
-            isSubmitting || !isDirty || (isEmployee && !canEmployeeEdit)
-          }
-        >
-          <Save className="mr-2 h-5 w-5" />
-          Guardar Cambios
-        </Button>
+        {isEmployee ? (
+          <Button
+            type="submit"
+            disabled={isSubmitting || !isDirty || !canEmployeeEditObservations}
+          >
+            <Save className="mr-2 h-5 w-5" />
+            Guardar Observaciones
+          </Button>
+        ) : (
+          <Button type="submit" disabled={isSubmitting || !isDirty}>
+            <Save className="mr-2 h-5 w-5" />
+            Guardar Cambios
+          </Button>
+        )}
       </div>
 
       <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm flex flex-wrap justify-center items-center gap-4">
@@ -136,15 +159,39 @@ const OTDetail: React.FC = () => {
             <Play className="mr-2 h-5 w-5" /> Empezar Trabajo
           </Button>
         )}
-        {isEmployee && otData.started_at && !otData.completed_at && (
+
+        {isEmployee && otData.status === "en_progreso" && (
           <Button
             type="button"
-            onClick={handleStopWork}
-            className="bg-red-600 hover:bg-red-700"
+            onClick={handlePauseWork}
+            className="bg-yellow-500 hover:bg-yellow-600"
           >
-            <StopCircle className="mr-2 h-5 w-5" /> Finalizar Trabajo
+            <Pause className="mr-2 h-5 w-5" /> Pausar Trabajo
           </Button>
         )}
+        {isEmployee && otData.status === "pausada" && (
+          <Button
+            type="button"
+            onClick={handleResumeWork}
+            className="bg-cyan-500 hover:bg-cyan-600"
+          >
+            <PlayCircle className="mr-2 h-5 w-5" /> Reanudar Trabajo
+          </Button>
+        )}
+
+        {isEmployee &&
+          otData.started_at &&
+          !otData.completed_at &&
+          otData.status !== "pausada" && (
+            <Button
+              type="button"
+              onClick={handleStopWork}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              <StopCircle className="mr-2 h-5 w-5" /> Finalizar Trabajo
+            </Button>
+          )}
+
         {otData.completed_at && (
           <div className="text-center p-2 rounded-md bg-green-50 dark:bg-green-900/50 text-green-800 dark:text-green-300">
             <p className="font-semibold">Trabajo Finalizado</p>
@@ -261,7 +308,7 @@ const OTDetail: React.FC = () => {
               </h2>
               <textarea
                 {...register("collaborator_observations")}
-                disabled={!canEmployeeEdit}
+                disabled={!canEmployeeEditObservations}
                 className="w-full mt-1 p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
                 rows={4}
               ></textarea>
