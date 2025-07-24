@@ -1,0 +1,6 @@
+cliente- tiene que tener un filtro por nombre o codigo
+contrato va en actividades
+agregar rol administracion (pueden crear clientes-ots pero no autorizar)
+
+trabajar en la exportacion de la ot - modo tabla y con contrato en segunda hoja
+ 

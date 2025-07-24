@@ -19,7 +19,8 @@ import ClienteDetail from "./pages/ClienteDetail";
 import OT from "./pages/ot";
 import OTCreate from "./pages/OTCreate";
 import OTDetail from "./pages/OTdetail";
-import Asistente from "./pages/Asistente"; // 1. IMPORTAMOS la nueva página
+import Asistente from "./pages/Asistente";
+import Perfil from "./pages/Perfil"; // 1. IMPORTAMOS
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({
   children,
@@ -75,8 +76,9 @@ function App() {
             <Route path="clientes/editar/:id" element={<ClienteDetail />} />
             <Route path="usuarios" element={<Usuarios />} />
             <Route path="usuarios/grafico" element={<UserChart />} />
-            <Route path="asistente" element={<Asistente />} />{" "}
-            {/* 2. AÑADIMOS la nueva ruta */}
+            <Route path="asistente" element={<Asistente />} />
+            <Route path="perfil" element={<Perfil />} />{" "}
+            {/* 2. AÑADIMOS LA RUTA */}
           </Route>
         </Routes>
       </Router>

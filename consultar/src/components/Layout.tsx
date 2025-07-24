@@ -12,6 +12,7 @@ import {
   Menu,
   X,
   FlaskConical,
+  UserCircle,
   Bot,
 } from "lucide-react";
 import ThemeToggle from "./ui/ThemeToggle";
@@ -52,7 +53,7 @@ const Layout: React.FC = () => {
       label: "Asistente IA",
       path: "/asistente",
       roles: ["empleado", "director", "administrador"],
-    }, // AÑADIDO
+    },
   ];
 
   const filteredMenuItems = menuItems.filter((item) =>
@@ -111,7 +112,19 @@ const Layout: React.FC = () => {
                   ))}
                 </ul>
               </li>
-              <li className="mt-auto">
+              <li className="mt-auto -mx-2 space-y-1">
+                {/* --- NUEVO BOTÓN DE PERFIL --- */}
+                <button
+                  onClick={() => navigate("/perfil")}
+                  className={`group flex w-full gap-x-3 rounded-md p-3 text-left text-base font-medium leading-6 transition-colors ${
+                    isActivePath("/perfil")
+                      ? "bg-blue-50 text-blue-700 dark:bg-blue-900/50 dark:text-white"
+                      : "text-gray-700 hover:bg-gray-100 hover:text-blue-700 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-white"
+                  }`}
+                >
+                  <UserCircle className="h-6 w-6 shrink-0" />
+                  Perfil
+                </button>
                 <button
                   onClick={handleLogout}
                   className="group flex w-full gap-x-3 rounded-md p-3 text-left text-base font-medium leading-6 text-gray-700 hover:bg-gray-100 hover:text-red-700 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-red-500"

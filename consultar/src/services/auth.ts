@@ -7,8 +7,7 @@ export interface User {
   email: string;
   name: string;
   role: "empleado" | "director" | "administrador";
-  points: number; // CAMBIO: AÑADIDO
-  created_at?: string;
+  points: number;
 }
 
 export interface LoginCredentials {
@@ -28,7 +27,7 @@ class AuthService {
   }
 
   async createUser(
-    userData: Omit<User, "id" | "created_at" | "points"> & { password?: string }
+    userData: Omit<User, "id" | "points"> & { password?: string }
   ): Promise<User> {
     const response = await axiosInstance.post("/users", userData);
     return response.data;
@@ -36,6 +35,20 @@ class AuthService {
 
   async deleteUser(userId: number): Promise<void> {
     await axiosInstance.delete(`/users/${userId}`);
+  }
+
+  // --- NUEVO MÉTODO ---
+  async changePassword(
+    userId: number,
+    passwords: { currentPassword: string; newPassword: string }
+  ): Promise<void> {
+    try {
+      await axiosInstance.put(`/users/${userId}/password`, passwords);
+    } catch (error: any) {
+      throw new Error(
+        error.response?.data?.error || "Error al cambiar la contraseña."
+      );
+    }
   }
 }
 
