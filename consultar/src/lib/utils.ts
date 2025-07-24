@@ -16,7 +16,6 @@ export function formatCurrency(amount: number): string {
 }
 
 export function formatDate(dateString: string): string {
-  // Creamos la fecha en UTC para evitar problemas de zona horaria
   const date = new Date(dateString);
   const utcDate = new Date(
     date.getUTCFullYear(),
@@ -29,4 +28,20 @@ export function formatDate(dateString: string): string {
     day: "numeric",
     timeZone: "UTC",
   });
+}
+
+// --- NUEVA FUNCIÓN PARA FECHA Y HORA ---
+export function formatDateTime(dateString: string | null): string {
+  if (!dateString) return "";
+  const date = new Date(dateString);
+  return (
+    date.toLocaleString("es-AR", {
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    }) + " hs."
+  );
 }

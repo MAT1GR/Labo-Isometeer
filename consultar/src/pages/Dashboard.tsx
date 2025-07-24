@@ -253,7 +253,6 @@ const EmpleadoDashboard: React.FC = () => {
           endDateStr: ot.completed_at
             ? formatDate(ot.completed_at)
             : "En progreso",
-          totalDuration: ot.duration_minutes,
         };
       })
       .reverse();

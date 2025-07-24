@@ -18,6 +18,7 @@ import {
   PlayCircle,
 } from "lucide-react";
 import { mutate } from "swr";
+import { formatDateTime } from "../lib/utils"; // 1. IMPORTAMOS LA NUEVA FUNCIÓN
 
 const OTDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -192,11 +193,19 @@ const OTDetail: React.FC = () => {
             </Button>
           )}
 
-        {otData.completed_at && (
-          <div className="text-center p-2 rounded-md bg-green-50 dark:bg-green-900/50 text-green-800 dark:text-green-300">
-            <p className="font-semibold">Trabajo Finalizado</p>
+        {/* --- 2. CAMBIO AQUÍ: MEJORAMOS LA VISUALIZACIÓN DEL TIEMPO --- */}
+        {otData.started_at && (
+          <div className="text-center p-2 rounded-md bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 w-full">
             <p className="text-sm">
-              Duración: {otData.duration_minutes} minutos
+              <span className="font-semibold">Comienzo:</span>{" "}
+              {formatDateTime(otData.started_at)}
+              {otData.completed_at && (
+                <>
+                  <span className="font-semibold mx-2">|</span>
+                  <span className="font-semibold">Finalizado:</span>{" "}
+                  {formatDateTime(otData.completed_at)}
+                </>
+              )}
             </p>
           </div>
         )}
@@ -243,7 +252,28 @@ const OTDetail: React.FC = () => {
               readOnly
             />
             {!isEmployee && (
-              <Input label="Contrato" {...register("contract")} />
+              <div>
+                <label className="text-sm font-medium dark:text-gray-300">
+                  Contrato
+                </label>
+                <select
+                  {...register("contract")}
+                  className="w-full mt-1 p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
+                >
+                  <option value="">Ninguno</option>
+                  <option value="Calibracion">Calibración</option>
+                  <option value="Completo">Completo</option>
+                  <option value="Ampliado">Ampliado</option>
+                  <option value="Refurbished">Refurbished</option>
+                  <option value="Fabricacion">Fabricación</option>
+                  <option value="Verificacion de identidad">
+                    Verificación de Identidad
+                  </option>
+                  <option value="Reducido">Reducido</option>
+                  <option value="Servicio tecnico">Servicio Técnico</option>
+                  <option value="Capacitacion">Capacitación</option>
+                </select>
+              </div>
             )}
           </div>
         </fieldset>

@@ -28,7 +28,6 @@ export interface WorkOrder {
   completed_at?: string | null;
   paused_at?: string | null;
   total_pause_duration?: number;
-  duration_minutes?: number | null;
   created_at: string;
   updated_at?: string;
   // Campos que vienen de JOINS
@@ -44,7 +43,6 @@ export interface TimelineOt {
   started_at: string;
   completed_at: string | null;
   status: string;
-  duration_minutes?: number | null;
 }
 
 class OTService {
