@@ -12,6 +12,7 @@ import {
   Calendar,
   Clock,
   TrendingUp,
+  PieChart as PieIcon,
 } from "lucide-react";
 import {
   BarChart,
@@ -23,10 +24,16 @@ import {
   ResponsiveContainer,
   LabelList,
   ReferenceLine,
+  PieChart,
+  Pie,
+  Cell,
+  AreaChart,
+  Area,
 } from "recharts";
-import { otService, TimelineOt } from "../services/otService"; // <-- IMPORTACIÓN CORREGIDA
+import { otService, TimelineOt } from "../services/otService";
 import useSWR from "swr";
-import axiosInstance from "../api/axiosInstance";
+import { fetcher } from "../api/axiosInstance";
+import Button from "../components/ui/Button";
 
 // --- Interfaces para los datos del dashboard de Admin ---
 interface DashboardStats {
@@ -48,12 +55,18 @@ interface RecentOrder {
   status: string;
   date: string;
 }
+interface MonthlyRevenue {
+  month: string;
+  revenue: number;
+}
 
 // --- VISTA PARA ADMINISTRADORES Y DIRECTORES ---
 const AdminDirectorDashboard: React.FC = () => {
-  const { data, error, isLoading } = useSWR("/dashboard/stats", (url) =>
-    axiosInstance.get(url).then((res) => res.data)
-  );
+  const { data, error, isLoading } = useSWR<{
+    stats: DashboardStats;
+    recentOrders: RecentOrder[];
+    monthlyRevenue: MonthlyRevenue[];
+  }>("/dashboard/stats", fetcher);
 
   const getStatusColor = (status: string) => {
     switch (status.toLowerCase()) {
@@ -81,11 +94,17 @@ const AdminDirectorDashboard: React.FC = () => {
   if (error || !data)
     return <p>No se pudieron cargar los datos del dashboard.</p>;
 
-  const { stats, recentOrders } = data;
+  const { stats, recentOrders, monthlyRevenue } = data;
+
+  const otStatusData = [
+    { name: "Pendientes", value: stats.pendingOT, fill: "#f59e0b" },
+    { name: "En Progreso", value: stats.inProgressOT, fill: "#3b82f6" },
+    { name: "Finalizadas", value: stats.completedOT, fill: "#22c55e" },
+  ].filter((item) => item.value > 0);
 
   return (
     <div className="space-y-6">
-      <h1 className="text-3xl font-bold">Dashboard</h1>
+      <h1 className="text-3xl font-bold">Dashboard General</h1>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <Card>
@@ -104,82 +123,110 @@ const AdminDirectorDashboard: React.FC = () => {
         </Card>
         <Card>
           <div className="flex justify-between items-center">
-            <p className="text-sm font-medium">Pendientes</p>
-            <Clock className="h-6 w-6 text-yellow-500" />
+            <p className="text-sm font-medium">Ingresos (Simulado)</p>
+            <TrendingUp className="h-6 w-6 text-green-500" />
           </div>
-          <p className="text-3xl font-bold">{stats.pendingOT}</p>
+          <p className="text-3xl font-bold">
+            {formatCurrency(stats.totalRevenue)}
+          </p>
         </Card>
         <Card>
           <div className="flex justify-between items-center">
-            <p className="text-sm font-medium">En Progreso</p>
-            <TrendingUp className="h-6 w-6 text-blue-500" />
+            <p className="text-sm font-medium">Facturas Vencidas</p>
+            <Clock className="h-6 w-6 text-red-500" />
           </div>
-          <p className="text-3xl font-bold">{stats.inProgressOT}</p>
+          <p className="text-3xl font-bold">{stats.overdueInvoices}</p>
         </Card>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card>
-          <h2 className="text-xl font-semibold mb-4">Órdenes Recientes</h2>
-          <div className="space-y-2">
-            {recentOrders.length > 0 ? (
-              recentOrders.map((order: RecentOrder) => (
-                <div
-                  key={order.id}
-                  className="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg"
-                >
-                  <div>
-                    <p className="font-medium">
-                      OT-{order.id}: {order.client_name}
-                    </p>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">
-                      {order.product}
-                    </p>
-                  </div>
-                  <span
-                    className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(
-                      order.status
-                    )}`}
-                  >
-                    {order.status.replace("_", " ")}
-                  </span>
-                </div>
-              ))
-            ) : (
-              <p className="text-sm text-gray-500 dark:text-gray-400">
-                No hay órdenes de trabajo recientes.
-              </p>
-            )}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <Card className="lg:col-span-2">
+          <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+            <TrendingUp /> Ingresos Mensuales (Simulado)
+          </h2>
+          <div className="h-80">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={monthlyRevenue}>
+                <defs>
+                  <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.8} />
+                    <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid
+                  strokeDasharray="3 3"
+                  stroke="currentColor"
+                  strokeOpacity={0.2}
+                />
+                <XAxis
+                  dataKey="month"
+                  fontSize={12}
+                  tick={{ fill: "currentColor" }}
+                />
+                <YAxis
+                  tickFormatter={(value) => `$${Number(value) / 1000}k`}
+                  fontSize={12}
+                  tick={{ fill: "currentColor" }}
+                />
+                <Tooltip
+                  cursor={{ fill: "rgba(200, 200, 200, 0.1)" }}
+                  contentStyle={{
+                    backgroundColor: "rgba(30,41,59,0.9)",
+                    border: "none",
+                    borderRadius: "0.5rem",
+                  }}
+                  labelStyle={{ color: "#cbd5e1" }}
+                  formatter={(value: number) => [
+                    formatCurrency(value),
+                    "Ingresos",
+                  ]}
+                />
+                <Area
+                  type="monotone"
+                  dataKey="revenue"
+                  stroke="#3b82f6"
+                  fill="url(#colorRevenue)"
+                />
+              </AreaChart>
+            </ResponsiveContainer>
           </div>
         </Card>
-
-        <div className="space-y-6">
-          <Card>
-            <h2 className="text-xl font-semibold mb-4">
-              Métricas de Facturación (Simulado)
-            </h2>
-            <div className="flex justify-around text-center">
-              <div>
-                <p className="text-sm font-medium">Ingresos</p>
-                <p className="text-xl font-bold">
-                  {formatCurrency(stats.totalRevenue)}
-                </p>
-              </div>
-              <div>
-                <p className="text-sm font-medium">Pagadas</p>
-                <p className="text-xl font-bold text-green-600">
-                  {stats.paidInvoices}
-                </p>
-              </div>
-              <div>
-                <p className="text-sm font-medium">Vencidas</p>
-                <p className="text-xl font-bold text-red-500">
-                  {stats.overdueInvoices}
-                </p>
-              </div>
-            </div>
-          </Card>
-        </div>
+        <Card>
+          <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+            <PieIcon /> Estado de OTs
+          </h2>
+          <div className="h-80">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie
+                  data={otStatusData}
+                  dataKey="value"
+                  nameKey="name"
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={60}
+                  outerRadius={80}
+                  paddingAngle={5}
+                  label={({ name, percent }) =>
+                    `${name} ${(percent * 100).toFixed(0)}%`
+                  }
+                >
+                  {otStatusData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.fill} />
+                  ))}
+                </Pie>
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: "rgba(30,41,59,0.9)",
+                    border: "none",
+                    borderRadius: "0.5rem",
+                  }}
+                  itemStyle={{ color: "#cbd5e1" }}
+                />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+        </Card>
       </div>
     </div>
   );
@@ -253,6 +300,7 @@ const EmpleadoDashboard: React.FC = () => {
           endDateStr: ot.completed_at
             ? formatDate(ot.completed_at)
             : "En progreso",
+          totalDuration: ot.duration_minutes,
         };
       })
       .reverse();
@@ -345,13 +393,15 @@ const EmpleadoDashboard: React.FC = () => {
                 >
                   <CartesianGrid
                     strokeDasharray="3 3"
-                    stroke="rgba(128, 128, 128, 0.2)"
+                    stroke="currentColor"
+                    strokeOpacity={0.2}
                   />
                   <XAxis
                     type="number"
                     domain={[1, daysInMonth]}
                     ticks={Array.from({ length: daysInMonth }, (_, i) => i + 1)}
                     allowDecimals={false}
+                    tick={{ fill: "currentColor", fontSize: 12 }}
                   />
                   <YAxis
                     dataKey="name"

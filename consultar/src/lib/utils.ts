@@ -15,7 +15,9 @@ export function formatCurrency(amount: number): string {
   }).format(amount);
 }
 
-export function formatDate(dateString: string): string {
+export function formatDate(dateString: string | null): string {
+  if (!dateString) return "N/A";
+  // Creamos la fecha en UTC para evitar problemas de zona horaria
   const date = new Date(dateString);
   const utcDate = new Date(
     date.getUTCFullYear(),
@@ -23,9 +25,9 @@ export function formatDate(dateString: string): string {
     date.getUTCDate()
   );
   return utcDate.toLocaleDateString("es-AR", {
+    day: "2-digit",
+    month: "2-digit",
     year: "numeric",
-    month: "long",
-    day: "numeric",
     timeZone: "UTC",
   });
 }

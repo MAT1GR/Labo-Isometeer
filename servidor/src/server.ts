@@ -44,6 +44,65 @@ if (!adminCheckStmt.get(adminEmail)) {
     "INSERT INTO users (email, password, name, role) VALUES (?, ?, ?, ?)"
   ).run(adminEmail, hashedPassword, "Administrador", "administrador");
 }
+const apiRouter = express.Router();
+// --- RUTA DEL DASHBOARD DEL EMPLEADO (CORREGIDA) ---
+apiRouter.get("/performance/:userId", (req: Request, res: Response) => {
+  const { userId } = req.params;
+  const { period } = req.query; // 'week', 'month', 'year'
+
+  let groupBy, dateFormat;
+  const now = new Date();
+  let startDate = "";
+
+  switch (period) {
+    case "month":
+      groupBy = "strftime('%d', completed_at)";
+      dateFormat = "%d";
+      startDate = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+      break;
+    case "year":
+      groupBy = "strftime('%m', completed_at)";
+      dateFormat = "%m";
+      startDate = new Date(now.getFullYear(), 0, 1).toISOString();
+      break;
+    case "week":
+    default:
+      groupBy = "strftime('%w', completed_at)";
+      dateFormat = "%w"; // Día de la semana (0=Domingo, 1=Lunes...)
+      const firstDayOfWeek =
+        now.getDate() - now.getDay() + (now.getDay() === 0 ? -6 : 1);
+      startDate = new Date(now.setDate(firstDayOfWeek)).toISOString();
+      break;
+  }
+
+  try {
+    const query = `
+            SELECT
+                strftime(${dateFormat}, completed_at) as label,
+                SUM(duration_minutes) as total_minutes
+            FROM work_orders
+            WHERE assigned_to = ? AND status = 'finalizada' AND completed_at >= ?
+            GROUP BY label
+            ORDER BY label;
+        `;
+    // --- CORRECCIÓN AQUÍ ---
+    // Le decimos a TypeScript cómo son los datos que esperamos de la DB
+    const results = db.prepare(query).all(userId, startDate) as {
+      label: string;
+      total_minutes: number;
+    }[];
+
+    const data = results.map((row) => ({
+      label: row.label,
+      hours: parseFloat((row.total_minutes / 60).toFixed(2)),
+    }));
+
+    res.status(200).json(data);
+  } catch (error) {
+    console.error("Error en GET /performance/:userId", error);
+    res.status(500).json({ error: "Error al obtener datos de rendimiento." });
+  }
+});
 
 // --- Función para obtener puntos (sin cambios) ---
 const getPointsForContract = (contractType: string | null): number => {
@@ -61,35 +120,76 @@ const getPointsForContract = (contractType: string | null): number => {
   };
   return pointsMap[contractType] || 0;
 };
-const apiRouter = express.Router();
 
-// --- NUEVA RUTA PARA EL GRÁFICO DEL DASHBOARD ---
+// [GET] /dashboard/stats - RUTA CORREGIDA
+apiRouter.get("/dashboard/stats", (req: Request, res: Response) => {
+  try {
+    const getCount = (table: string, whereClause: string = "1 = 1") =>
+      (
+        db
+          .prepare(
+            `SELECT COUNT(*) as count FROM ${table} WHERE ${whereClause}`
+          )
+          .get() as { count: number }
+      ).count;
+    const statsData = {
+      stats: {
+        totalOT: getCount("work_orders"),
+        totalClients: getCount("clients"),
+        pendingOT: getCount(
+          "work_orders",
+          "status = 'pendiente' OR status = 'autorizada'"
+        ),
+        inProgressOT: getCount(
+          "work_orders",
+          "status = 'en_progreso' OR status = 'pausada'"
+        ),
+        completedOT: getCount("work_orders", "status = 'finalizada'"),
+        billedOT: getCount("work_orders", "status = 'facturada'"),
+        totalRevenue: 2450000,
+        paidInvoices: 89,
+        unpaidInvoices: 23,
+        overdueInvoices: 8,
+      },
+      recentOrders: db
+        .prepare(
+          `
+                SELECT ot.id, ot.product, ot.status, ot.date, c.name as client_name 
+                FROM work_orders ot 
+                JOIN clients c ON ot.client_id = c.id 
+                ORDER BY ot.created_at DESC LIMIT 5
+            `
+        )
+        .all(),
+      monthlyRevenue: [
+        { month: "Ene", revenue: 180000 },
+        { month: "Feb", revenue: 220000 },
+        { month: "Mar", revenue: 195000 },
+        { month: "Abr", revenue: 280000 },
+        { month: "May", revenue: 245000 },
+        { month: "Jun", revenue: 310000 },
+      ],
+    };
+    res.status(200).json(statsData);
+  } catch (error) {
+    console.error("Error en /dashboard/stats:", error);
+    res.status(500).json({ error: "Error al obtener las estadísticas." });
+  }
+});
+
+// [GET] /ots/timeline - RUTA CORREGIDA
 apiRouter.get("/ots/timeline", (req: Request, res: Response) => {
   const { year, month, assigned_to } = req.query;
-
-  if (!year || !month || !assigned_to) {
-    return res
-      .status(400)
-      .json({
-        error: "Faltan parámetros: año, mes y usuario asignado son requeridos.",
-      });
-  }
-
+  if (!year || !month || !assigned_to)
+    return res.status(400).json({ error: "Faltan parámetros." });
   try {
     const startDate = new Date(Date.UTC(Number(year), Number(month) - 1, 1));
     const endDate = new Date(Date.UTC(Number(year), Number(month), 1));
-
-    // La consulta busca OTs que se superponen con el rango de fechas del mes seleccionado
     const query = `
             SELECT id, custom_id, product, started_at, completed_at, status, duration_minutes
             FROM work_orders
-            WHERE assigned_to = ? 
-              AND authorized = 1
-              AND started_at IS NOT NULL
-              AND started_at < ?
-              AND (completed_at >= ? OR completed_at IS NULL)
+            WHERE assigned_to = ? AND authorized = 1 AND started_at IS NOT NULL AND started_at < ? AND (completed_at >= ? OR completed_at IS NULL)
         `;
-
     const ots = db
       .prepare(query)
       .all(assigned_to, endDate.toISOString(), startDate.toISOString());
@@ -98,7 +198,7 @@ apiRouter.get("/ots/timeline", (req: Request, res: Response) => {
     console.error("Error en GET /ots/timeline:", error);
     res
       .status(500)
-      .json({ error: "Error al obtener los datos para la línea de tiempo." });
+      .json({ error: "Error al obtener datos para la línea de tiempo." });
   }
 });
 
@@ -270,12 +370,10 @@ apiRouter.put("/ots/:id/deauthorize", (req: Request, res: Response) => {
       .get(req.params.id) as { status: string };
     if (!ot) return res.status(404).json({ error: "OT no encontrada." });
     if (ot.status !== "pendiente") {
-      return res
-        .status(403)
-        .json({
-          error:
-            "No se puede desautorizar una OT que ya está en progreso o finalizada.",
-        });
+      return res.status(403).json({
+        error:
+          "No se puede desautorizar una OT que ya está en progreso o finalizada.",
+      });
     }
     const info = db
       .prepare(
@@ -370,12 +468,10 @@ apiRouter.delete("/users/:id", (req: Request, res: Response) => {
     res.status(200).json({ message: "Usuario eliminado con éxito." });
   } catch (error: any) {
     if (error.code === "SQLITE_CONSTRAINT_FOREIGNKEY")
-      return res
-        .status(400)
-        .json({
-          error:
-            "No se puede eliminar el usuario porque ha creado Órdenes de Trabajo.",
-        });
+      return res.status(400).json({
+        error:
+          "No se puede eliminar el usuario porque ha creado Órdenes de Trabajo.",
+      });
     res.status(500).json({ error: "Error interno del servidor." });
   }
 });
@@ -538,12 +634,10 @@ apiRouter.post("/clients/bulk-import", (req: Request, res: Response) => {
   });
   try {
     insertMany(clients);
-    res
-      .status(200)
-      .json({
-        imported: importedCount,
-        duplicates: clients.length - importedCount,
-      });
+    res.status(200).json({
+      imported: importedCount,
+      duplicates: clients.length - importedCount,
+    });
   } catch (error) {
     res.status(500).json({ error: "Error al procesar la importación." });
   }
@@ -668,7 +762,9 @@ apiRouter.delete("/ots/:id", (req, res) => {
     res.status(500).json({ error: "Error interno del servidor." });
   }
 });
-apiRouter.get("/dashboard/stats", (req, res) => {
+
+// --- RUTA DEL DASHBOARD MEJORADA CON DATOS REALES ---
+apiRouter.get("/dashboard/stats", (req: Request, res: Response) => {
   try {
     const getCount = (table: string, whereClause: string = "1 = 1") =>
       (
@@ -678,24 +774,40 @@ apiRouter.get("/dashboard/stats", (req, res) => {
           )
           .get() as { count: number }
       ).count;
+
     const statsData = {
       stats: {
         totalOT: getCount("work_orders"),
         totalClients: getCount("clients"),
-        pendingOT: getCount("work_orders", "status = 'pendiente'"),
-        inProgressOT: getCount("work_orders", "status = 'en_progreso'"),
+        pendingOT: getCount(
+          "work_orders",
+          "status = 'pendiente' OR status = 'autorizada'"
+        ),
+        inProgressOT: getCount(
+          "work_orders",
+          "status = 'en_progreso' OR status = 'pausada'"
+        ),
         completedOT: getCount("work_orders", "status = 'finalizada'"),
         billedOT: getCount("work_orders", "status = 'facturada'"),
-        totalRevenue: 2450000,
-        paidInvoices: 89,
-        unpaidInvoices: 23,
-        overdueInvoices: 8,
+        totalRevenue: 2450000, // Dato simulado
+        paidInvoices: 89, // Dato simulado
+        unpaidInvoices: 23, // Dato simulado
+        overdueInvoices: 8, // Dato simulado
       },
       recentOrders: db
         .prepare(
           `SELECT ot.id, ot.product, ot.status, ot.date, c.name as client_name FROM work_orders ot JOIN clients c ON ot.client_id = c.id ORDER BY ot.created_at DESC LIMIT 5`
         )
         .all(),
+      // Datos simulados para el gráfico de ingresos, como antes
+      monthlyRevenue: [
+        { month: "Ene", revenue: 180000 },
+        { month: "Feb", revenue: 220000 },
+        { month: "Mar", revenue: 195000 },
+        { month: "Abr", revenue: 280000 },
+        { month: "May", revenue: 245000 },
+        { month: "Jun", revenue: 310000 },
+      ],
     };
     res.status(200).json(statsData);
   } catch (error) {

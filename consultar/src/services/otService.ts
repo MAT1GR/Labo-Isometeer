@@ -37,6 +37,7 @@ export interface WorkOrder {
 }
 
 export interface TimelineOt {
+  duration_minutes: any;
   id: number;
   custom_id?: string;
   product: string;
@@ -46,6 +47,15 @@ export interface TimelineOt {
 }
 
 class OTService {
+  async getEmployeePerformance(params: {
+    period: "week" | "month" | "year";
+    userId: number;
+  }): Promise<Performance[]> {
+    const response = await axiosInstance.get(`/performance/${params.userId}`, {
+      params: { period: params.period },
+    });
+    return response.data;
+  }
   async getAllOTs(user: User | null): Promise<WorkOrder[]> {
     if (!user) return [];
     const response = await axiosInstance.get("/ots", {
