@@ -52,11 +52,15 @@ const Login: React.FC = () => {
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-800 dark:to-gray-900 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8">
         <div className="text-center">
-          <div className="mx-auto h-16 w-16 bg-blue-600 rounded-full flex items-center justify-center mb-4">
-            <FlaskConical className="h-8 w-8 text-white" />
+          <div className="mx-auto h-16 w-32 rounded-full flex items-center justify-center mb-4">
+            <img
+              className="h-auto w-auto"
+              src="public/logo.png"
+              alt="Logo de la Empresa"
+            />
           </div>
           <h2 className="mt-6 text-3xl font-bold text-gray-900 dark:text-gray-100">
-            Laboratorio Consultar
+            ISOmeter Go
           </h2>
           <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
             Sistema de Gestión Interno
