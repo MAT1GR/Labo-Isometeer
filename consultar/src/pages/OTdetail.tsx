@@ -1,4 +1,4 @@
-// RUTA: /cliente/src/pages/OTdetail.tsx
+// RUTA: /cliente/src/pages/OTDetail.tsx
 
 import React, { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
@@ -8,13 +8,19 @@ import { authService, User } from "../services/auth";
 import { useAuth } from "../contexts/AuthContext";
 import Input from "../components/ui/Input";
 import Button from "../components/ui/Button";
-import { ArrowLeft, Save, Play, StopCircle, CheckSquare } from "lucide-react";
+import {
+  ArrowLeft,
+  Save,
+  Play,
+  StopCircle,
+  CheckSquare,
+  XSquare,
+} from "lucide-react";
 import { mutate } from "swr";
 
 const OTDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  // CORREGIDO: Se usan las nuevas funciones de permisos del contexto
   const { user, canViewAdminContent, canAuthorizeOT } = useAuth();
   const {
     register,
@@ -37,7 +43,6 @@ const OTDetail: React.FC = () => {
       try {
         const [ot, userList] = await Promise.all([
           otService.getOTById(Number(id)),
-          // CORREGIDO: Se usa la función correcta para cargar la lista de usuarios
           canViewAdminContent()
             ? authService.getAllUsers()
             : Promise.resolve([]),
@@ -79,6 +84,14 @@ const OTDetail: React.FC = () => {
     await loadData();
     mutate(["/ots", user]);
   };
+
+  const handleDeauthorize = async () => {
+    if (!id) return;
+    await otService.deauthorizeOT(Number(id));
+    await loadData();
+    mutate(["/ots", user]);
+  };
+
   const handleStartWork = async () => {
     if (!id) return;
     await otService.startOT(Number(id));
@@ -94,8 +107,9 @@ const OTDetail: React.FC = () => {
 
   const isEmployee = user?.role === "empleado";
   const isClosed = otData.status === "cierre";
-  const canEmployeeEdit = !isClosed;
-  const canAdminEditMainData = otData.status === "pendiente";
+
+  // Lógica de edición mejorada
+  const isFormEditableForAdmin = canViewAdminContent() && !isClosed;
 
   return (
     <form
@@ -112,9 +126,7 @@ const OTDetail: React.FC = () => {
         </h1>
         <Button
           type="submit"
-          disabled={
-            isSubmitting || !isDirty || (isEmployee && !canEmployeeEdit)
-          }
+          disabled={isSubmitting || !isDirty || (isEmployee && isClosed)}
         >
           <Save className="mr-2 h-5 w-5" />
           Guardar Cambios
@@ -122,7 +134,6 @@ const OTDetail: React.FC = () => {
       </div>
 
       <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm flex flex-wrap justify-center items-center gap-4">
-        {/* CORREGIDO: Se usa canAuthorizeOT para el botón de autorizar */}
         {canAuthorizeOT() && !otData.authorized && (
           <Button
             type="button"
@@ -132,6 +143,13 @@ const OTDetail: React.FC = () => {
             <CheckSquare className="mr-2 h-5 w-5" /> Autorizar OT
           </Button>
         )}
+        {canAuthorizeOT() &&
+          otData.authorized &&
+          otData.status === "pendiente" && (
+            <Button type="button" onClick={handleDeauthorize} variant="danger">
+              <XSquare className="mr-2 h-5 w-5" /> Desautorizar OT
+            </Button>
+          )}
         {isEmployee && otData.authorized && !otData.started_at && (
           <Button
             type="button"
@@ -160,26 +178,21 @@ const OTDetail: React.FC = () => {
         )}
       </div>
 
-      {canViewAdminContent() && !canAdminEditMainData && (
-        <div className="p-4 bg-yellow-50 dark:bg-yellow-900/50 text-yellow-800 dark:text-yellow-300 rounded-md text-center font-semibold">
-          Los datos principales de esta OT no se pueden editar porque ya está en
-          progreso o finalizada. Solo se puede modificar la sección de
-          Administración.
-        </div>
-      )}
-
       <div className="bg-white dark:bg-gray-800 dark:border dark:border-gray-700 p-6 rounded-lg shadow-sm space-y-8">
         <fieldset
-          disabled={
-            isEmployee || (canViewAdminContent() && !canAdminEditMainData)
-          }
+          disabled={!isFormEditableForAdmin && !isEmployee}
           className="disabled:opacity-70"
         >
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6 border-b dark:border-gray-700 pb-6">
             <h2 className="text-lg font-semibold text-blue-700 dark:text-blue-400 col-span-full">
               OT Seleccionada
             </h2>
-            <Input label="Fecha" type="date" {...register("date")} />
+            <Input
+              label="Fecha"
+              type="date"
+              {...register("date")}
+              disabled={isEmployee}
+            />
             <div>
               <label className="text-sm font-medium dark:text-gray-300">
                 Tipo de OT
@@ -187,6 +200,7 @@ const OTDetail: React.FC = () => {
               <select
                 {...register("type")}
                 className="w-full mt-1 p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
+                disabled={isEmployee}
               >
                 <option value="Produccion">Producción</option>
                 <option value="Calibracion">Calibración</option>
@@ -200,50 +214,46 @@ const OTDetail: React.FC = () => {
               value={otData.custom_id || `Interno #${id}`}
               readOnly
             />
-            {!isEmployee && (
-              <Input label="Contrato" {...register("contract")} />
-            )}
+            <Input
+              label="Contrato"
+              {...register("contract")}
+              disabled={isEmployee}
+            />
           </div>
-        </fieldset>
 
-        {!isEmployee && (
-          <fieldset
-            disabled={canViewAdminContent() && !canAdminEditMainData}
-            className="disabled:opacity-70"
-          >
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 border-b dark:border-gray-700 pb-6">
-              <h2 className="text-lg font-semibold text-blue-700 dark:text-blue-400 col-span-full">
-                Información del Cliente
-              </h2>
-              <Input label="Empresa" value={otData.client_name} readOnly />
-              <Input label="Nº Cliente" value={otData.client_code} readOnly />
-            </div>
-          </fieldset>
-        )}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 border-b dark:border-gray-700 pb-6">
+            <h2 className="text-lg font-semibold text-blue-700 dark:text-blue-400 col-span-full">
+              Información del Cliente
+            </h2>
+            <Input label="Empresa" value={otData.client_name} readOnly />
+            <Input label="Nº Cliente" value={otData.client_code} readOnly />
+          </div>
 
-        <fieldset
-          disabled={
-            isEmployee || (canViewAdminContent() && !canAdminEditMainData)
-          }
-          className="disabled:opacity-70"
-        >
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 border-b dark:border-gray-700 pb-6">
             <h2 className="text-lg font-semibold text-blue-700 dark:text-blue-400 col-span-full">
               Producto
             </h2>
-            <Input label="Nombre" {...register("product")} />
-            <Input label="Marca" {...register("brand")} />
-            <Input label="Modelo" {...register("model")} />
+            <Input
+              label="Nombre"
+              {...register("product")}
+              disabled={isEmployee}
+            />
+            <Input label="Marca" {...register("brand")} disabled={isEmployee} />
+            <Input
+              label="Modelo"
+              {...register("model")}
+              disabled={isEmployee}
+            />
             <Input
               label="Nº de Lacre"
               {...register("seal_number")}
-              disabled={!isLacreEnabled}
+              disabled={!isLacreEnabled || isEmployee}
             />
             <Input
               label="Vto. del Certificado"
               type="date"
               {...register("certificate_expiry")}
-              disabled={!isLacreEnabled}
+              disabled={!isLacreEnabled || isEmployee}
             />
             <div className="col-span-full">
               <label className="text-sm font-medium dark:text-gray-300">
@@ -253,51 +263,47 @@ const OTDetail: React.FC = () => {
                 {...register("observations")}
                 className="w-full mt-1 p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
                 rows={3}
+                disabled={isEmployee}
               ></textarea>
             </div>
           </div>
         </fieldset>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          {isEmployee && (
-            <div className="col-span-full">
-              <h2 className="text-lg font-semibold text-blue-700 dark:text-blue-400 mb-4">
-                Mis Observaciones
-              </h2>
+          <div className={canViewAdminContent() ? "" : "col-span-full"}>
+            <h2 className="text-lg font-semibold text-blue-700 dark:text-blue-400 mb-4">
+              {isEmployee ? "Mis Observaciones" : "Actividades"}
+            </h2>
+            {isEmployee ? (
               <textarea
                 {...register("collaborator_observations")}
-                disabled={!canEmployeeEdit}
+                disabled={isClosed}
                 className="w-full mt-1 p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
                 rows={4}
+                placeholder="Añade tus observaciones aquí..."
               ></textarea>
-            </div>
-          )}
-
-          {canViewAdminContent() && (
-            <>
-              <div>
-                <h2 className="text-lg font-semibold text-blue-700 dark:text-blue-400 mb-4">
-                  Actividades
-                </h2>
-                <fieldset disabled={isClosed}>
-                  <div>
-                    <label className="text-sm font-medium dark:text-gray-300">
-                      Asignar a
-                    </label>
-                    <select
-                      {...register("assigned_to")}
-                      className="w-full mt-1 p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
-                    >
-                      <option value="">Sin asignar</option>
-                      {users.map((u) => (
-                        <option key={u.id} value={u.id}>
-                          {u.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </fieldset>
-                <div className="mt-4">
+            ) : (
+              <fieldset
+                disabled={!isFormEditableForAdmin}
+                className="space-y-4"
+              >
+                <div>
+                  <label className="text-sm font-medium dark:text-gray-300">
+                    Asignar a
+                  </label>
+                  <select
+                    {...register("assigned_to")}
+                    className="w-full mt-1 p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
+                  >
+                    <option value="">Sin asignar</option>
+                    {users.map((u) => (
+                      <option key={u.id} value={u.id}>
+                        {u.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
                   <label className="text-sm font-medium dark:text-gray-300">
                     Observaciones del Colaborador
                   </label>
@@ -308,63 +314,69 @@ const OTDetail: React.FC = () => {
                     rows={3}
                   ></textarea>
                 </div>
-              </div>
-              <div>
-                <h2 className="text-lg font-semibold text-blue-700 dark:text-blue-400 mb-4">
-                  Administración
-                </h2>
-                <fieldset disabled={isClosed} className="space-y-4">
-                  <Input
-                    label="Cotización (Detalles)"
-                    {...register("quotation_details")}
-                  />
-                  <Input
-                    label="Cotización (Monto)"
-                    type="number"
-                    step="0.01"
-                    {...register("quotation_amount")}
-                  />
-                  <Input label="Disposición" {...register("disposition")} />
-                  <div className="grid grid-cols-2 gap-4 pt-4">
-                    <div className="bg-gray-100 dark:bg-gray-700 p-3 rounded">
-                      <p className="text-sm font-medium">Saldo a Facturar</p>
-                      <p className="text-lg font-bold">$0.00</p>
-                    </div>
-                    <div className="bg-gray-100 dark:bg-gray-700 p-3 rounded">
-                      <p className="text-sm font-medium">Saldo a Cobrar</p>
-                      <p className="text-lg font-bold">$0.00</p>
-                    </div>
+              </fieldset>
+            )}
+          </div>
+
+          {canViewAdminContent() && (
+            <div>
+              <h2 className="text-lg font-semibold text-blue-700 dark:text-blue-400 mb-4">
+                Administración
+              </h2>
+              <fieldset
+                disabled={!isFormEditableForAdmin}
+                className="space-y-4"
+              >
+                <Input
+                  label="Cotización (Detalles)"
+                  {...register("quotation_details")}
+                />
+                <Input
+                  label="Cotización (Monto)"
+                  type="number"
+                  step="0.01"
+                  {...register("quotation_amount")}
+                />
+                <Input label="Disposición" {...register("disposition")} />
+                <div className="grid grid-cols-2 gap-4 pt-4">
+                  <div className="bg-gray-100 dark:bg-gray-700 p-3 rounded">
+                    <p className="text-sm font-medium">Saldo a Facturar</p>
+                    <p className="text-lg font-bold">$0.00</p>
                   </div>
-                  <div className="mt-4 flex gap-4">
-                    <Button type="button" disabled>
-                      Cargar Factura
-                    </Button>
-                    <Button type="button" disabled>
-                      Cargar Recibo
-                    </Button>
+                  <div className="bg-gray-100 dark:bg-gray-700 p-3 rounded">
+                    <p className="text-sm font-medium">Saldo a Cobrar</p>
+                    <p className="text-lg font-bold">$0.00</p>
                   </div>
-                  <div>
-                    <h3 className="text-md font-semibold mt-4">Archivos</h3>
-                    <p className="text-sm text-gray-500">(Próximamente)</p>
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium dark:text-gray-300">
-                      Estado Final
-                    </label>
-                    <select
-                      {...register("status")}
-                      className="w-full mt-1 p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
-                    >
-                      <option value="pendiente">Pendiente</option>
-                      <option value="en_progreso">En Progreso</option>
-                      <option value="finalizada">Finalizada</option>
-                      <option value="facturada">Facturada</option>
-                      <option value="cierre">Cierre</option>
-                    </select>
-                  </div>
-                </fieldset>
-              </div>
-            </>
+                </div>
+                <div className="mt-4 flex gap-4">
+                  <Button type="button" disabled>
+                    Cargar Factura
+                  </Button>
+                  <Button type="button" disabled>
+                    Cargar Recibo
+                  </Button>
+                </div>
+                <div>
+                  <h3 className="text-md font-semibold mt-4">Archivos</h3>
+                  <p className="text-sm text-gray-500">(Próximamente)</p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium dark:text-gray-300">
+                    Estado Final
+                  </label>
+                  <select
+                    {...register("status")}
+                    className="w-full mt-1 p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
+                  >
+                    <option value="pendiente">Pendiente</option>
+                    <option value="en_progreso">En Progreso</option>
+                    <option value="finalizada">Finalizada</option>
+                    <option value="facturada">Facturada</option>
+                    <option value="cierre">Cierre</option>
+                  </select>
+                </div>
+              </fieldset>
+            </div>
           )}
         </div>
       </div>

@@ -15,7 +15,6 @@ import axiosInstance from "../api/axiosInstance";
 type OTCreateFormData = Omit<
   WorkOrder,
   | "id"
-  | "custom_id"
   | "created_at"
   | "updated_at"
   | "client_name"
@@ -24,13 +23,13 @@ type OTCreateFormData = Omit<
 >;
 
 const OTCreate: React.FC = () => {
-  // CORREGIDO: Se usa canViewAdminContent en lugar de isDirectorOrAdmin
   const { user, canViewAdminContent } = useAuth();
   const navigate = useNavigate();
   const {
     register,
     handleSubmit,
     control,
+    setValue, // <--- AÑADIDO
     formState: { isSubmitting },
   } = useForm<OTCreateFormData>({
     defaultValues: {
@@ -68,23 +67,26 @@ const OTCreate: React.FC = () => {
     loadPrerequisites();
   }, []);
 
+  // --- LÓGICA PARA GENERAR ID AUTOMÁTICO ---
   useEffect(() => {
     const [date, type, clientId] = watchedFields;
     if (date && type && clientId) {
       const params = new URLSearchParams({
         date,
         type,
-        client_id: clientId.toString(),
+        client_id: String(clientId),
       });
       axiosInstance
         .get(`/ots/generate-id?${params.toString()}`)
         .then((response) => {
-          setIdPreview(response.data.previewId);
+          const newId = response.data.previewId;
+          setIdPreview(newId);
+          setValue("custom_id", newId); // Guarda el ID en el formulario
         });
     } else {
       setIdPreview("Completar campos...");
     }
-  }, [watchedFields]);
+  }, [watchedFields, setValue]);
 
   const onSubmit = async (data: OTCreateFormData) => {
     if (!user) return;
@@ -257,7 +259,6 @@ const OTCreate: React.FC = () => {
               ))}
             </select>
           </div>
-          {/* CORREGIDO: Se usa canViewAdminContent para mostrar la sección de administración */}
           {canViewAdminContent() && (
             <div>
               <h2 className="text-lg font-semibold text-blue-700 dark:text-blue-400 mb-4">
