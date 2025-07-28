@@ -17,7 +17,8 @@ import {
 import useSWR, { mutate } from "swr";
 
 const OT: React.FC = () => {
-  const { user, isDirectorOrAdmin } = useAuth();
+  const { user, canCreateContent, canViewAdminContent, canAuthorizeOT } =
+    useAuth();
   const navigate = useNavigate();
 
   const {
@@ -42,6 +43,8 @@ const OT: React.FC = () => {
   };
 
   const handleToggleAuthorization = async (ot: WorkOrder) => {
+    if (!user) return; // Asegurarse de que el usuario exista
+
     try {
       if (ot.authorized) {
         if (ot.status !== "pendiente") {
@@ -52,7 +55,8 @@ const OT: React.FC = () => {
         }
         await otService.deauthorizeOT(ot.id);
       } else {
-        await otService.authorizeOT(ot.id);
+        // CORREGIDO: Se pasa el ID del usuario al autorizar
+        await otService.authorizeOT(ot.id, user.id);
       }
       mutate(["/ots", user]);
     } catch (error: any) {
@@ -84,9 +88,11 @@ const OT: React.FC = () => {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold">
-          {isDirectorOrAdmin() ? "Órdenes de Trabajo" : "Mis Tareas Asignadas"}
+          {canViewAdminContent()
+            ? "Órdenes de Trabajo"
+            : "Mis Tareas Asignadas"}
         </h1>
-        {isDirectorOrAdmin() && (
+        {canCreateContent() && (
           <Button onClick={() => navigate("/ot/crear")}>
             <PlusCircle className="mr-2 h-4 w-4" /> Crear Nueva OT
           </Button>
@@ -97,7 +103,7 @@ const OT: React.FC = () => {
           <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
             <thead className="bg-gray-50 dark:bg-gray-700">
               <tr>
-                {isDirectorOrAdmin() && (
+                {canAuthorizeOT() && (
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">
                     Auth
                   </th>
@@ -127,12 +133,12 @@ const OT: React.FC = () => {
                 <tr
                   key={ot.id}
                   className={`${
-                    !ot.authorized && isDirectorOrAdmin()
+                    !ot.authorized && canViewAdminContent()
                       ? "bg-orange-50 dark:bg-orange-900/20"
                       : ""
                   }`}
                 >
-                  {isDirectorOrAdmin() && (
+                  {canAuthorizeOT() && (
                     <td className="px-6 py-4">
                       <button
                         onClick={() => handleToggleAuthorization(ot)}
@@ -173,13 +179,13 @@ const OT: React.FC = () => {
                       variant="outline"
                       onClick={() => navigate(`/ot/editar/${ot.id}`)}
                     >
-                      {isDirectorOrAdmin() ? (
+                      {canViewAdminContent() ? (
                         <Edit className="h-4 w-4" />
                       ) : (
                         "Ver"
                       )}
                     </Button>
-                    {isDirectorOrAdmin() && (
+                    {canViewAdminContent() && (
                       <Button
                         size="sm"
                         variant="danger"
@@ -197,12 +203,12 @@ const OT: React.FC = () => {
           <div className="text-center py-12">
             <Briefcase className="mx-auto h-12 w-12 text-gray-400" />
             <h3 className="mt-2 text-sm font-semibold">
-              {isDirectorOrAdmin()
+              {canViewAdminContent()
                 ? "No hay Órdenes de Trabajo"
                 : "Sin tareas asignadas"}
             </h3>
             <p className="mt-1 text-sm text-gray-500">
-              {isDirectorOrAdmin()
+              {canViewAdminContent()
                 ? "¡Crea la primera para empezar a trabajar!"
                 : "No tienes Órdenes de Trabajo autorizadas en este momento."}
             </p>

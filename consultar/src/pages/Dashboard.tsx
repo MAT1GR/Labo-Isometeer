@@ -452,8 +452,8 @@ const EmpleadoDashboard: React.FC = () => {
 
 // --- Componente Principal del Dashboard ---
 const Dashboard: React.FC = () => {
-  const { isDirectorOrAdmin } = useAuth();
-  return isDirectorOrAdmin() ? (
+  const { canViewAdminContent } = useAuth(); // CORREGIDO
+  return canViewAdminContent() ? (
     <AdminDirectorDashboard />
   ) : (
     <EmpleadoDashboard />

@@ -1,4 +1,4 @@
-// RUTA: /cliente/src/pages/OTDetail.tsx
+// RUTA: /cliente/src/pages/OTdetail.tsx
 
 import React, { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
@@ -14,7 +14,8 @@ import { mutate } from "swr";
 const OTDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { user, isDirectorOrAdmin } = useAuth();
+  // CORREGIDO: Se usan las nuevas funciones de permisos del contexto
+  const { user, canViewAdminContent, canAuthorizeOT } = useAuth();
   const {
     register,
     handleSubmit,
@@ -36,7 +37,10 @@ const OTDetail: React.FC = () => {
       try {
         const [ot, userList] = await Promise.all([
           otService.getOTById(Number(id)),
-          isDirectorOrAdmin() ? authService.getAllUsers() : Promise.resolve([]),
+          // CORREGIDO: Se usa la función correcta para cargar la lista de usuarios
+          canViewAdminContent()
+            ? authService.getAllUsers()
+            : Promise.resolve([]),
         ]);
         setOtData(ot);
         setUsers(userList);
@@ -70,8 +74,8 @@ const OTDetail: React.FC = () => {
   };
 
   const handleAuthorize = async () => {
-    if (!id) return;
-    await otService.authorizeOT(Number(id));
+    if (!id || !user) return;
+    await otService.authorizeOT(Number(id), user.id);
     await loadData();
     mutate(["/ots", user]);
   };
@@ -118,7 +122,8 @@ const OTDetail: React.FC = () => {
       </div>
 
       <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm flex flex-wrap justify-center items-center gap-4">
-        {isDirectorOrAdmin() && !otData.authorized && (
+        {/* CORREGIDO: Se usa canAuthorizeOT para el botón de autorizar */}
+        {canAuthorizeOT() && !otData.authorized && (
           <Button
             type="button"
             onClick={handleAuthorize}
@@ -155,7 +160,7 @@ const OTDetail: React.FC = () => {
         )}
       </div>
 
-      {isDirectorOrAdmin() && !canAdminEditMainData && (
+      {canViewAdminContent() && !canAdminEditMainData && (
         <div className="p-4 bg-yellow-50 dark:bg-yellow-900/50 text-yellow-800 dark:text-yellow-300 rounded-md text-center font-semibold">
           Los datos principales de esta OT no se pueden editar porque ya está en
           progreso o finalizada. Solo se puede modificar la sección de
@@ -166,7 +171,7 @@ const OTDetail: React.FC = () => {
       <div className="bg-white dark:bg-gray-800 dark:border dark:border-gray-700 p-6 rounded-lg shadow-sm space-y-8">
         <fieldset
           disabled={
-            isEmployee || (isDirectorOrAdmin() && !canAdminEditMainData)
+            isEmployee || (canViewAdminContent() && !canAdminEditMainData)
           }
           className="disabled:opacity-70"
         >
@@ -203,7 +208,7 @@ const OTDetail: React.FC = () => {
 
         {!isEmployee && (
           <fieldset
-            disabled={isDirectorOrAdmin() && !canAdminEditMainData}
+            disabled={canViewAdminContent() && !canAdminEditMainData}
             className="disabled:opacity-70"
           >
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 border-b dark:border-gray-700 pb-6">
@@ -218,7 +223,7 @@ const OTDetail: React.FC = () => {
 
         <fieldset
           disabled={
-            isEmployee || (isDirectorOrAdmin() && !canAdminEditMainData)
+            isEmployee || (canViewAdminContent() && !canAdminEditMainData)
           }
           className="disabled:opacity-70"
         >
@@ -268,7 +273,7 @@ const OTDetail: React.FC = () => {
             </div>
           )}
 
-          {isDirectorOrAdmin() && (
+          {canViewAdminContent() && (
             <>
               <div>
                 <h2 className="text-lg font-semibold text-blue-700 dark:text-blue-400 mb-4">

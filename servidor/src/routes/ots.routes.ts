@@ -5,6 +5,37 @@ import db from "../config/database";
 
 const router = Router();
 
+// --- RUTA: [GET] /api/ots ---
+router.get("/", (req: Request, res: Response) => {
+  const { role, assigned_to } = req.query;
+
+  try {
+    let query = `
+      SELECT 
+        ot.id, ot.custom_id, ot.product, ot.status, ot.authorized,
+        c.name as client_name,
+        u.name as assigned_to_name
+      FROM work_orders ot
+      LEFT JOIN clients c ON ot.client_id = c.id
+      LEFT JOIN users u ON ot.assigned_to = u.id
+    `;
+    const params: any[] = [];
+
+    if (role === "empleado") {
+      query += " WHERE ot.assigned_to = ? AND ot.authorized = 1";
+      params.push(assigned_to);
+    }
+
+    query += " ORDER BY ot.created_at DESC";
+
+    const ots = db.prepare(query).all(params);
+    res.status(200).json(ots);
+  } catch (error) {
+    console.error("Error en GET /ots:", error);
+    res.status(500).json({ error: "Error al obtener las órdenes de trabajo." });
+  }
+});
+
 const getPointsForActivity = (activity: string): number => {
   const pointsMap: { [key: string]: number } = {
     Calibracion: 1,
@@ -82,14 +113,17 @@ router.post("/", (req: Request, res: Response) => {
 // [PUT] /api/ots/:id/authorize
 router.put("/:id/authorize", (req: Request, res: Response) => {
   const { userId } = req.body;
+  if (!userId) {
+    return res.status(400).json({ error: "userId es requerido." });
+  }
+
   const authorizer = db
     .prepare("SELECT role FROM users WHERE id = ?")
     .get(userId) as { role: string };
 
   if (
     !authorizer ||
-    (authorizer.role !== "director" &&
-      authorizer.role !== "administrador del sistema")
+    (authorizer.role !== "director" && authorizer.role !== "administrador")
   ) {
     return res
       .status(403)
@@ -209,54 +243,6 @@ router.delete("/:id", (req: Request, res: Response) => {
 });
 
 // --- RUTAS DE ACCIONES DE OT ---
-router.put("/:id/authorize", (req: Request, res: Response) => {
-  try {
-    const { userId } = req.body;
-    const authorizer = db
-      .prepare("SELECT role FROM users WHERE id = ?")
-      .get(userId) as { role: string };
-
-    if (
-      !authorizer ||
-      (authorizer.role !== "director" &&
-        authorizer.role !== "administrador del sistema")
-    ) {
-      return res
-        .status(403)
-        .json({ error: "No tienes permisos para autorizar OTs." });
-    }
-    const info = db
-      .prepare(
-        "UPDATE work_orders SET authorized = 1, status = 'autorizada', updated_at = CURRENT_TIMESTAMP WHERE id = ?"
-      )
-      .run(req.params.id);
-    if (info.changes === 0)
-      return res.status(404).json({ error: "OT no encontrada." });
-    res.status(200).json({ message: "OT autorizada." });
-  } catch (error) {
-    res.status(500).json({ error: "Error al autorizar la OT." });
-  }
-});
-
-// --- RUTAS DE ACCIONES DE OT ---
-router.put("/:id/authorize", (req: Request, res: Response) => {
-  try {
-    const info = db
-      .prepare(
-        "UPDATE work_orders SET authorized = 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?"
-      )
-      .run(req.params.id);
-    if (info.changes === 0)
-      return res.status(404).json({ error: "OT no encontrada." });
-    const updatedOT = db
-      .prepare("SELECT * FROM work_orders WHERE id = ?")
-      .get(req.params.id);
-    res.status(200).json(updatedOT);
-  } catch (error) {
-    res.status(500).json({ error: "Error al autorizar la OT." });
-  }
-});
-
 router.put("/:id/deauthorize", (req: Request, res: Response) => {
   try {
     const ot = db
@@ -356,29 +342,6 @@ router.put("/:id/resume", (req: Request, res: Response) => {
   }
 });
 
-// RUTA: /servidor/src/routes/ots.routes.ts
-
-import { Router, Request, Response } from "express";
-import db from "../config/database";
-
-const router = Router();
-
-const getPointsForActivity = (activity: string): number => {
-  const pointsMap: { [key: string]: number } = {
-    Calibracion: 1,
-    Completo: 1,
-    Ampliado: 0.5,
-    Refurbished: 0.5,
-    Fabricacion: 1,
-    "Verificacion de identidad": 0.1,
-    Reducido: 0.2,
-    "Servicio tecnico": 0.2,
-    Capacitacion: 1,
-  };
-  return pointsMap[activity] || 0;
-};
-
-// [PUT] /api/ots/:id/stop - Lógica de puntos corregida
 router.put("/:id/stop", (req: Request, res: Response) => {
   try {
     const ot = db
@@ -463,27 +426,31 @@ router.get("/generate-id", (req: Request, res: Response) => {
   }
 });
 
-router.get("/timeline", (req: Request, res: Response) => {
-  const { year, month, assigned_to } = req.query;
-  if (!year || !month || !assigned_to)
-    return res.status(400).json({ error: "Faltan parámetros." });
-  try {
-    const startDate = new Date(Date.UTC(Number(year), Number(month) - 1, 1));
-    const endDate = new Date(Date.UTC(Number(year), Number(month), 1));
-    const query = `
+// CORREGIDO: Ruta timeline ahora usa path parameters
+router.get(
+  "/timeline/:assigned_to/:year/:month",
+  (req: Request, res: Response) => {
+    const { year, month, assigned_to } = req.params;
+    if (!year || !month || !assigned_to)
+      return res.status(400).json({ error: "Faltan parámetros." });
+    try {
+      const startDate = new Date(Date.UTC(Number(year), Number(month) - 1, 1));
+      const endDate = new Date(Date.UTC(Number(year), Number(month), 1));
+      const query = `
             SELECT id, custom_id, product, started_at, completed_at, status, duration_minutes
             FROM work_orders
             WHERE assigned_to = ? AND authorized = 1 AND started_at IS NOT NULL AND started_at < ? AND (completed_at >= ? OR completed_at IS NULL)
         `;
-    const ots = db
-      .prepare(query)
-      .all(assigned_to, endDate.toISOString(), startDate.toISOString());
-    res.status(200).json(ots);
-  } catch (error) {
-    res
-      .status(500)
-      .json({ error: "Error al obtener los datos para la línea de tiempo." });
+      const ots = db
+        .prepare(query)
+        .all(assigned_to, endDate.toISOString(), startDate.toISOString());
+      res.status(200).json(ots);
+    } catch (error) {
+      res
+        .status(500)
+        .json({ error: "Error al obtener los datos para la línea de tiempo." });
+    }
   }
-});
+);
 
 export default router;

@@ -24,7 +24,8 @@ type OTCreateFormData = Omit<
 >;
 
 const OTCreate: React.FC = () => {
-  const { user, isDirectorOrAdmin } = useAuth();
+  // CORREGIDO: Se usa canViewAdminContent en lugar de isDirectorOrAdmin
+  const { user, canViewAdminContent } = useAuth();
   const navigate = useNavigate();
   const {
     register,
@@ -154,7 +155,6 @@ const OTCreate: React.FC = () => {
             </select>
           </div>
           <Input label="ID de OT" value={idPreview} disabled readOnly />
-          {/* --- CAMBIO AQUÍ: CONTRATO ES UN SELECT --- */}
           <div>
             <label className="text-sm font-medium dark:text-gray-300">
               Contrato
@@ -257,7 +257,8 @@ const OTCreate: React.FC = () => {
               ))}
             </select>
           </div>
-          {isDirectorOrAdmin() && (
+          {/* CORREGIDO: Se usa canViewAdminContent para mostrar la sección de administración */}
+          {canViewAdminContent() && (
             <div>
               <h2 className="text-lg font-semibold text-blue-700 dark:text-blue-400 mb-4">
                 Administración

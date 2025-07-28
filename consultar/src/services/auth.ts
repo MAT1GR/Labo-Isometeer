@@ -6,7 +6,8 @@ export interface User {
   id: number;
   email: string;
   name: string;
-  role: "empleado" | "director" | "administrador";
+  // CORREGIDO: Rol simplificado a "administrador"
+  role: "empleado" | "director" | "administracion" | "administrador";
   points: number;
 }
 
@@ -37,7 +38,6 @@ class AuthService {
     await axiosInstance.delete(`/users/${userId}`);
   }
 
-  // --- NUEVO MÉTODO ---
   async changePassword(
     userId: number,
     passwords: { currentPassword: string; newPassword: string }

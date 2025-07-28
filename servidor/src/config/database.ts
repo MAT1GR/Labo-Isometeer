@@ -13,7 +13,8 @@ db.exec(`
     email TEXT UNIQUE NOT NULL, 
     password TEXT NOT NULL, 
     name TEXT NOT NULL,
-    role TEXT NOT NULL CHECK (role IN ('empleado', 'director', 'administracion', 'administrador del sistema')),
+    -- CORREGIDO: Rol simplificado a "administrador"
+    role TEXT NOT NULL CHECK (role IN ('empleado', 'director', 'administracion', 'administrador')),
     points REAL NOT NULL DEFAULT 0
   );
 
@@ -88,8 +89,8 @@ if (!adminCheckStmt.get(adminEmail)) {
   ).run(
     adminEmail,
     hashedPassword,
-    "Admin del Sistema",
-    "administrador del sistema"
+    "Administrador", // Nombre actualizado
+    "administrador" // Rol simplificado
   );
 }
 

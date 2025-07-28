@@ -8,9 +8,10 @@ interface AuthContextType {
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
   logout: () => void;
-  canViewAdminContent: () => boolean;
   canAuthorizeOT: () => boolean;
   canCreateContent: () => boolean;
+  canViewAdminContent: () => boolean;
+  canManageUsers: () => boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -51,19 +52,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   const canViewAdminContent = () => {
     return (
       user?.role === "director" ||
-      user?.role === "administrador del sistema" ||
+      user?.role === "administrador" ||
       user?.role === "administracion"
-    );
-  };
-
-  const canAuthorizeOT = () => {
-    return (
-      user?.role === "director" || user?.role === "administrador del sistema"
     );
   };
 
   const canCreateContent = () => {
     return user?.role !== "empleado";
+  };
+
+  const canAuthorizeOT = () => {
+    return user?.role === "director" || user?.role === "administrador";
+  };
+
+  const canManageUsers = () => {
+    return user?.role === "administrador";
   };
 
   return (
@@ -73,9 +76,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         loading,
         login,
         logout,
-        canViewAdminContent,
         canAuthorizeOT,
         canCreateContent,
+        canViewAdminContent,
+        canManageUsers,
       }}
     >
       {children}

@@ -13,11 +13,12 @@ import useSWR, { mutate } from "swr";
 import { fetcher } from "../api/axiosInstance";
 import { useNavigate } from "react-router-dom";
 
+// CORREGIDO: Rol simplificado a "administrador"
 const userSchema = z.object({
   name: z.string().min(3, "El nombre es requerido"),
   email: z.string().email("Email inválido"),
   password: z.string().min(6, "La contraseña debe tener al menos 6 caracteres"),
-  role: z.enum(["empleado", "director", "administrador"]),
+  role: z.enum(["empleado", "director", "administracion", "administrador"]),
 });
 
 type UserFormData = z.infer<typeof userSchema>;
@@ -154,6 +155,7 @@ const Usuarios: React.FC = () => {
                 >
                   <option value="empleado">Empleado</option>
                   <option value="director">Director</option>
+                  <option value="administracion">Administración</option>
                   <option value="administrador">Administrador</option>
                 </select>
               </div>

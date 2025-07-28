@@ -29,13 +29,11 @@ export interface WorkOrder {
   duration_minutes?: number | null;
   created_at: string;
   updated_at?: string;
-  // Campos que vienen de JOINS
   client_name?: string;
   client_code?: string;
   assigned_to_name?: string;
 }
 
-// Interfaz para los datos específicos del gráfico
 export interface TimelineOt {
   id: number;
   custom_id?: string;
@@ -60,7 +58,11 @@ class OTService {
     month: number;
     assigned_to: number;
   }): Promise<TimelineOt[]> {
-    const response = await axiosInstance.get("/ots/timeline", { params });
+    const { year, month, assigned_to } = params;
+    // CORREGIDO: La URL ahora coincide con la nueva ruta del servidor
+    const response = await axiosInstance.get(
+      `/ots/timeline/${assigned_to}/${year}/${month}`
+    );
     return response.data;
   }
 
@@ -79,13 +81,19 @@ class OTService {
   async deleteOT(otId: number): Promise<void> {
     await axiosInstance.delete(`/ots/${otId}`);
   }
-  async authorizeOT(id: number): Promise<WorkOrder> {
-    const response = await axiosInstance.put(`/ots/${id}/authorize`);
+
+  // CORREGIDO: Ahora se envía el userId en el cuerpo de la petición
+  async authorizeOT(id: number, userId: number): Promise<WorkOrder> {
+    const response = await axiosInstance.put(`/ots/${id}/authorize`, {
+      userId,
+    });
     return response.data;
   }
+
   async deauthorizeOT(id: number): Promise<void> {
     await axiosInstance.put(`/ots/${id}/deauthorize`);
   }
+
   async startOT(id: number): Promise<WorkOrder> {
     const response = await axiosInstance.put(`/ots/${id}/start`);
     return response.data;
