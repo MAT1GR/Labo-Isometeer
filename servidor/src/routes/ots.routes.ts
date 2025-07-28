@@ -14,15 +14,17 @@ router.get("/", (req: Request, res: Response) => {
       SELECT 
         ot.id, ot.custom_id, ot.product, ot.status, ot.authorized,
         c.name as client_name,
-        u.name as assigned_to_name
+        (SELECT GROUP_CONCAT(u.name, ', ') 
+         FROM work_order_activities wa 
+         JOIN users u ON wa.assigned_to = u.id 
+         WHERE wa.work_order_id = ot.id) as assigned_to_name
       FROM work_orders ot
       LEFT JOIN clients c ON ot.client_id = c.id
-      LEFT JOIN users u ON ot.assigned_to = u.id
     `;
     const params: any[] = [];
 
-    if (role === "empleado") {
-      query += " WHERE ot.assigned_to = ? AND ot.authorized = 1";
+    if (role === "empleado" && assigned_to) {
+      query += ` WHERE ot.id IN (SELECT work_order_id FROM work_order_activities WHERE assigned_to = ?) AND ot.authorized = 1`;
       params.push(assigned_to);
     }
 
@@ -65,10 +67,14 @@ router.post("/", (req: Request, res: Response) => {
   }
 
   const insertOTStmt = db.prepare(
-    `INSERT INTO work_orders (custom_id, date, type, client_id, contract, product, brand, model, seal_number, observations, certificate_expiry, created_by, assigned_to, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    `INSERT INTO work_orders (
+      custom_id, date, type, client_id, product, brand, model, 
+      seal_number, observations, certificate_expiry, created_by, status,
+      quotation_amount, quotation_details, disposition
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   );
   const insertActivityStmt = db.prepare(
-    "INSERT INTO work_order_activities (work_order_id, activity) VALUES (?, ?)"
+    "INSERT INTO work_order_activities (work_order_id, activity, assigned_to) VALUES (?, ?, ?)"
   );
 
   const createTransaction = db.transaction(() => {
@@ -77,7 +83,6 @@ router.post("/", (req: Request, res: Response) => {
       otData.date,
       otData.type,
       otData.client_id,
-      otData.contract,
       otData.product,
       otData.brand,
       otData.model,
@@ -85,20 +90,28 @@ router.post("/", (req: Request, res: Response) => {
       otData.observations,
       otData.certificate_expiry,
       created_by,
-      otData.assigned_to,
-      "pendiente"
+      "pendiente",
+      otData.quotation_amount,
+      otData.quotation_details,
+      otData.disposition
     );
     const otId = info.lastInsertRowid;
-    let totalPoints = 0;
-    for (const activity of activities) {
-      insertActivityStmt.run(otId, activity);
-      totalPoints += getPointsForActivity(activity);
-    }
-    if (otData.assigned_to && totalPoints > 0) {
-      db.prepare("UPDATE users SET points = points + ? WHERE id = ?").run(
-        totalPoints,
-        otData.assigned_to
-      );
+
+    for (const act of activities) {
+      if (act.activity) {
+        const assignedTo = act.assigned_to ? Number(act.assigned_to) : null;
+        insertActivityStmt.run(otId, act.activity, assignedTo);
+
+        if (assignedTo) {
+          const points = getPointsForActivity(act.activity);
+          if (points > 0) {
+            db.prepare("UPDATE users SET points = points + ? WHERE id = ?").run(
+              points,
+              assignedTo
+            );
+          }
+        }
+      }
     }
     return { id: otId };
   });
@@ -106,8 +119,94 @@ router.post("/", (req: Request, res: Response) => {
   try {
     const result = createTransaction();
     res.status(201).json(result);
+  } catch (error: any) {
+    console.error("Error al crear OT:", error);
+    res.status(500).json({ error: error.message || "Error al crear la OT." });
+  }
+});
+
+// [GET] /api/ots/:id
+router.get("/:id", (req: Request, res: Response) => {
+  try {
+    const ot = db
+      .prepare(
+        `SELECT ot.*, c.name as client_name, c.code as client_code FROM work_orders ot JOIN clients c ON ot.client_id = c.id WHERE ot.id = ?`
+      )
+      .get(req.params.id);
+
+    if (ot) {
+      const activities = db
+        .prepare(
+          `SELECT wa.activity, wa.assigned_to 
+           FROM work_order_activities wa
+           WHERE wa.work_order_id = ?`
+        )
+        .all(req.params.id);
+      res.status(200).json({ ...ot, activities });
+    } else {
+      res.status(404).json({ error: "OT no encontrada." });
+    }
   } catch (error) {
-    res.status(500).json({ error: "Error al crear la OT." });
+    res.status(500).json({ error: "Error al obtener la OT." });
+  }
+});
+
+// [PUT] /api/ots/:id
+router.put("/:id", (req: Request, res: Response) => {
+  const { id } = req.params;
+  const { activities = [], role, ...otData } = req.body;
+
+  if (role === "empleado") {
+    const info = db
+      .prepare(
+        "UPDATE work_orders SET collaborator_observations = ? WHERE id = ?"
+      )
+      .run(otData.collaborator_observations, id);
+    if (info.changes === 0)
+      return res.status(404).json({ error: "OT no encontrada" });
+    return res.status(200).json({ message: "Observaciones guardadas." });
+  }
+
+  const updateStmt = db.prepare(
+    `UPDATE work_orders SET date=?, type=?, product=?, brand=?, model=?, seal_number=?, observations=?, certificate_expiry=?, status=?, quotation_amount=?, quotation_details=?, disposition=?, updated_at=CURRENT_TIMESTAMP WHERE id=?`
+  );
+  const deleteActivitiesStmt = db.prepare(
+    "DELETE FROM work_order_activities WHERE work_order_id = ?"
+  );
+  const insertActivityStmt = db.prepare(
+    "INSERT INTO work_order_activities (work_order_id, activity, assigned_to) VALUES (?, ?, ?)"
+  );
+
+  const updateTransaction = db.transaction(() => {
+    updateStmt.run(
+      otData.date,
+      otData.type,
+      otData.product,
+      otData.brand,
+      otData.model,
+      otData.seal_number,
+      otData.observations,
+      otData.certificate_expiry,
+      otData.status,
+      otData.quotation_amount,
+      otData.quotation_details,
+      otData.disposition,
+      id
+    );
+    deleteActivitiesStmt.run(id);
+    for (const act of activities) {
+      if (act.activity) {
+        const assignedTo = act.assigned_to ? Number(act.assigned_to) : null;
+        insertActivityStmt.run(id, act.activity, assignedTo);
+      }
+    }
+  });
+
+  try {
+    updateTransaction();
+    res.status(200).json({ message: "OT actualizada con éxito." });
+  } catch (error) {
+    res.status(500).json({ error: "Error al actualizar la OT." });
   }
 });
 
@@ -132,7 +231,6 @@ router.put("/:id/authorize", (req: Request, res: Response) => {
   }
 
   try {
-    // CORREGIDO: Se mantiene el estado como 'pendiente' al autorizar
     const info = db
       .prepare(
         "UPDATE work_orders SET authorized = 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?"
@@ -146,211 +244,6 @@ router.put("/:id/authorize", (req: Request, res: Response) => {
     res.status(200).json(updatedOT);
   } catch (error) {
     res.status(500).json({ error: "Error al autorizar la OT." });
-  }
-});
-
-// [GET] /api/ots/:id
-router.get("/:id", (req: Request, res: Response) => {
-  try {
-    const ot = db
-      .prepare(
-        `SELECT ot.*, c.name as client_name, c.code as client_code FROM work_orders ot JOIN clients c ON ot.client_id = c.id WHERE ot.id = ?`
-      )
-      .get(req.params.id);
-    if (ot) {
-      const activities = db
-        .prepare(
-          "SELECT activity FROM work_order_activities WHERE work_order_id = ?"
-        )
-        .all(req.params.id)
-        .map((row: any) => row.activity);
-      res.status(200).json({ ...ot, activities });
-    } else {
-      res.status(404).json({ error: "OT no encontrada." });
-    }
-  } catch (error) {
-    res.status(500).json({ error: "Error al obtener la OT." });
-  }
-});
-
-// [PUT] /api/ots/:id
-router.put("/:id", (req: Request, res: Response) => {
-  const { id } = req.params;
-  const { activities = [], role, ...otData } = req.body;
-
-  if (role === "empleado") {
-    const info = db
-      .prepare(
-        "UPDATE work_orders SET collaborator_observations = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?"
-      )
-      .run(otData.collaborator_observations, id);
-    if (info.changes === 0)
-      return res.status(404).json({ error: "OT no encontrada" });
-    return res.status(200).json({ message: "Observaciones guardadas." });
-  }
-
-  const updateStmt = db.prepare(
-    `UPDATE work_orders SET date=?, type=?, contract=?, product=?, brand=?, model=?, seal_number=?, observations=?, certificate_expiry=?, status=?, assigned_to=?, quotation_amount=?, quotation_details=?, disposition=?, updated_at=CURRENT_TIMESTAMP WHERE id=?`
-  );
-  const deleteActivitiesStmt = db.prepare(
-    "DELETE FROM work_order_activities WHERE work_order_id = ?"
-  );
-  const insertActivityStmt = db.prepare(
-    "INSERT INTO work_order_activities (work_order_id, activity) VALUES (?, ?)"
-  );
-
-  const updateTransaction = db.transaction(() => {
-    updateStmt.run(
-      otData.date,
-      otData.type,
-      otData.contract,
-      otData.product,
-      otData.brand,
-      otData.model,
-      otData.seal_number,
-      otData.observations,
-      otData.certificate_expiry,
-      otData.status,
-      otData.assigned_to,
-      otData.quotation_amount,
-      otData.quotation_details,
-      otData.disposition,
-      id
-    );
-    deleteActivitiesStmt.run(id);
-    for (const activity of activities) {
-      insertActivityStmt.run(id, activity);
-    }
-  });
-
-  try {
-    updateTransaction();
-    res.status(200).json({ message: "OT actualizada con éxito." });
-  } catch (error) {
-    res.status(500).json({ error: "Error al actualizar la OT." });
-  }
-});
-
-// [DELETE] /api/ots/:id
-router.delete("/:id", (req: Request, res: Response) => {
-  try {
-    const { id } = req.params;
-    const info = db.prepare("DELETE FROM work_orders WHERE id = ?").run(id);
-    if (info.changes === 0)
-      return res.status(404).json({ error: "Orden de Trabajo no encontrada." });
-    res.status(200).json({ message: "Orden de Trabajo eliminada con éxito." });
-  } catch (error) {
-    res.status(500).json({ error: "Error interno del servidor." });
-  }
-});
-
-// --- RUTAS DE ACCIONES DE OT ---
-router.put("/:id/deauthorize", (req: Request, res: Response) => {
-  try {
-    const ot = db
-      .prepare("SELECT status FROM work_orders WHERE id = ?")
-      .get(req.params.id) as { status: string };
-    if (!ot) return res.status(404).json({ error: "OT no encontrada." });
-
-    if (ot.status !== "pendiente") {
-      return res.status(403).json({
-        error:
-          "No se puede desautorizar una OT que ya está en progreso o finalizada.",
-      });
-    }
-
-    const info = db
-      .prepare(
-        "UPDATE work_orders SET authorized = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ?"
-      )
-      .run(req.params.id);
-    if (info.changes === 0)
-      return res.status(404).json({ error: "OT no encontrada." });
-    res.status(200).json({ message: "OT desautorizada con éxito." });
-  } catch (error) {
-    res.status(500).json({ error: "Error al desautorizar la OT." });
-  }
-});
-
-// [GET] /api/ots/:id
-router.get("/:id", (req: Request, res: Response) => {
-  try {
-    const ot = db
-      .prepare(
-        `SELECT ot.*, c.name as client_name, c.code as client_code FROM work_orders ot JOIN clients c ON ot.client_id = c.id WHERE ot.id = ?`
-      )
-      .get(req.params.id);
-    if (ot) {
-      const activities = db
-        .prepare(
-          "SELECT activity FROM work_order_activities WHERE work_order_id = ?"
-        )
-        .all(req.params.id)
-        .map((row: any) => row.activity);
-      res.status(200).json({ ...ot, activities });
-    } else {
-      res.status(404).json({ error: "OT no encontrada." });
-    }
-  } catch (error) {
-    res.status(500).json({ error: "Error al obtener la OT." });
-  }
-});
-
-// [PUT] /api/ots/:id
-router.put("/:id", (req: Request, res: Response) => {
-  const { id } = req.params;
-  const { activities = [], role, ...otData } = req.body;
-
-  if (role === "empleado") {
-    const info = db
-      .prepare(
-        "UPDATE work_orders SET collaborator_observations = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?"
-      )
-      .run(otData.collaborator_observations, id);
-    if (info.changes === 0)
-      return res.status(404).json({ error: "OT no encontrada" });
-    return res.status(200).json({ message: "Observaciones guardadas." });
-  }
-
-  const updateStmt = db.prepare(
-    `UPDATE work_orders SET date=?, type=?, contract=?, product=?, brand=?, model=?, seal_number=?, observations=?, certificate_expiry=?, status=?, assigned_to=?, quotation_amount=?, quotation_details=?, disposition=?, updated_at=CURRENT_TIMESTAMP WHERE id=?`
-  );
-  const deleteActivitiesStmt = db.prepare(
-    "DELETE FROM work_order_activities WHERE work_order_id = ?"
-  );
-  const insertActivityStmt = db.prepare(
-    "INSERT INTO work_order_activities (work_order_id, activity) VALUES (?, ?)"
-  );
-
-  const updateTransaction = db.transaction(() => {
-    updateStmt.run(
-      otData.date,
-      otData.type,
-      otData.contract,
-      otData.product,
-      otData.brand,
-      otData.model,
-      otData.seal_number,
-      otData.observations,
-      otData.certificate_expiry,
-      otData.status,
-      otData.assigned_to,
-      otData.quotation_amount,
-      otData.quotation_details,
-      otData.disposition,
-      id
-    );
-    deleteActivitiesStmt.run(id);
-    for (const activity of activities) {
-      insertActivityStmt.run(id, activity);
-    }
-  });
-
-  try {
-    updateTransaction();
-    res.status(200).json({ message: "OT actualizada con éxito." });
-  } catch (error) {
-    res.status(500).json({ error: "Error al actualizar la OT." });
   }
 });
 

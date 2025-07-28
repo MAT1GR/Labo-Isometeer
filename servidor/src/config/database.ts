@@ -6,14 +6,12 @@ import bcrypt from "bcryptjs";
 const db = new Database("laboratorio.db");
 db.pragma("foreign_keys = ON");
 
-// --- CREACIÓN DE TABLAS CORREGIDA Y FINAL ---
 db.exec(`
   CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT, 
     email TEXT UNIQUE NOT NULL, 
     password TEXT NOT NULL, 
     name TEXT NOT NULL,
-    -- CORREGIDO: Rol simplificado a "administrador"
     role TEXT NOT NULL CHECK (role IN ('empleado', 'director', 'administracion', 'administrador')),
     points REAL NOT NULL DEFAULT 0
   );
@@ -43,7 +41,6 @@ db.exec(`
     date TEXT NOT NULL, 
     type TEXT NOT NULL, 
     client_id INTEGER NOT NULL,
-    contract TEXT, 
     product TEXT NOT NULL, 
     brand TEXT,
     model TEXT,
@@ -53,7 +50,7 @@ db.exec(`
     collaborator_observations TEXT,
     status TEXT NOT NULL DEFAULT 'pendiente' CHECK(status IN ('pendiente', 'autorizada', 'en_progreso', 'pausada', 'finalizada', 'facturada', 'cierre')),
     created_by INTEGER NOT NULL, 
-    assigned_to INTEGER,
+    -- COLUMNA 'assigned_to' ELIMINADA DE AQUÍ
     quotation_amount REAL,
     quotation_details TEXT,
     disposition TEXT,
@@ -66,19 +63,18 @@ db.exec(`
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP, 
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE,
-    FOREIGN KEY (created_by) REFERENCES users(id),
-    FOREIGN KEY (assigned_to) REFERENCES users(id)
+    FOREIGN KEY (created_by) REFERENCES users(id)
   );
   
   CREATE TABLE IF NOT EXISTS work_order_activities (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     work_order_id INTEGER NOT NULL,
     activity TEXT NOT NULL,
-    FOREIGN KEY (work_order_id) REFERENCES work_orders(id) ON DELETE CASCADE
+    assigned_to INTEGER, -- <-- AÑADIDO
+    FOREIGN KEY (work_order_id) REFERENCES work_orders(id) ON DELETE CASCADE,
+    FOREIGN KEY (assigned_to) REFERENCES users(id) -- <-- AÑADIDO
   );
 `);
-
-// --- Lógica de Usuario Admin ---
 const adminEmail = "admin@laboratorio.com";
 const adminCheckStmt = db.prepare("SELECT id FROM users WHERE email = ?");
 if (!adminCheckStmt.get(adminEmail)) {
@@ -86,12 +82,7 @@ if (!adminCheckStmt.get(adminEmail)) {
   const hashedPassword = bcrypt.hashSync(adminPassword, 10);
   db.prepare(
     "INSERT INTO users (email, password, name, role) VALUES (?, ?, ?, ?)"
-  ).run(
-    adminEmail,
-    hashedPassword,
-    "Administrador", // Nombre actualizado
-    "administrador" // Rol simplificado
-  );
+  ).run(adminEmail, hashedPassword, "Administrador", "administrador");
 }
 
 export default db;
