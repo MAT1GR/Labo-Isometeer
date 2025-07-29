@@ -3,13 +3,24 @@
 import axiosInstance from "../api/axiosInstance";
 import { User } from "./auth";
 
+export interface Activity {
+  id: number;
+  activity: string;
+  assigned_to: number | null;
+  assigned_to_name?: string;
+  status: "pendiente" | "en_progreso" | "finalizada";
+  started_at?: string;
+  completed_at?: string;
+}
+
 export interface WorkOrder {
+  completed_at: any;
   id: number;
   custom_id?: string;
   date: string;
   type: string;
   client_id: number;
-  contract?: string;
+  activities?: Activity[];
   product: string;
   brand?: string;
   model?: string;
@@ -19,14 +30,10 @@ export interface WorkOrder {
   certificate_expiry?: string;
   status: string;
   created_by: number;
-  assigned_to?: number | null;
   quotation_amount?: number;
   quotation_details?: string;
   disposition?: string;
   authorized: boolean;
-  started_at?: string | null;
-  completed_at?: string | null;
-  duration_minutes?: number | null;
   created_at: string;
   updated_at?: string;
   client_name?: string;
@@ -53,19 +60,6 @@ class OTService {
     return response.data;
   }
 
-  async getTimelineData(params: {
-    year: number;
-    month: number;
-    assigned_to: number;
-  }): Promise<TimelineOt[]> {
-    const { year, month, assigned_to } = params;
-    // CORREGIDO: La URL ahora coincide con la nueva ruta del servidor
-    const response = await axiosInstance.get(
-      `/ots/timeline/${assigned_to}/${year}/${month}`
-    );
-    return response.data;
-  }
-
   async getOTById(id: number): Promise<WorkOrder> {
     const response = await axiosInstance.get(`/ots/${id}`);
     return response.data;
@@ -82,7 +76,6 @@ class OTService {
     await axiosInstance.delete(`/ots/${otId}`);
   }
 
-  // CORREGIDO: Ahora se envía el userId en el cuerpo de la petición
   async authorizeOT(id: number, userId: number): Promise<WorkOrder> {
     const response = await axiosInstance.put(`/ots/${id}/authorize`, {
       userId,
@@ -94,13 +87,12 @@ class OTService {
     await axiosInstance.put(`/ots/${id}/deauthorize`);
   }
 
-  async startOT(id: number): Promise<WorkOrder> {
-    const response = await axiosInstance.put(`/ots/${id}/start`);
-    return response.data;
+  async startActivity(activityId: number): Promise<void> {
+    await axiosInstance.put(`/ots/activities/${activityId}/start`);
   }
-  async stopOT(id: number): Promise<WorkOrder> {
-    const response = await axiosInstance.put(`/ots/${id}/stop`);
-    return response.data;
+
+  async stopActivity(activityId: number): Promise<void> {
+    await axiosInstance.put(`/ots/activities/${activityId}/stop`);
   }
 }
 

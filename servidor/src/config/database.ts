@@ -48,18 +48,13 @@ db.exec(`
     observations TEXT,
     certificate_expiry TEXT,
     collaborator_observations TEXT,
-    status TEXT NOT NULL DEFAULT 'pendiente' CHECK(status IN ('pendiente', 'autorizada', 'en_progreso', 'pausada', 'finalizada', 'facturada', 'cierre')),
+    status TEXT NOT NULL DEFAULT 'pendiente', -- Ya no se usa 'autorizada'
     created_by INTEGER NOT NULL, 
-    -- COLUMNA 'assigned_to' ELIMINADA DE AQUÍ
     quotation_amount REAL,
     quotation_details TEXT,
     disposition TEXT,
     authorized BOOLEAN NOT NULL DEFAULT FALSE,
-    started_at DATETIME,
-    completed_at DATETIME,
-    paused_at DATETIME,
-    total_pause_duration INTEGER NOT NULL DEFAULT 0,
-    duration_minutes INTEGER,
+    -- COLUMNAS DE TIEMPO ELIMINADAS DE AQUÍ
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP, 
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE,
@@ -70,11 +65,20 @@ db.exec(`
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     work_order_id INTEGER NOT NULL,
     activity TEXT NOT NULL,
-    assigned_to INTEGER, -- <-- AÑADIDO
+    assigned_to INTEGER,
+    -- NUEVAS COLUMNAS PARA SEGUIMIENTO INDIVIDUAL
+    status TEXT NOT NULL DEFAULT 'pendiente' CHECK(status IN ('pendiente', 'en_progreso', 'finalizada')),
+    started_at DATETIME,
+    completed_at DATETIME,
     FOREIGN KEY (work_order_id) REFERENCES work_orders(id) ON DELETE CASCADE,
-    FOREIGN KEY (assigned_to) REFERENCES users(id) -- <-- AÑADIDO
+    FOREIGN KEY (assigned_to) REFERENCES users(id)
   );
 `);
+
+
+
+
+
 const adminEmail = "admin@laboratorio.com";
 const adminCheckStmt = db.prepare("SELECT id FROM users WHERE email = ?");
 if (!adminCheckStmt.get(adminEmail)) {

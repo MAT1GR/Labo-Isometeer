@@ -70,15 +70,11 @@ const SidebarNavigation: React.FC = () => {
   return (
     <div className="flex grow flex-col gap-y-5 overflow-y-auto bg-white dark:bg-gray-800 px-6 pb-4 shadow-sm border-r border-gray-200 dark:border-gray-700">
       <div className="flex h-16 shrink-0 items-center gap-3">
-        {/* --- LOGO DE LA EMPRESA --- */}
-        <img
-          className="h-8 w-auto"
-          src="public/logo.png"
-          alt="Logo de la Empresa"
-        />
+        {/* --- LOGO DE LA EMPRESA RESTAURADO --- */}
+        <img className="h-8 w-auto" src="/logo.png" alt="Logo de la Empresa" />
         <div>
           <h1 className="text-lg font-bold text-blue-600 dark:text-blue-500">
-            ISOmeter Go
+            Lab Consultar
           </h1>
           <p className="text-xs text-gray-500 dark:text-gray-400">
             Sistema de Gestión

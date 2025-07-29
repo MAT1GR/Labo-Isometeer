@@ -1,9 +1,9 @@
-// RUTA: /cliente/src/pages/OTDetail.tsx
+// RUTA: /cliente/src/pages/OTdetail.tsx
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { useForm, useWatch } from "react-hook-form";
-import { otService, WorkOrder } from "../services/otService";
+import { useForm, useWatch, useFieldArray } from "react-hook-form";
+import { otService, WorkOrder, Activity } from "../services/otService";
 import { authService, User } from "../services/auth";
 import { useAuth } from "../contexts/AuthContext";
 import Input from "../components/ui/Input";
@@ -15,8 +15,22 @@ import {
   StopCircle,
   CheckSquare,
   XSquare,
+  PlusCircle,
+  Trash2,
 } from "lucide-react";
 import { mutate } from "swr";
+
+const activityOptions = [
+  "Calibracion",
+  "Completo",
+  "Ampliado",
+  "Refurbished",
+  "Fabricacion",
+  "Verificacion de identidad",
+  "Reducido",
+  "Servicio tecnico",
+  "Capacitacion",
+];
 
 const OTDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -29,18 +43,27 @@ const OTDetail: React.FC = () => {
     reset,
     formState: { isSubmitting, isDirty },
   } = useForm<WorkOrder>();
+
+  const { fields, append, remove } = useFieldArray({
+    control,
+    name: "activities" as never,
+  });
+
   const [otData, setOtData] = useState<WorkOrder | null>(null);
   const [users, setUsers] = useState<User[]>([]);
+  const [error, setError] = useState<string | null>(null);
 
+  const watchedActivities = useWatch({ control, name: "activities" });
   const otType = useWatch({ control, name: "type" });
   const isLacreEnabled =
     otType === "Ensayo SE" ||
     otType === "Ensayo EE" ||
     otType === "Otros Servicios";
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     if (id) {
       try {
+        setError(null);
         const [ot, userList] = await Promise.all([
           otService.getOTById(Number(id)),
           canViewAdminContent()
@@ -57,15 +80,16 @@ const OTDetail: React.FC = () => {
             : "",
         };
         reset(formattedOt);
-      } catch (error) {
-        console.error("Error cargando datos de la OT:", error);
+      } catch (err: any) {
+        console.error("Error cargando datos de la OT:", err);
+        setError("No se pudieron cargar los datos de la Orden de Trabajo.");
       }
     }
-  };
+  }, [id, reset, canViewAdminContent]);
 
   useEffect(() => {
     loadData();
-  }, [id, reset]);
+  }, [loadData]);
 
   const onSubmit = async (data: WorkOrder) => {
     try {
@@ -92,24 +116,33 @@ const OTDetail: React.FC = () => {
     mutate(["/ots", user]);
   };
 
-  const handleStartWork = async () => {
-    if (!id) return;
-    await otService.startOT(Number(id));
-    await loadData();
-  };
-  const handleStopWork = async () => {
-    if (!id) return;
-    await otService.stopOT(Number(id));
+  const handleStartActivity = async (activityId: number) => {
+    await otService.startActivity(activityId);
     await loadData();
   };
 
-  if (!otData) return <div className="p-8">Cargando datos...</div>;
+  const handleStopActivity = async (activityId: number) => {
+    await otService.stopActivity(activityId);
+    await loadData();
+  };
+
+  if (error) return <div className="p-8 text-red-500 text-center">{error}</div>;
+  if (!otData)
+    return <div className="p-8 text-center">Cargando datos de la OT...</div>;
 
   const isEmployee = user?.role === "empleado";
   const isClosed = otData.status === "cierre";
 
-  // Lógica de edición mejorada
   const isFormEditableForAdmin = canViewAdminContent() && !isClosed;
+
+  const getAvailableActivities = (currentIndex: number) => {
+    const selectedActivities =
+      watchedActivities?.map((act: any) => act.activity) || [];
+    const currentActivity = watchedActivities?.[currentIndex]?.activity;
+    return activityOptions.filter(
+      (opt) => !selectedActivities.includes(opt) || opt === currentActivity
+    );
+  };
 
   return (
     <form
@@ -150,49 +183,15 @@ const OTDetail: React.FC = () => {
               <XSquare className="mr-2 h-5 w-5" /> Desautorizar OT
             </Button>
           )}
-        {isEmployee && otData.authorized && !otData.started_at && (
-          <Button
-            type="button"
-            onClick={handleStartWork}
-            className="bg-blue-600 hover:bg-blue-700"
-          >
-            <Play className="mr-2 h-5 w-5" /> Empezar Trabajo
-          </Button>
-        )}
-        {isEmployee && otData.started_at && !otData.completed_at && (
-          <Button
-            type="button"
-            onClick={handleStopWork}
-            className="bg-red-600 hover:bg-red-700"
-          >
-            <StopCircle className="mr-2 h-5 w-5" /> Finalizar Trabajo
-          </Button>
-        )}
-        {otData.completed_at && (
-          <div className="text-center p-2 rounded-md bg-green-50 dark:bg-green-900/50 text-green-800 dark:text-green-300">
-            <p className="font-semibold">Trabajo Finalizado</p>
-            <p className="text-sm">
-              Duración: {otData.duration_minutes} minutos
-            </p>
-          </div>
-        )}
       </div>
 
       <div className="bg-white dark:bg-gray-800 dark:border dark:border-gray-700 p-6 rounded-lg shadow-sm space-y-8">
-        <fieldset
-          disabled={!isFormEditableForAdmin && !isEmployee}
-          className="disabled:opacity-70"
-        >
+        <fieldset disabled={!isFormEditableForAdmin}>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6 border-b dark:border-gray-700 pb-6">
             <h2 className="text-lg font-semibold text-blue-700 dark:text-blue-400 col-span-full">
               OT Seleccionada
             </h2>
-            <Input
-              label="Fecha"
-              type="date"
-              {...register("date")}
-              disabled={isEmployee}
-            />
+            <Input label="Fecha" type="date" {...register("date")} />
             <div>
               <label className="text-sm font-medium dark:text-gray-300">
                 Tipo de OT
@@ -200,7 +199,6 @@ const OTDetail: React.FC = () => {
               <select
                 {...register("type")}
                 className="w-full mt-1 p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
-                disabled={isEmployee}
               >
                 <option value="Produccion">Producción</option>
                 <option value="Calibracion">Calibración</option>
@@ -213,11 +211,6 @@ const OTDetail: React.FC = () => {
               label="ID de OT"
               value={otData.custom_id || `Interno #${id}`}
               readOnly
-            />
-            <Input
-              label="Contrato"
-              {...register("contract")}
-              disabled={isEmployee}
             />
           </div>
 
@@ -233,27 +226,19 @@ const OTDetail: React.FC = () => {
             <h2 className="text-lg font-semibold text-blue-700 dark:text-blue-400 col-span-full">
               Producto
             </h2>
-            <Input
-              label="Nombre"
-              {...register("product")}
-              disabled={isEmployee}
-            />
-            <Input label="Marca" {...register("brand")} disabled={isEmployee} />
-            <Input
-              label="Modelo"
-              {...register("model")}
-              disabled={isEmployee}
-            />
+            <Input label="Nombre" {...register("product")} />
+            <Input label="Marca" {...register("brand")} />
+            <Input label="Modelo" {...register("model")} />
             <Input
               label="Nº de Lacre"
               {...register("seal_number")}
-              disabled={!isLacreEnabled || isEmployee}
+              disabled={!isLacreEnabled}
             />
             <Input
               label="Vto. del Certificado"
               type="date"
               {...register("certificate_expiry")}
-              disabled={!isLacreEnabled || isEmployee}
+              disabled={!isLacreEnabled}
             />
             <div className="col-span-full">
               <label className="text-sm font-medium dark:text-gray-300">
@@ -263,69 +248,140 @@ const OTDetail: React.FC = () => {
                 {...register("observations")}
                 className="w-full mt-1 p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
                 rows={3}
-                disabled={isEmployee}
               ></textarea>
             </div>
           </div>
         </fieldset>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          <div className={canViewAdminContent() ? "" : "col-span-full"}>
-            <h2 className="text-lg font-semibold text-blue-700 dark:text-blue-400 mb-4">
-              {isEmployee ? "Mis Observaciones" : "Actividades"}
+        <div className="border-b dark:border-gray-700 pb-6">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-lg font-semibold text-blue-700 dark:text-blue-400">
+              Actividades y Asignaciones
             </h2>
-            {isEmployee ? (
-              <textarea
-                {...register("collaborator_observations")}
-                disabled={isClosed}
-                className="w-full mt-1 p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
-                rows={4}
-                placeholder="Añade tus observaciones aquí..."
-              ></textarea>
-            ) : (
-              <fieldset
-                disabled={!isFormEditableForAdmin}
-                className="space-y-4"
+            {isFormEditableForAdmin && (
+              <Button
+                type="button"
+                size="sm"
+                onClick={() => append({ activity: "", assigned_to: null })}
               >
-                <div>
-                  <label className="text-sm font-medium dark:text-gray-300">
-                    Asignar a
-                  </label>
-                  <select
-                    {...register("assigned_to")}
-                    className="w-full mt-1 p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
-                  >
-                    <option value="">Sin asignar</option>
-                    {users.map((u) => (
-                      <option key={u.id} value={u.id}>
-                        {u.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="text-sm font-medium dark:text-gray-300">
-                    Observaciones del Colaborador
-                  </label>
-                  <textarea
-                    value={otData.collaborator_observations || ""}
-                    readOnly
-                    className="w-full mt-1 p-2 border rounded-md bg-gray-100 dark:bg-gray-900"
-                    rows={3}
-                  ></textarea>
-                </div>
-              </fieldset>
+                <PlusCircle className="h-4 w-4 mr-2" /> Agregar Actividad
+              </Button>
             )}
+          </div>
+          <div className="space-y-4">
+            {fields.map((field, index) => (
+              <div
+                key={field.id}
+                className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center bg-gray-50 dark:bg-gray-700/50 p-4 rounded-md"
+              >
+                <select
+                  {...register(`activities.${index}.activity`)}
+                  className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
+                  disabled={!isFormEditableForAdmin}
+                >
+                  <option value="">Seleccionar actividad...</option>
+                  {getAvailableActivities(index).map((opt) => (
+                    <option key={opt} value={opt}>
+                      {opt}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  {...register(`activities.${index}.assigned_to`)}
+                  className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
+                  disabled={!isFormEditableForAdmin}
+                >
+                  <option value="">Asignar a...</option>
+                  {users.map((u) => (
+                    <option key={u.id} value={u.id}>
+                      {u.name}
+                    </option>
+                  ))}
+                </select>
+                {isFormEditableForAdmin && (
+                  <Button
+                    type="button"
+                    variant="danger"
+                    size="sm"
+                    onClick={() => remove(index)}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                )}
+              </div>
+            ))}
+
+            {isEmployee &&
+              otData.activities?.map((act: Activity) => (
+                <div
+                  key={act.id}
+                  className="grid grid-cols-4 gap-4 items-center bg-gray-50 dark:bg-gray-700/50 p-3 rounded-md"
+                >
+                  <span className="font-medium">{act.activity}</span>
+                  <span>{act.assigned_to_name || "No asignado"}</span>
+                  <span
+                    className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                      act.status === "finalizada"
+                        ? "bg-green-100 text-green-800"
+                        : "bg-yellow-100 text-yellow-800"
+                    }`}
+                  >
+                    {act.status.replace("_", " ")}
+                  </span>
+                  {user?.id === act.assigned_to && otData.authorized && (
+                    <div className="flex gap-2">
+                      {act.status === "pendiente" && (
+                        <Button
+                          type="button"
+                          size="sm"
+                          onClick={() => handleStartActivity(act.id)}
+                        >
+                          <Play className="h-4 w-4 mr-1" /> Iniciar
+                        </Button>
+                      )}
+                      {act.status === "en_progreso" && (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="danger"
+                          onClick={() => handleStopActivity(act.id)}
+                        >
+                          <StopCircle className="h-4 w-4 mr-1" /> Finalizar
+                        </Button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ))}
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          <div className="col-span-full">
+            <h2 className="text-lg font-semibold text-blue-700 dark:text-blue-400 mb-4">
+              Observaciones del Colaborador
+            </h2>
+            <textarea
+              {...register("collaborator_observations")}
+              disabled={!isEmployee || isClosed}
+              className="w-full mt-1 p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
+              rows={4}
+              placeholder={
+                isEmployee
+                  ? "Añade tus observaciones aquí..."
+                  : "Visible para el empleado asignado..."
+              }
+            ></textarea>
           </div>
 
           {canViewAdminContent() && (
-            <div>
+            <div className="col-span-full">
               <h2 className="text-lg font-semibold text-blue-700 dark:text-blue-400 mb-4">
                 Administración
               </h2>
               <fieldset
                 disabled={!isFormEditableForAdmin}
-                className="space-y-4"
+                className="grid grid-cols-1 md:grid-cols-2 gap-6"
               >
                 <Input
                   label="Cotización (Detalles)"
@@ -338,28 +394,6 @@ const OTDetail: React.FC = () => {
                   {...register("quotation_amount")}
                 />
                 <Input label="Disposición" {...register("disposition")} />
-                <div className="grid grid-cols-2 gap-4 pt-4">
-                  <div className="bg-gray-100 dark:bg-gray-700 p-3 rounded">
-                    <p className="text-sm font-medium">Saldo a Facturar</p>
-                    <p className="text-lg font-bold">$0.00</p>
-                  </div>
-                  <div className="bg-gray-100 dark:bg-gray-700 p-3 rounded">
-                    <p className="text-sm font-medium">Saldo a Cobrar</p>
-                    <p className="text-lg font-bold">$0.00</p>
-                  </div>
-                </div>
-                <div className="mt-4 flex gap-4">
-                  <Button type="button" disabled>
-                    Cargar Factura
-                  </Button>
-                  <Button type="button" disabled>
-                    Cargar Recibo
-                  </Button>
-                </div>
-                <div>
-                  <h3 className="text-md font-semibold mt-4">Archivos</h3>
-                  <p className="text-sm text-gray-500">(Próximamente)</p>
-                </div>
                 <div>
                   <label className="text-sm font-medium dark:text-gray-300">
                     Estado Final
