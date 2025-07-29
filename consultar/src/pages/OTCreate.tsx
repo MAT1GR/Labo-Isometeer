@@ -1,5 +1,3 @@
-// RUTA: /cliente/src/pages/OTCreate.tsx
-
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useForm, useWatch, useFieldArray } from "react-hook-form";
@@ -9,12 +7,17 @@ import { authService, User } from "../services/auth";
 import { useAuth } from "../contexts/AuthContext";
 import Input from "../components/ui/Input";
 import Button from "../components/ui/Button";
-import { ArrowLeft, Save, PlusCircle, Trash2 } from "lucide-react";
+import { ArrowLeft, Save, PlusCircle, Trash2, Loader } from "lucide-react";
 import axiosInstance from "../api/axiosInstance";
 
 type OTCreateFormData = Omit<
   WorkOrder,
-  "id" | "created_at" | "updated_at" | "client_name" | "client_code"
+  | "id"
+  | "created_at"
+  | "updated_at"
+  | "client_name"
+  | "client_code"
+  | "assigned_to_name"
 >;
 
 const activityOptions = [
@@ -54,13 +57,14 @@ const OTCreate: React.FC = () => {
   const [clients, setClients] = useState<Client[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [idPreview, setIdPreview] = useState("Completar campos...");
+  const [isIdLoading, setIsIdLoading] = useState(false);
 
   const watchedActivities = useWatch({ control, name: "activities" });
-  const watchedFields = useWatch({
+  const watchedIdFields = useWatch({
     control,
     name: ["date", "type", "client_id"],
   });
-  const otType = watchedFields[1];
+  const otType = watchedIdFields[1];
   const isLacreEnabled =
     otType === "Ensayo SE" ||
     otType === "Ensayo EE" ||
@@ -82,9 +86,12 @@ const OTCreate: React.FC = () => {
     loadPrerequisites();
   }, []);
 
+  // --- LÓGICA PARA GENERAR ID AUTOMÁTICO RESTAURADA ---
   useEffect(() => {
-    const [date, type, clientId] = watchedFields;
+    const [date, type, clientId] = watchedIdFields;
+
     if (date && type && clientId) {
+      setIsIdLoading(true);
       const params = new URLSearchParams({
         date,
         type,
@@ -96,11 +103,12 @@ const OTCreate: React.FC = () => {
           const newId = response.data.previewId;
           setIdPreview(newId);
           setValue("custom_id", newId);
-        });
+        })
+        .finally(() => setIsIdLoading(false));
     } else {
       setIdPreview("Completar campos...");
     }
-  }, [watchedFields, setValue]);
+  }, [watchedIdFields, setValue]);
 
   const onSubmit = async (data: any) => {
     if (!user) return;
@@ -168,14 +176,19 @@ const OTCreate: React.FC = () => {
               className="w-full mt-1 p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
             >
               <option value="">Seleccionar tipo...</option>
-              <option value="Produccion">Producción</option>
-              <option value="Calibracion">Calibración</option>
-              <option value="Ensayo SE">Ensayo SE</option>
-              <option value="Ensayo EE">Ensayo EE</option>
-              <option value="Otros Servicios">Otros Servicios</option>
+              {otTypes.map((t) => (
+                <option key={t.value} value={t.value}>
+                  {t.label}
+                </option>
+              ))}
             </select>
           </div>
-          <Input label="ID de OT" value={idPreview} disabled readOnly />
+          <div className="relative">
+            <Input label="ID de OT" value={idPreview} disabled readOnly />
+            {isIdLoading && (
+              <Loader className="absolute right-3 top-9 h-5 w-5 animate-spin text-gray-400" />
+            )}
+          </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 border-b dark:border-gray-700 pb-6">
@@ -202,7 +215,6 @@ const OTCreate: React.FC = () => {
             </select>
           </div>
         </div>
-
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 border-b dark:border-gray-700 pb-6">
           <h2 className="text-lg font-semibold text-blue-700 dark:text-blue-400 col-span-full">
             Producto

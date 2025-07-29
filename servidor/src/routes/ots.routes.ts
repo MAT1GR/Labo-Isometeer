@@ -196,7 +196,41 @@ router.put("/:id", (req: Request, res: Response) => {
   }
 });
 
-// [PUT] /api/ots/:id/authorize
+// --- RUTA generate-id RESTAURADA Y VERIFICADA ---
+router.get("/generate-id", (req: Request, res: Response) => {
+  try {
+    const { date, type, client_id } = req.query;
+    if (!date || !type || !client_id)
+      return res.status(200).json({ previewId: "Completar campos..." });
+
+    const client = db
+      .prepare("SELECT code FROM clients WHERE id = ?")
+      .get(client_id as string) as { code: string };
+    if (!client) return res.status(200).json({ previewId: "Cliente inválido" });
+
+    // Lógica para el número incremental (N)
+    const countResult = db
+      .prepare(
+        `SELECT COUNT(*) as count FROM work_orders WHERE date = ? AND type = ? AND client_id = ?`
+      )
+      .get(date as string, type as string, client_id as string) as {
+      count: number;
+    };
+    const sequentialNumber = (countResult.count || 0) + 1;
+
+    const dateObj = new Date(date as string);
+    const year = dateObj.getUTCFullYear().toString().slice(-2);
+    const month = (dateObj.getUTCMonth() + 1).toString().padStart(2, "0");
+    const day = dateObj.getUTCDate().toString().padStart(2, "0");
+
+    const custom_id = `${year}${month}${day}${sequentialNumber} ${type} ${client.code}`;
+    res.status(200).json({ previewId: custom_id });
+  } catch (error) {
+    res.status(500).json({ error: "Error al generar el ID" });
+  }
+});
+
+// --- RUTAS DE ACCIONES DE OT ---
 router.put("/:id/authorize", (req: Request, res: Response) => {
   const { userId } = req.body;
   if (!userId) {
@@ -240,36 +274,6 @@ router.delete("/:id", (req: Request, res: Response) => {
     res.status(200).json({ message: "Orden de Trabajo eliminada con éxito." });
   } catch (error) {
     res.status(500).json({ error: "Error interno del servidor." });
-  }
-});
-
-// --- RUTA generate-id RESTAURADA ---
-router.get("/generate-id", (req: Request, res: Response) => {
-  try {
-    const { date, type, client_id } = req.query;
-    if (!date || !type || !client_id)
-      return res.status(200).json({ previewId: "Completar campos..." });
-    const client = db
-      .prepare("SELECT code FROM clients WHERE id = ?")
-      .get(client_id as string) as { code: string };
-    if (!client) return res.status(200).json({ previewId: "Cliente inválido" });
-    const dateObj = new Date(date as string);
-    const year = dateObj.getUTCFullYear().toString().slice(-2);
-    const month = (dateObj.getUTCMonth() + 1).toString().padStart(2, "0");
-    const day = dateObj.getUTCDate().toString().padStart(2, "0");
-    const datePrefix = `${year}${month}${day}`;
-    const otsTodayCount = (
-      db
-        .prepare("SELECT COUNT(*) as count FROM work_orders WHERE date = ?")
-        .get(date as string) as { count: number }
-    ).count;
-    const sequentialNumber = otsTodayCount + 1;
-    const typeLetter = (type as string).charAt(0).toUpperCase();
-    const clientCode = client.code;
-    const custom_id = `${datePrefix}${sequentialNumber} ${typeLetter} ${clientCode}`;
-    res.status(200).json({ previewId: custom_id });
-  } catch (error) {
-    res.status(500).json({ error: "Error al generar el ID" });
   }
 });
 
