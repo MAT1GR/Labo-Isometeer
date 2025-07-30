@@ -46,6 +46,7 @@ const OTCreate: React.FC = () => {
       date: new Date().toISOString().split("T")[0],
       status: "pendiente",
       activities: [{ activity: "", assigned_to: null }],
+      contract_type: "Contrato General",
     },
   });
 
@@ -69,6 +70,17 @@ const OTCreate: React.FC = () => {
     otType === "Ensayo SE" ||
     otType === "Ensayo EE" ||
     otType === "Otros Servicios";
+
+  // Logic to set default contract based on OT type
+  useEffect(() => {
+    if (otType === "Calibracion") {
+      setValue("contract_type", "Contrato de Calibración");
+    } else if (otType === "Ensayo SE" || otType === "Ensayo EE") {
+      setValue("contract_type", "Contrato de Ensayo");
+    } else {
+      setValue("contract_type", "Contrato General");
+    }
+  }, [otType, setValue]);
 
   useEffect(() => {
     const loadPrerequisites = async () => {
@@ -168,7 +180,7 @@ const OTCreate: React.FC = () => {
       </div>
 
       <div className="bg-white dark:bg-gray-800 dark:border dark:border-gray-700 p-6 rounded-lg shadow-sm space-y-8">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 border-b dark:border-gray-700 pb-6">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 border-b dark:border-gray-700 pb-6">
           <Input
             label="Fecha *"
             type="date"
@@ -188,6 +200,21 @@ const OTCreate: React.FC = () => {
                   {t.label}
                 </option>
               ))}
+            </select>
+          </div>
+          <div>
+            <label className="text-sm font-medium dark:text-gray-300">
+              Contrato
+            </label>
+            <select
+              {...register("contract_type")}
+              className="w-full mt-1 p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
+            >
+              <option value="Contrato General">Contrato General</option>
+              <option value="Contrato de Calibración">
+                Contrato de Calibración
+              </option>
+              <option value="Contrato de Ensayo">Contrato de Ensayo</option>
             </select>
           </div>
           <div className="relative">

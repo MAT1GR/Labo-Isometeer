@@ -34,6 +34,7 @@ export interface WorkOrder {
   quotation_details?: string;
   disposition?: string;
   authorized: boolean;
+  contract_type?: string; // NUEVO CAMPO
   created_at: string;
   updated_at?: string;
   client_name?: string;

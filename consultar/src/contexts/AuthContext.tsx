@@ -12,6 +12,7 @@ interface AuthContextType {
   canCreateContent: () => boolean;
   canViewAdminContent: () => boolean;
   canManageUsers: () => boolean;
+  canManageContracts: () => boolean; // Nueva función de permiso
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -69,6 +70,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     return user?.role === "administrador";
   };
 
+  const canManageContracts = () => {
+    return user?.role === "administrador";
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -80,6 +85,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         canCreateContent,
         canViewAdminContent,
         canManageUsers,
+        canManageContracts, // Añadimos la función al contexto
       }}
     >
       {children}

@@ -17,8 +17,10 @@ import {
   XSquare,
   PlusCircle,
   Trash2,
+  Download, // Ícono para exportar
 } from "lucide-react";
 import { mutate } from "swr";
+import { exportOtToPdf } from "../services/pdfGenerator"; // Importamos la función
 
 const activityOptions = [
   "Calibracion",
@@ -41,6 +43,7 @@ const OTDetail: React.FC = () => {
     handleSubmit,
     control,
     reset,
+    setValue,
     formState: { isSubmitting, isDirty },
   } = useForm<WorkOrder>();
 
@@ -59,6 +62,19 @@ const OTDetail: React.FC = () => {
     otType === "Ensayo SE" ||
     otType === "Ensayo EE" ||
     otType === "Otros Servicios";
+
+  // Logic to set default contract based on OT type
+  useEffect(() => {
+    if (otType === "Calibracion") {
+      setValue("contract_type", "Contrato de Calibración", {
+        shouldDirty: true,
+      });
+    } else if (otType === "Ensayo SE" || otType === "Ensayo EE") {
+      setValue("contract_type", "Contrato de Ensayo", { shouldDirty: true });
+    } else {
+      setValue("contract_type", "Contrato General", { shouldDirty: true });
+    }
+  }, [otType, setValue]);
 
   const loadData = useCallback(async () => {
     if (id) {
@@ -126,6 +142,12 @@ const OTDetail: React.FC = () => {
     await loadData();
   };
 
+  const handleExport = () => {
+    if (otData) {
+      exportOtToPdf(otData);
+    }
+  };
+
   if (error) return <div className="p-8 text-red-500 text-center">{error}</div>;
   if (!otData)
     return <div className="p-8 text-center">Cargando datos de la OT...</div>;
@@ -157,13 +179,19 @@ const OTDetail: React.FC = () => {
         <h1 className="text-2xl font-bold">
           Detalle de OT: {otData.custom_id || `#${otData.id}`}
         </h1>
-        <Button
-          type="submit"
-          disabled={isSubmitting || !isDirty || (isEmployee && isClosed)}
-        >
-          <Save className="mr-2 h-5 w-5" />
-          Guardar Cambios
-        </Button>
+        <div className="flex gap-2">
+          <Button type="button" variant="secondary" onClick={handleExport}>
+            <Download className="mr-2 h-5 w-5" />
+            Exportar a PDF
+          </Button>
+          <Button
+            type="submit"
+            disabled={isSubmitting || !isDirty || (isEmployee && isClosed)}
+          >
+            <Save className="mr-2 h-5 w-5" />
+            Guardar Cambios
+          </Button>
+        </div>
       </div>
 
       <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm flex flex-wrap justify-center items-center gap-4">
@@ -205,6 +233,21 @@ const OTDetail: React.FC = () => {
                 <option value="Ensayo SE">Ensayo SE</option>
                 <option value="Ensayo EE">Ensayo EE</option>
                 <option value="Otros Servicios">Otros Servicios</option>
+              </select>
+            </div>
+            <div>
+              <label className="text-sm font-medium dark:text-gray-300">
+                Contrato
+              </label>
+              <select
+                {...register("contract_type")}
+                className="w-full mt-1 p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
+              >
+                <option value="Contrato General">Contrato General</option>
+                <option value="Contrato de Calibración">
+                  Contrato de Calibración
+                </option>
+                <option value="Contrato de Ensayo">Contrato de Ensayo</option>
               </select>
             </div>
             <Input

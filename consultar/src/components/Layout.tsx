@@ -14,12 +14,13 @@ import {
   X,
   UserCircle,
   Bot,
+  FileSignature, // Importamos el nuevo ícono
 } from "lucide-react";
 import ThemeToggle from "./ui/ThemeToggle";
 import { cn } from "../lib/utils";
 
 const SidebarNavigation: React.FC = () => {
-  const { user, logout } = useAuth();
+  const { user, logout, canManageContracts } = useAuth(); // Añadimos canManageContracts
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -49,6 +50,13 @@ const SidebarNavigation: React.FC = () => {
       roles: ["administrador"],
     },
     {
+      icon: FileSignature, // Nuevo ícono para Contratos
+      label: "Contratos",
+      path: "/contratos",
+      show: canManageContracts, // Usamos la nueva función de permiso
+      roles: ["administrador"], // Solo para admin
+    },
+    {
       icon: Bot,
       label: "Asistente IA",
       path: "/asistente",
@@ -56,8 +64,9 @@ const SidebarNavigation: React.FC = () => {
     },
   ];
 
-  const filteredMenuItems = menuItems.filter((item) =>
-    item.roles.includes(user?.role || "")
+  const filteredMenuItems = menuItems.filter(
+    (item) =>
+      item.roles.includes(user?.role || "") && (item.show ? item.show() : true)
   );
 
   const handleLogout = () => {
@@ -70,7 +79,6 @@ const SidebarNavigation: React.FC = () => {
   return (
     <div className="flex grow flex-col gap-y-5 overflow-y-auto bg-white dark:bg-gray-800 px-6 pb-4 shadow-sm border-r border-gray-200 dark:border-gray-700">
       <div className="flex h-16 shrink-0 items-center gap-3">
-        {/* --- LOGO DE LA EMPRESA RESTAURADO --- */}
         <img className="h-8 w-auto" src="/logo.png" alt="Logo de la Empresa" />
         <div>
           <h1 className="text-lg font-bold text-blue-600 dark:text-blue-500">

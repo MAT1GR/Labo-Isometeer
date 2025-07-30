@@ -48,13 +48,13 @@ db.exec(`
     observations TEXT,
     certificate_expiry TEXT,
     collaborator_observations TEXT,
-    status TEXT NOT NULL DEFAULT 'pendiente', -- Ya no se usa 'autorizada'
+    status TEXT NOT NULL DEFAULT 'pendiente',
     created_by INTEGER NOT NULL, 
     quotation_amount REAL,
     quotation_details TEXT,
     disposition TEXT,
     authorized BOOLEAN NOT NULL DEFAULT FALSE,
-    -- COLUMNAS DE TIEMPO ELIMINADAS DE AQUÍ
+    contract_type TEXT DEFAULT 'Contrato General',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP, 
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE,
@@ -66,18 +66,48 @@ db.exec(`
     work_order_id INTEGER NOT NULL,
     activity TEXT NOT NULL,
     assigned_to INTEGER,
-    -- NUEVAS COLUMNAS PARA SEGUIMIENTO INDIVIDUAL
     status TEXT NOT NULL DEFAULT 'pendiente' CHECK(status IN ('pendiente', 'en_progreso', 'finalizada')),
     started_at DATETIME,
     completed_at DATETIME,
     FOREIGN KEY (work_order_id) REFERENCES work_orders(id) ON DELETE CASCADE,
     FOREIGN KEY (assigned_to) REFERENCES users(id)
   );
+
+  CREATE TABLE IF NOT EXISTS contracts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT UNIQUE NOT NULL,
+    content TEXT,
+    pdf_path TEXT 
+  );
 `);
 
+// Seed contracts if they don't exist
+const seedContracts = () => {
+  const contracts = [
+    {
+      name: "Contrato General",
+      content:
+        "Este es el texto por defecto para el Contrato General. El administrador puede editar este contenido o subir un PDF.",
+    },
+    {
+      name: "Contrato de Calibración",
+      content:
+        "Este es el texto por defecto para el Contrato de Calibración. El administrador puede editar este contenido o subir un PDF.",
+    },
+    {
+      name: "Contrato de Ensayo",
+      content:
+        "Este es el texto por defecto para el Contrato de Ensayo. El administrador puede editar este contenido o subir un PDF.",
+    },
+  ];
 
+  const stmt = db.prepare(
+    "INSERT OR IGNORE INTO contracts (name, content) VALUES (?, ?)"
+  );
+  contracts.forEach((c) => stmt.run(c.name, c.content));
+};
 
-
+seedContracts();
 
 const adminEmail = "admin@laboratorio.com";
 const adminCheckStmt = db.prepare("SELECT id FROM users WHERE email = ?");
