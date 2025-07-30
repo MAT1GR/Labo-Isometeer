@@ -9,6 +9,8 @@ import Button from "../components/ui/Button";
 import { Save, FileSignature, Upload, File } from "lucide-react";
 import axiosInstance from "../api/axiosInstance";
 
+const staticBaseUrl = axiosInstance.defaults.baseURL?.replace("/api", "") || "";
+
 const Contratos: React.FC = () => {
   const {
     data: contracts,
@@ -123,7 +125,7 @@ const Contratos: React.FC = () => {
                   <h3 className="font-semibold mb-2">Archivo PDF:</h3>
                   {contract.pdf_path ? (
                     <a
-                      href={`${axiosInstance.defaults.baseURL}/${contract.pdf_path}`}
+                      href={`${staticBaseUrl}/${contract.pdf_path}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="text-blue-500 hover:underline flex items-center gap-2"

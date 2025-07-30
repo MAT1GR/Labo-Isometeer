@@ -46,7 +46,7 @@ const OTCreate: React.FC = () => {
       date: new Date().toISOString().split("T")[0],
       status: "pendiente",
       activities: [{ activity: "", assigned_to: null }],
-      contract_type: "Contrato General",
+      contract_type: "Contrato de Producción",
     },
   });
 
@@ -78,7 +78,7 @@ const OTCreate: React.FC = () => {
     } else if (otType === "Ensayo SE" || otType === "Ensayo EE") {
       setValue("contract_type", "Contrato de Ensayo");
     } else {
-      setValue("contract_type", "Contrato General");
+      setValue("contract_type", "Contrato de Producción");
     }
   }, [otType, setValue]);
 
@@ -210,7 +210,9 @@ const OTCreate: React.FC = () => {
               {...register("contract_type")}
               className="w-full mt-1 p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
             >
-              <option value="Contrato General">Contrato General</option>
+              <option value="Contrato de Producción">
+                Contrato de Producción
+              </option>
               <option value="Contrato de Calibración">
                 Contrato de Calibración
               </option>

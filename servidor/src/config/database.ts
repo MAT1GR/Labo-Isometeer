@@ -54,7 +54,7 @@ db.exec(`
     quotation_details TEXT,
     disposition TEXT,
     authorized BOOLEAN NOT NULL DEFAULT FALSE,
-    contract_type TEXT DEFAULT 'Contrato General',
+    contract_type TEXT DEFAULT 'Contrato de Producción', -- CAMBIO DE NOMBRE
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP, 
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE,
@@ -85,9 +85,9 @@ db.exec(`
 const seedContracts = () => {
   const contracts = [
     {
-      name: "Contrato General",
+      name: "Contrato de Producción", // CAMBIO DE NOMBRE
       content:
-        "Este es el texto por defecto para el Contrato General. El administrador puede editar este contenido o subir un PDF.",
+        "Este es el texto por defecto para el Contrato de Producción. El administrador puede editar este contenido o subir un PDF.",
     },
     {
       name: "Contrato de Calibración",
