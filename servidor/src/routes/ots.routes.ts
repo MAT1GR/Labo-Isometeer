@@ -264,6 +264,27 @@ router.put("/:id/authorize", (req: Request, res: Response) => {
   }
 });
 
+router.put("/:id/deauthorize", (req, res) => {
+  try {
+    const info = db
+      .prepare(
+        "UPDATE work_orders SET authorized = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND status = 'pendiente'"
+      )
+      .run(req.params.id);
+
+    if (info.changes === 0) {
+      return res.status(404).json({
+        error:
+          "OT no encontrada o no se puede desautorizar porque no está pendiente.",
+      });
+    }
+
+    res.status(200).json({ message: "OT desautorizada con éxito." });
+  } catch (error) {
+    res.status(500).json({ error: "Error al desautorizar la OT." });
+  }
+});
+
 // [DELETE] /api/ots/:id
 router.delete("/:id", (req: Request, res: Response) => {
   try {

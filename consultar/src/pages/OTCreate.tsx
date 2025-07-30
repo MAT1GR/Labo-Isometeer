@@ -134,6 +134,14 @@ const OTCreate: React.FC = () => {
     );
   };
 
+  const otTypes = [
+    { value: "Produccion", label: "Producción" },
+    { value: "Calibracion", label: "Calibración" },
+    { value: "Ensayo SE", label: "Ensayo SE" },
+    { value: "Ensayo EE", label: "Ensayo EE" },
+    { value: "Otros Servicios", label: "Otros Servicios" },
+  ];
+
   return (
     <form
       onSubmit={handleSubmit(onSubmit)}

@@ -51,18 +51,25 @@ router.delete("/:id", (req: Request, res: Response) => {
       return res
         .status(403)
         .json({ error: "No se puede eliminar al administrador principal." });
+
+    // Verificar si el usuario tiene OTs asignadas
+    const otsAsignadas = db
+      .prepare(
+        "SELECT COUNT(*) as count FROM work_order_activities WHERE assigned_to = ?"
+      )
+      .get(id) as { count: number };
+
+    if (otsAsignadas.count > 0) {
+      return res.status(400).json({
+        error: "No se puede eliminar este usuario porque tiene OTs asignadas.",
+      });
+    }
+
     const info = db.prepare("DELETE FROM users WHERE id = ?").run(id);
     if (info.changes === 0)
       return res.status(404).json({ error: "Usuario no encontrado." });
     res.status(200).json({ message: "Usuario eliminado con éxito." });
   } catch (error: any) {
-    if (error.code === "SQLITE_CONSTRAINT_FOREIGNKEY")
-      return res
-        .status(400)
-        .json({
-          error:
-            "No se puede eliminar este usuario porque tiene OTs asignadas.",
-        });
     res.status(500).json({ error: "Error interno del servidor." });
   }
 });
