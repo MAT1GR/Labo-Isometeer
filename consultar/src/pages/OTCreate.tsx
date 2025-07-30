@@ -86,7 +86,6 @@ const OTCreate: React.FC = () => {
     loadPrerequisites();
   }, []);
 
-  // --- LÓGICA PARA GENERAR ID AUTOMÁTICO RESTAURADA ---
   useEffect(() => {
     const [date, type, clientId] = watchedIdFields;
 

@@ -5,6 +5,41 @@ import db from "../config/database";
 
 const router = Router();
 
+// --- Helper function to generate custom OT ID ---
+const generateCustomId = (
+  date: string,
+  type: string,
+  client_id: string | number
+): string => {
+  const client = db
+    .prepare("SELECT code FROM clients WHERE id = ?")
+    .get(client_id) as { code: string };
+  if (!client) throw new Error("Cliente inválido para generar ID");
+
+  // Lógica para el número incremental diario (N)
+  const countResult = db
+    .prepare(`SELECT COUNT(*) as count FROM work_orders WHERE date = ?`)
+    .get(date) as { count: number };
+  const sequentialNumber = (countResult.count || 0) + 1;
+
+  // Mapeo de tipo a inicial
+  const typeInitials: { [key: string]: string } = {
+    Produccion: "P",
+    Calibracion: "C",
+    "Ensayo SE": "S",
+    "Ensayo EE": "E",
+    "Otros Servicios": "O",
+  };
+  const typeInitial = typeInitials[type as string] || "?";
+
+  // The date string is 'YYYY-MM-DD'. We split it to avoid timezone issues.
+  const [yearStr, monthStr, dayStr] = date.split("-");
+  const year = yearStr.slice(-2);
+
+  // Construir el nuevo ID con el formato AAMMDDN T CLIENTE_ID
+  return `${year}${monthStr}${dayStr}${sequentialNumber} ${typeInitial} ${client.code}`;
+};
+
 // --- RUTA: [GET] /api/ots ---
 router.get("/", (req: Request, res: Response) => {
   const { role, assigned_to } = req.query;
@@ -31,6 +66,27 @@ router.get("/", (req: Request, res: Response) => {
   } catch (error) {
     console.error("Error en GET /ots:", error);
     res.status(500).json({ error: "Error al obtener las órdenes de trabajo." });
+  }
+});
+
+// --- RUTA generate-id (DEBE IR ANTES DE /:id) ---
+router.get("/generate-id", (req: Request, res: Response) => {
+  try {
+    const { date, type, client_id } = req.query;
+    if (!date || !type || !client_id)
+      return res.status(200).json({ previewId: "Completar campos..." });
+
+    const custom_id = generateCustomId(
+      date as string,
+      type as string,
+      client_id as string
+    );
+    res.status(200).json({ previewId: custom_id });
+  } catch (error: any) {
+    console.error("Error al generar ID:", error);
+    res
+      .status(500)
+      .json({ error: "Error al generar el ID", details: error.message });
   }
 });
 
@@ -71,8 +127,15 @@ router.post("/", (req: Request, res: Response) => {
     "INSERT INTO work_order_activities (work_order_id, activity, assigned_to) VALUES (?, ?, ?)"
   );
   const createTransaction = db.transaction(() => {
+    // Regenerate the ID right before insertion to ensure it's unique and correct
+    const final_custom_id = generateCustomId(
+      otData.date,
+      otData.type,
+      otData.client_id
+    );
+
     const info = insertOTStmt.run(
-      otData.custom_id,
+      final_custom_id, // Use the server-generated ID
       otData.date,
       otData.type,
       otData.client_id,
@@ -111,6 +174,12 @@ router.post("/", (req: Request, res: Response) => {
     res.status(201).json(result);
   } catch (error: any) {
     console.error("Error al crear OT:", error);
+    if (error.code === "SQLITE_CONSTRAINT_UNIQUE") {
+      return res.status(409).json({
+        error:
+          "Error de concurrencia: El ID de OT generado ya existe. Inténtelo de nuevo.",
+      });
+    }
     res.status(500).json({ error: error.message || "Error al crear la OT." });
   }
 });
@@ -193,40 +262,6 @@ router.put("/:id", (req: Request, res: Response) => {
     res.status(200).json({ message: "OT actualizada con éxito." });
   } catch (error) {
     res.status(500).json({ error: "Error al actualizar la OT." });
-  }
-});
-
-// --- RUTA generate-id RESTAURADA Y VERIFICADA ---
-router.get("/generate-id", (req: Request, res: Response) => {
-  try {
-    const { date, type, client_id } = req.query;
-    if (!date || !type || !client_id)
-      return res.status(200).json({ previewId: "Completar campos..." });
-
-    const client = db
-      .prepare("SELECT code FROM clients WHERE id = ?")
-      .get(client_id as string) as { code: string };
-    if (!client) return res.status(200).json({ previewId: "Cliente inválido" });
-
-    // Lógica para el número incremental (N)
-    const countResult = db
-      .prepare(
-        `SELECT COUNT(*) as count FROM work_orders WHERE date = ? AND type = ? AND client_id = ?`
-      )
-      .get(date as string, type as string, client_id as string) as {
-      count: number;
-    };
-    const sequentialNumber = (countResult.count || 0) + 1;
-
-    const dateObj = new Date(date as string);
-    const year = dateObj.getUTCFullYear().toString().slice(-2);
-    const month = (dateObj.getUTCMonth() + 1).toString().padStart(2, "0");
-    const day = dateObj.getUTCDate().toString().padStart(2, "0");
-
-    const custom_id = `${year}${month}${day}${sequentialNumber} ${type} ${client.code}`;
-    res.status(200).json({ previewId: custom_id });
-  } catch (error) {
-    res.status(500).json({ error: "Error al generar el ID" });
   }
 });
 
