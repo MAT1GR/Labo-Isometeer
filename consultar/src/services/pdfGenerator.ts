@@ -8,6 +8,9 @@ import { formatDate } from "../lib/utils";
 import { PDFDocument } from "pdf-lib";
 import axiosInstance from "../api/axiosInstance";
 
+// Helper para construir la URL base para archivos estáticos
+const staticBaseUrl = axiosInstance.defaults.baseURL?.replace("/api", "") || "";
+
 // Helper function to save the generated PDF
 const savePdf = (uint8Array: Uint8Array, filename: string) => {
   const blob = new Blob([uint8Array], { type: "application/pdf" });
@@ -78,7 +81,7 @@ export const exportOtToPdf = async (otData: WorkOrder) => {
     if (selectedContract) {
       if (selectedContract.pdf_path) {
         // If there is a PDF, fetch and merge it
-        const pdfUrl = `${axiosInstance.defaults.baseURL}/${selectedContract.pdf_path}`;
+        const pdfUrl = `${staticBaseUrl}/${selectedContract.pdf_path}`;
         const contractPdfBytes = await fetch(pdfUrl).then((res) =>
           res.arrayBuffer()
         );
