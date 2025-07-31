@@ -56,8 +56,12 @@ export const exportOtToPdf = async (otData: WorkOrder) => {
   if (otData.activities && otData.activities.length > 0) {
     autoTable(jspdfDoc, {
       startY: (jspdfDoc as any).lastAutoTable.finalY + 10,
-      head: [["Actividad", "Estado"]], // Columna "Asignado a" eliminada
-      body: otData.activities.map((act) => [act.activity, act.status]),
+      head: [["Actividad", "Asignado a", "Estado"]],
+      body: otData.activities.map((act) => [
+        act.activity,
+        act.assigned_to_name || "N/A",
+        act.status,
+      ]),
       theme: "striped",
     });
   }
@@ -71,7 +75,7 @@ export const exportOtToPdf = async (otData: WorkOrder) => {
   // --- Página 2: Contrato (PDF adjunto) ---
   try {
     const allContracts = await contractService.getAllContracts();
-    // Aseguramos que usamos el contract_type del objeto que nos pasan, que viene del formulario
+    // Usamos el contract_type del objeto otData que recibimos del formulario
     const selectedContract = allContracts.find(
       (c) => c.name === otData.contract_type
     );

@@ -120,8 +120,8 @@ router.post("/", (req: Request, res: Response) => {
     `INSERT INTO work_orders (
       custom_id, date, type, client_id, product, brand, model, 
       seal_number, observations, certificate_expiry, created_by, status,
-      quotation_amount, quotation_details, disposition
-     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      quotation_amount, quotation_details, disposition, contract_type
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   );
   const insertActivityStmt = db.prepare(
     "INSERT INTO work_order_activities (work_order_id, activity, assigned_to) VALUES (?, ?, ?)"
@@ -149,7 +149,8 @@ router.post("/", (req: Request, res: Response) => {
       "pendiente",
       otData.quotation_amount,
       otData.quotation_details,
-      otData.disposition
+      otData.disposition,
+      otData.contract_type // Guardamos el tipo de contrato
     );
     const otId = info.lastInsertRowid;
     for (const act of activities) {
@@ -224,8 +225,9 @@ router.put("/:id", (req: Request, res: Response) => {
       return res.status(404).json({ error: "OT no encontrada" });
     return res.status(200).json({ message: "Observaciones guardadas." });
   }
+  // CORRECCIÓN: Se añade contract_type a la consulta de actualización
   const updateStmt = db.prepare(
-    `UPDATE work_orders SET date=?, type=?, product=?, brand=?, model=?, seal_number=?, observations=?, certificate_expiry=?, status=?, quotation_amount=?, quotation_details=?, disposition=?, updated_at=CURRENT_TIMESTAMP WHERE id=?`
+    `UPDATE work_orders SET date=?, type=?, product=?, brand=?, model=?, seal_number=?, observations=?, certificate_expiry=?, status=?, quotation_amount=?, quotation_details=?, disposition=?, contract_type=?, updated_at=CURRENT_TIMESTAMP WHERE id=?`
   );
   const deleteActivitiesStmt = db.prepare(
     "DELETE FROM work_order_activities WHERE work_order_id = ?"
@@ -247,6 +249,7 @@ router.put("/:id", (req: Request, res: Response) => {
       otData.quotation_amount,
       otData.quotation_details,
       otData.disposition,
+      otData.contract_type, // Se pasa el valor del contrato
       id
     );
     deleteActivitiesStmt.run(id);
@@ -389,3 +392,4 @@ router.put("/activities/:activityId/stop", (req: Request, res: Response) => {
 });
 
 export default router;
+  

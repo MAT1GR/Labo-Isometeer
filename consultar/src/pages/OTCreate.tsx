@@ -1,3 +1,5 @@
+// RUTA: /cliente/src/pages/OTCreate.tsx
+
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useForm, useWatch, useFieldArray } from "react-hook-form";

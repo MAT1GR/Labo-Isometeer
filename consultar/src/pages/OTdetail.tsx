@@ -17,10 +17,10 @@ import {
   XSquare,
   PlusCircle,
   Trash2,
-  Download, // Ícono para exportar
+  Download,
 } from "lucide-react";
 import { mutate } from "swr";
-import { exportOtToPdf } from "../services/pdfGenerator"; // Importamos la función
+import { exportOtToPdf } from "../services/pdfGenerator";
 
 const activityOptions = [
   "Calibracion",
@@ -63,7 +63,6 @@ const OTDetail: React.FC = () => {
     otType === "Ensayo EE" ||
     otType === "Otros Servicios";
 
-  // Logic to set default contract based on OT type
   useEffect(() => {
     if (otType === "Calibracion") {
       setValue("contract_type", "Contrato de Calibración", {
@@ -72,7 +71,10 @@ const OTDetail: React.FC = () => {
     } else if (otType === "Ensayo SE" || otType === "Ensayo EE") {
       setValue("contract_type", "Contrato de Ensayo", { shouldDirty: true });
     } else {
-      setValue("contract_type", "Contrato General", { shouldDirty: true });
+      
+      setValue("contract_type", "Contrato de Producción", {
+        shouldDirty: true,
+      });
     }
   }, [otType, setValue]);
 
@@ -243,7 +245,9 @@ const OTDetail: React.FC = () => {
                 {...register("contract_type")}
                 className="w-full mt-1 p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
               >
-                <option value="Contrato General">Contrato General</option>
+                <option value="Contrato de Producción">
+                  Contrato de Producción
+                </option>
                 <option value="Contrato de Calibración">
                   Contrato de Calibración
                 </option>
