@@ -55,12 +55,9 @@ export const exportOtToPdf = async (otData: WorkOrder) => {
 
   if (otData.activities && otData.activities.length > 0) {
     autoTable(jspdfDoc, {
-      head: [["Actividad", "Asignado a", "Estado"]],
-      body: otData.activities.map((act) => [
-        act.activity,
-        act.assigned_to_name || "Sin asignar",
-        act.status,
-      ]),
+      startY: (jspdfDoc as any).lastAutoTable.finalY + 10,
+      head: [["Actividad", "Estado"]], // Columna "Asignado a" eliminada
+      body: otData.activities.map((act) => [act.activity, act.status]),
       theme: "striped",
     });
   }
@@ -71,16 +68,17 @@ export const exportOtToPdf = async (otData: WorkOrder) => {
   const [otPage] = await finalPdfDoc.copyPages(otPdfDoc, [0]);
   finalPdfDoc.addPage(otPage);
 
-  // --- Página 2: Contrato (PDF adjunto o texto) ---
+  // --- Página 2: Contrato (PDF adjunto) ---
   try {
     const allContracts = await contractService.getAllContracts();
+    // Aseguramos que usamos el contract_type del objeto que nos pasan, que viene del formulario
     const selectedContract = allContracts.find(
       (c) => c.name === otData.contract_type
     );
 
     if (selectedContract) {
       if (selectedContract.pdf_path) {
-        // If there is a PDF, fetch and merge it
+        // Si hay un PDF, lo obtenemos y lo fusionamos
         const pdfUrl = `${staticBaseUrl}/${selectedContract.pdf_path}`;
         const contractPdfBytes = await fetch(pdfUrl).then((res) =>
           res.arrayBuffer()
@@ -92,20 +90,17 @@ export const exportOtToPdf = async (otData: WorkOrder) => {
         );
         copiedPages.forEach((page) => finalPdfDoc.addPage(page));
       } else {
-        // If there is no PDF, add the text content to a new page
+        // Si no hay PDF, lo indicamos en el documento
         const textPage = finalPdfDoc.addPage();
         textPage.drawText(`Contrato: ${selectedContract.name}`, {
           x: 50,
           y: textPage.getHeight() - 50,
           size: 18,
         });
-        // This is a very basic text wrapping. A more complex solution would be needed for better formatting.
-        textPage.drawText(selectedContract.content, {
+        textPage.drawText("No hay un archivo PDF asociado a este contrato.", {
           x: 50,
           y: textPage.getHeight() - 80,
           size: 12,
-          maxWidth: 500,
-          lineHeight: 15,
         });
       }
     } else {
@@ -125,7 +120,7 @@ export const exportOtToPdf = async (otData: WorkOrder) => {
     });
   }
 
-  // Save and download the final merged PDF
+  // Guardar y descargar el PDF final
   const finalPdfBytes = await finalPdfDoc.save();
   savePdf(finalPdfBytes, `OT-${otData.custom_id || otData.id}.pdf`);
 };
