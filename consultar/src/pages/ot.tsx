@@ -1,8 +1,10 @@
 // RUTA: /cliente/src/pages/OT.tsx
 
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { otService, WorkOrder } from "../services/otService";
+import { otService, WorkOrder, OTFilters } from "../services/otService";
+import { clientService, Client } from "../services/clientService";
+import { authService, User } from "../services/auth";
 import { useAuth } from "../contexts/AuthContext";
 import Card from "../components/ui/Card";
 import Button from "../components/ui/Button";
@@ -13,43 +15,55 @@ import {
   Edit,
   CheckSquare,
   XSquare,
+  Filter,
 } from "lucide-react";
 import useSWR, { mutate } from "swr";
-import ConfirmationModal from "../components/ui/ConfirmationModal"; // Importamos el modal
+import ConfirmationModal from "../components/ui/ConfirmationModal";
+import OTFiltersComponent from "../components/OTFilters"; // Importamos el nuevo componente
 
 const OT: React.FC = () => {
   const { user, canCreateContent, canViewAdminContent, canAuthorizeOT } =
     useAuth();
   const navigate = useNavigate();
 
-  // Estado para el modal de confirmación
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [otToDelete, setOtToDelete] = useState<number | null>(null);
 
+  // Estados para los filtros
+  const [filters, setFilters] = useState<OTFilters>({});
+  const [showFilters, setShowFilters] = useState(false);
+
+  // Fetching de datos para los selectores del filtro
+  const { data: clients } = useSWR<Client[]>(
+    "/clients",
+    clientService.getAllClients
+  );
+  const { data: users } = useSWR<User[]>("/users", authService.getAllUsers);
+
+  // SWR ahora depende de los filtros. Se volverá a ejecutar cuando cambien.
   const {
     data: ots,
     error,
     isLoading,
-  } = useSWR(user ? ["/ots", user] : null, () => otService.getAllOTs(user));
+  } = useSWR(user ? ["/ots", user, filters] : null, () =>
+    otService.getAllOTs(user, filters)
+  );
 
-  // Abre el modal y guarda el ID de la OT a eliminar
   const handleDeleteRequest = (otId: number) => {
     setOtToDelete(otId);
     setIsModalOpen(true);
   };
 
-  // Cierra el modal
   const handleCloseModal = () => {
     setOtToDelete(null);
     setIsModalOpen(false);
   };
 
-  // Ejecuta la eliminación si se confirma en el modal
   const handleConfirmDelete = async () => {
     if (otToDelete === null) return;
     try {
       await otService.deleteOT(otToDelete);
-      mutate(["/ots", user]);
+      mutate(["/ots", user, filters]);
     } catch (err: any) {
       alert(err.message || "Error al eliminar la OT.");
     } finally {
@@ -58,8 +72,7 @@ const OT: React.FC = () => {
   };
 
   const handleToggleAuthorization = async (ot: WorkOrder) => {
-    if (!user) return; // Asegurarse de que el usuario exista
-
+    if (!user) return;
     try {
       if (ot.authorized) {
         if (ot.status !== "pendiente") {
@@ -72,11 +85,16 @@ const OT: React.FC = () => {
       } else {
         await otService.authorizeOT(ot.id, user.id);
       }
-      mutate(["/ots", user]);
+      mutate(["/ots", user, filters]);
     } catch (error: any) {
       alert(error.message || "Error al cambiar el estado de autorización.");
     }
   };
+
+  const activeFilterCount = useMemo(
+    () => Object.values(filters).filter(Boolean).length,
+    [filters]
+  );
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -96,7 +114,6 @@ const OT: React.FC = () => {
   };
 
   if (error) return <div>Error al cargar las órdenes de trabajo.</div>;
-  if (isLoading) return <div>Cargando...</div>;
 
   return (
     <>
@@ -114,14 +131,43 @@ const OT: React.FC = () => {
               ? "Órdenes de Trabajo"
               : "Mis Tareas Asignadas"}
           </h1>
-          {canCreateContent() && (
-            <Button onClick={() => navigate("/ot/crear")}>
-              <PlusCircle className="mr-2 h-4 w-4" /> Crear Nueva OT
-            </Button>
-          )}
+          <div className="flex items-center gap-2">
+            {canViewAdminContent() && (
+              <Button
+                variant="outline"
+                onClick={() => setShowFilters(!showFilters)}
+              >
+                <Filter className="mr-2 h-4 w-4" />
+                Filtrar
+                {activeFilterCount > 0 && (
+                  <span className="ml-2 bg-blue-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                    {activeFilterCount}
+                  </span>
+                )}
+              </Button>
+            )}
+            {canCreateContent() && (
+              <Button onClick={() => navigate("/ot/crear")}>
+                <PlusCircle className="mr-2 h-4 w-4" /> Crear Nueva OT
+              </Button>
+            )}
+          </div>
         </div>
+
+        {showFilters && canViewAdminContent() && (
+          <OTFiltersComponent
+            filters={filters}
+            setFilters={setFilters}
+            clients={clients || []}
+            users={users || []}
+            onClose={() => setShowFilters(false)}
+          />
+        )}
+
         <Card>
-          {ots && ots.length > 0 ? (
+          {isLoading ? (
+            <div>Cargando...</div>
+          ) : ots && ots.length > 0 ? (
             <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
               <thead className="bg-gray-50 dark:bg-gray-700">
                 <tr>
@@ -225,12 +271,16 @@ const OT: React.FC = () => {
             <div className="text-center py-12">
               <Briefcase className="mx-auto h-12 w-12 text-gray-400" />
               <h3 className="mt-2 text-sm font-semibold">
-                {canViewAdminContent()
+                {activeFilterCount > 0
+                  ? "No se encontraron OTs con los filtros aplicados"
+                  : canViewAdminContent()
                   ? "No hay Órdenes de Trabajo"
                   : "Sin tareas asignadas"}
               </h3>
               <p className="mt-1 text-sm text-gray-500">
-                {canViewAdminContent()
+                {activeFilterCount > 0
+                  ? "Intenta ajustar o limpiar los filtros."
+                  : canViewAdminContent()
                   ? "¡Crea la primera para empezar a trabajar!"
                   : "No tienes Órdenes de Trabajo autorizadas en este momento."}
               </p>

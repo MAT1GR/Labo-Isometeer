@@ -34,7 +34,7 @@ export interface WorkOrder {
   quotation_details?: string;
   disposition?: string;
   authorized: boolean;
-  contract_type?: string; // NUEVO CAMPO
+  contract_type?: string;
   created_at: string;
   updated_at?: string;
   client_name?: string;
@@ -42,22 +42,33 @@ export interface WorkOrder {
   assigned_to_name?: string;
 }
 
-export interface TimelineOt {
-  id: number;
-  custom_id?: string;
-  product: string;
-  started_at: string;
-  completed_at: string | null;
-  status: string;
-  duration_minutes?: number | null;
+// Interfaz para los filtros
+export interface OTFilters {
+  [key: string]: any;
 }
 
 class OTService {
-  async getAllOTs(user: User | null): Promise<WorkOrder[]> {
+  // Modificamos la función para que acepte filtros
+  async getAllOTs(
+    user: User | null,
+    filters: OTFilters = {}
+  ): Promise<WorkOrder[]> {
     if (!user) return [];
-    const response = await axiosInstance.get("/ots", {
-      params: { role: user.role, assigned_to: user.id },
+
+    // Construimos los parámetros de la consulta
+    const params = new URLSearchParams({
+      role: user.role,
+      assigned_to: String(user.id),
     });
+
+    // Añadimos los filtros a los parámetros, ignorando los vacíos
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value) {
+        params.append(key, String(value));
+      }
+    });
+
+    const response = await axiosInstance.get("/ots", { params });
     return response.data;
   }
 

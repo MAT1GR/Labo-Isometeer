@@ -6,7 +6,6 @@ import db from "../config/database";
 const router = Router();
 
 // --- Helper function to generate custom OT ID ---
-// CORREGIDO: La lógica ahora busca el máximo número secuencial del día para evitar duplicados.
 const generateCustomId = (
   date: string,
   type: string,
@@ -17,20 +16,16 @@ const generateCustomId = (
     .get(client_id) as { code: string };
   if (!client) throw new Error("Cliente inválido para generar ID");
 
-  // The date string is 'YYYY-MM-DD'. We split it to avoid timezone issues.
   const [yearStr, monthStr, dayStr] = date.split("-");
   const year = yearStr.slice(-2);
   const datePrefix = `${year}${monthStr}${dayStr}`;
 
-  // Lógica mejorada para el número incremental diario (N)
-  // Busca todas las OTs del mismo día para encontrar el último número usado.
   const otsOfTheDay = db
     .prepare("SELECT custom_id FROM work_orders WHERE date = ?")
     .all(date) as { custom_id: string }[];
 
   let maxSequential = 0;
   for (const ot of otsOfTheDay) {
-    // Extrae el número secuencial del custom_id (ej: de '2507311 P 123' extrae '1')
     if (ot.custom_id && ot.custom_id.startsWith(datePrefix)) {
       const idWithoutPrefix = ot.custom_id.substring(datePrefix.length);
       const sequentialMatch = idWithoutPrefix.match(/^(\d+)/);
@@ -45,7 +40,6 @@ const generateCustomId = (
 
   const sequentialNumber = maxSequential + 1;
 
-  // Mapeo de tipo a inicial
   const typeInitials: { [key: string]: string } = {
     Produccion: "P",
     Calibracion: "C",
@@ -55,13 +49,22 @@ const generateCustomId = (
   };
   const typeInitial = typeInitials[type as string] || "?";
 
-  // Construir el nuevo ID con el formato AAMMDDN T CLIENTE_ID
   return `${datePrefix}${sequentialNumber} ${typeInitial} ${client.code}`;
 };
 
 // --- RUTA: [GET] /api/ots ---
+// CORREGIDO: Se añade la lógica completa para manejar los filtros desde el frontend
 router.get("/", (req: Request, res: Response) => {
-  const { role, assigned_to } = req.query;
+  const {
+    role,
+    assigned_to,
+    searchTerm,
+    clientId,
+    assignedToId,
+    status,
+    authorized,
+  } = req.query;
+
   try {
     let query = `
       SELECT 
@@ -74,12 +77,47 @@ router.get("/", (req: Request, res: Response) => {
       FROM work_orders ot
       LEFT JOIN clients c ON ot.client_id = c.id
     `;
+
     const params: any[] = [];
+    const whereClauses: string[] = [];
+
     if (role === "empleado" && assigned_to) {
-      query += ` WHERE ot.id IN (SELECT work_order_id FROM work_order_activities WHERE assigned_to = ?) AND ot.authorized = 1`;
+      whereClauses.push(
+        `ot.id IN (SELECT work_order_id FROM work_order_activities WHERE assigned_to = ?) AND ot.authorized = 1`
+      );
       params.push(assigned_to);
+    } else {
+      // Aplicar filtros solo para vistas de admin/director
+      if (searchTerm) {
+        whereClauses.push(`(ot.custom_id LIKE ? OR ot.product LIKE ?)`);
+        params.push(`%${searchTerm}%`, `%${searchTerm}%`);
+      }
+      if (clientId) {
+        whereClauses.push(`ot.client_id = ?`);
+        params.push(clientId);
+      }
+      if (status) {
+        whereClauses.push(`ot.status = ?`);
+        params.push(status);
+      }
+      if (authorized === "true" || authorized === "false") {
+        whereClauses.push(`ot.authorized = ?`);
+        params.push(authorized === "true" ? 1 : 0);
+      }
+      if (assignedToId) {
+        whereClauses.push(
+          `ot.id IN (SELECT work_order_id FROM work_order_activities WHERE assigned_to = ?)`
+        );
+        params.push(assignedToId);
+      }
     }
+
+    if (whereClauses.length > 0) {
+      query += ` WHERE ${whereClauses.join(" AND ")}`;
+    }
+
     query += " GROUP BY ot.id ORDER BY ot.created_at DESC";
+
     const ots = db.prepare(query).all(params);
     res.status(200).json(ots);
   } catch (error) {
@@ -146,7 +184,6 @@ router.post("/", (req: Request, res: Response) => {
     "INSERT INTO work_order_activities (work_order_id, activity, assigned_to) VALUES (?, ?, ?)"
   );
   const createTransaction = db.transaction(() => {
-    // Regenerate the ID right before insertion to ensure it's unique and correct
     const final_custom_id = generateCustomId(
       otData.date,
       otData.type,
@@ -154,7 +191,7 @@ router.post("/", (req: Request, res: Response) => {
     );
 
     const info = insertOTStmt.run(
-      final_custom_id, // Use the server-generated ID
+      final_custom_id,
       otData.date,
       otData.type,
       otData.client_id,
@@ -368,12 +405,10 @@ router.put("/activities/:activityId/start", (req: Request, res: Response) => {
       throw new Error("La actividad ya fue iniciada o no se encontró.");
     }
 
-    // Actualizar actividad
     db.prepare(
       "UPDATE work_order_activities SET status = 'en_progreso', started_at = CURRENT_TIMESTAMP WHERE id = ?"
     ).run(activityId);
 
-    // Actualizar el estado de la OT principal a 'en_progreso' si está 'pendiente'
     db.prepare(
       "UPDATE work_orders SET status = 'en_progreso' WHERE id = ? AND status = 'pendiente'"
     ).run(activity.work_order_id);
