@@ -1,6 +1,6 @@
 // RUTA: /cliente/src/pages/OTdetail.tsx
 
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useForm, useWatch, useFieldArray } from "react-hook-form";
 import { otService, WorkOrder, Activity } from "../services/otService";
@@ -18,9 +18,13 @@ import {
   PlusCircle,
   Trash2,
   Download,
+  Clock,
+  CalendarCheck,
+  Lock,
 } from "lucide-react";
 import { mutate } from "swr";
 import { exportOtToPdf } from "../services/pdfGenerator";
+import { formatDateTime } from "../lib/utils";
 
 const activityOptions = [
   "Calibracion",
@@ -63,6 +67,29 @@ const OTDetail: React.FC = () => {
     otType === "Ensayo EE" ||
     otType === "Otros Servicios";
 
+  const isEmployee = user?.role === "empleado";
+
+  // CORRECCIÓN: Filtra TODAS las actividades del empleado, no solo la primera.
+  const myActivities = useMemo(() => {
+    if (isEmployee && otData?.activities) {
+      return otData.activities.filter((act) => act.assigned_to === user.id);
+    }
+    return []; // Devuelve un array vacío si no es empleado o no hay actividades
+  }, [otData, user, isEmployee]);
+
+  const isOtStartedOrLater = useMemo(() => {
+    if (!otData) return false;
+    const startedStatuses = [
+      "en_progreso",
+      "finalizada",
+      "facturada",
+      "cierre",
+    ];
+    return startedStatuses.includes(otData.status);
+  }, [otData]);
+
+  const isFormEditable = canViewAdminContent() && !isOtStartedOrLater;
+
   useEffect(() => {
     if (otType === "Calibracion") {
       setValue("contract_type", "Contrato de Calibración", {
@@ -71,7 +98,6 @@ const OTDetail: React.FC = () => {
     } else if (otType === "Ensayo SE" || otType === "Ensayo EE") {
       setValue("contract_type", "Contrato de Ensayo", { shouldDirty: true });
     } else {
-      
       setValue("contract_type", "Contrato de Producción", {
         shouldDirty: true,
       });
@@ -154,11 +180,6 @@ const OTDetail: React.FC = () => {
   if (!otData)
     return <div className="p-8 text-center">Cargando datos de la OT...</div>;
 
-  const isEmployee = user?.role === "empleado";
-  const isClosed = otData.status === "cierre";
-
-  const isFormEditableForAdmin = canViewAdminContent() && !isClosed;
-
   const getAvailableActivities = (currentIndex: number) => {
     const selectedActivities =
       watchedActivities?.map((act: any) => act.activity) || [];
@@ -188,7 +209,9 @@ const OTDetail: React.FC = () => {
           </Button>
           <Button
             type="submit"
-            disabled={isSubmitting || !isDirty || (isEmployee && isClosed)}
+            disabled={
+              isSubmitting || !isDirty || (isEmployee && isOtStartedOrLater)
+            }
           >
             <Save className="mr-2 h-5 w-5" />
             Guardar Cambios
@@ -215,8 +238,96 @@ const OTDetail: React.FC = () => {
           )}
       </div>
 
+      {/* CORRECCIÓN: Renderiza una lista de tareas si el empleado tiene varias */}
+      {isEmployee && myActivities.length > 0 && (
+        <div className="bg-blue-50 dark:bg-blue-900/30 dark:border dark:border-blue-800/50 p-6 rounded-lg shadow-sm">
+          <h2 className="text-lg font-semibold text-blue-800 dark:text-blue-300 mb-4">
+            Mis Tareas en esta OT
+          </h2>
+          <div className="space-y-4">
+            {myActivities.map((activity) => (
+              <div
+                key={activity.id}
+                className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4"
+              >
+                <div className="flex-1">
+                  <p className="font-bold">{activity.activity}</p>
+                  <div className="grid grid-cols-2 gap-4 text-xs mt-2 text-gray-600 dark:text-gray-400">
+                    <div className="flex items-center gap-2">
+                      <Clock className="h-4 w-4" />
+                      <span>
+                        Inicio: {formatDateTime(activity.started_at) || "N/A"}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <CalendarCheck className="h-4 w-4" />
+                      <span>
+                        Fin: {formatDateTime(activity.completed_at) || "N/A"}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-4">
+                  <span
+                    className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                      activity.status === "finalizada"
+                        ? "bg-green-100 text-green-800"
+                        : activity.status === "en_progreso"
+                        ? "bg-blue-100 text-blue-800"
+                        : "bg-yellow-100 text-yellow-800"
+                    }`}
+                  >
+                    {activity.status.replace("_", " ")}
+                  </span>
+                  {otData.authorized && (
+                    <>
+                      {activity.status === "pendiente" && (
+                        <Button
+                          type="button"
+                          size="sm"
+                          onClick={() => handleStartActivity(activity.id)}
+                          className="bg-green-600 hover:bg-green-700"
+                        >
+                          <Play className="h-4 w-4" />
+                        </Button>
+                      )}
+                      {activity.status === "en_progreso" && (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="danger"
+                          onClick={() => handleStopActivity(activity.id)}
+                        >
+                          <StopCircle className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {canViewAdminContent() && isOtStartedOrLater && (
+        <div className="bg-yellow-50 dark:bg-yellow-900/30 border-l-4 border-yellow-400 p-4 rounded-md">
+          <div className="flex items-center">
+            <div className="flex-shrink-0">
+              <Lock className="h-5 w-5 text-yellow-500" />
+            </div>
+            <div className="ml-3">
+              <p className="text-sm text-yellow-700 dark:text-yellow-200">
+                La edición de los datos principales está bloqueada porque la OT
+                ya se encuentra "{otData.status.replace("_", " ")}".
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="bg-white dark:bg-gray-800 dark:border dark:border-gray-700 p-6 rounded-lg shadow-sm space-y-8">
-        <fieldset disabled={!isFormEditableForAdmin}>
+        <fieldset disabled={!isFormEditable}>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6 border-b dark:border-gray-700 pb-6">
             <h2 className="text-lg font-semibold text-blue-700 dark:text-blue-400 col-span-full">
               OT Seleccionada
@@ -261,13 +372,15 @@ const OTDetail: React.FC = () => {
             />
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 border-b dark:border-gray-700 pb-6">
-            <h2 className="text-lg font-semibold text-blue-700 dark:text-blue-400 col-span-full">
-              Información del Cliente
-            </h2>
-            <Input label="Empresa" value={otData.client_name} readOnly />
-            <Input label="Nº Cliente" value={otData.client_code} readOnly />
-          </div>
+          {!isEmployee && (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 border-b dark:border-gray-700 pb-6">
+              <h2 className="text-lg font-semibold text-blue-700 dark:text-blue-400 col-span-full">
+                Información del Cliente
+              </h2>
+              <Input label="Empresa" value={otData.client_name} readOnly />
+              <Input label="Nº Cliente" value={otData.client_code} readOnly />
+            </div>
+          )}
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 border-b dark:border-gray-700 pb-6">
             <h2 className="text-lg font-semibold text-blue-700 dark:text-blue-400 col-span-full">
@@ -300,108 +413,67 @@ const OTDetail: React.FC = () => {
           </div>
         </fieldset>
 
-        <div className="border-b dark:border-gray-700 pb-6">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-lg font-semibold text-blue-700 dark:text-blue-400">
-              Actividades y Asignaciones
-            </h2>
-            {isFormEditableForAdmin && (
-              <Button
-                type="button"
-                size="sm"
-                onClick={() => append({ activity: "", assigned_to: null })}
-              >
-                <PlusCircle className="h-4 w-4 mr-2" /> Agregar Actividad
-              </Button>
-            )}
-          </div>
-          <div className="space-y-4">
-            {fields.map((field, index) => (
-              <div
-                key={field.id}
-                className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center bg-gray-50 dark:bg-gray-700/50 p-4 rounded-md"
-              >
-                <select
-                  {...register(`activities.${index}.activity`)}
-                  className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
-                  disabled={!isFormEditableForAdmin}
+        {!isEmployee && (
+          <div className="border-b dark:border-gray-700 pb-6">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-lg font-semibold text-blue-700 dark:text-blue-400">
+                Actividades y Asignaciones
+              </h2>
+              {isFormEditable && (
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={() => append({ activity: "", assigned_to: null })}
                 >
-                  <option value="">Seleccionar actividad...</option>
-                  {getAvailableActivities(index).map((opt) => (
-                    <option key={opt} value={opt}>
-                      {opt}
-                    </option>
-                  ))}
-                </select>
-                <select
-                  {...register(`activities.${index}.assigned_to`)}
-                  className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
-                  disabled={!isFormEditableForAdmin}
-                >
-                  <option value="">Asignar a...</option>
-                  {users.map((u) => (
-                    <option key={u.id} value={u.id}>
-                      {u.name}
-                    </option>
-                  ))}
-                </select>
-                {isFormEditableForAdmin && (
-                  <Button
-                    type="button"
-                    variant="danger"
-                    size="sm"
-                    onClick={() => remove(index)}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                )}
-              </div>
-            ))}
-
-            {isEmployee &&
-              otData.activities?.map((act: Activity) => (
+                  <PlusCircle className="h-4 w-4 mr-2" /> Agregar Actividad
+                </Button>
+              )}
+            </div>
+            <div className="space-y-4">
+              {fields.map((field, index) => (
                 <div
-                  key={act.id}
-                  className="grid grid-cols-4 gap-4 items-center bg-gray-50 dark:bg-gray-700/50 p-3 rounded-md"
+                  key={field.id}
+                  className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center bg-gray-50 dark:bg-gray-700/50 p-4 rounded-md"
                 >
-                  <span className="font-medium">{act.activity}</span>
-                  <span>{act.assigned_to_name || "No asignado"}</span>
-                  <span
-                    className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                      act.status === "finalizada"
-                        ? "bg-green-100 text-green-800"
-                        : "bg-yellow-100 text-yellow-800"
-                    }`}
+                  <select
+                    {...register(`activities.${index}.activity`)}
+                    className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
+                    disabled={!isFormEditable}
                   >
-                    {act.status.replace("_", " ")}
-                  </span>
-                  {user?.id === act.assigned_to && otData.authorized && (
-                    <div className="flex gap-2">
-                      {act.status === "pendiente" && (
-                        <Button
-                          type="button"
-                          size="sm"
-                          onClick={() => handleStartActivity(act.id)}
-                        >
-                          <Play className="h-4 w-4 mr-1" /> Iniciar
-                        </Button>
-                      )}
-                      {act.status === "en_progreso" && (
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="danger"
-                          onClick={() => handleStopActivity(act.id)}
-                        >
-                          <StopCircle className="h-4 w-4 mr-1" /> Finalizar
-                        </Button>
-                      )}
-                    </div>
+                    <option value="">Seleccionar actividad...</option>
+                    {getAvailableActivities(index).map((opt) => (
+                      <option key={opt} value={opt}>
+                        {opt}
+                      </option>
+                    ))}
+                  </select>
+                  <select
+                    {...register(`activities.${index}.assigned_to`)}
+                    className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
+                    disabled={!isFormEditable}
+                  >
+                    <option value="">Asignar a...</option>
+                    {users.map((u) => (
+                      <option key={u.id} value={u.id}>
+                        {u.name}
+                      </option>
+                    ))}
+                  </select>
+                  {isFormEditable && (
+                    <Button
+                      type="button"
+                      variant="danger"
+                      size="sm"
+                      onClick={() => remove(index)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
                   )}
                 </div>
               ))}
+            </div>
           </div>
-        </div>
+        )}
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
           <div className="col-span-full">
@@ -410,7 +482,7 @@ const OTDetail: React.FC = () => {
             </h2>
             <textarea
               {...register("collaborator_observations")}
-              disabled={!isEmployee || isClosed}
+              disabled={isEmployee && isOtStartedOrLater}
               className="w-full mt-1 p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
               rows={4}
               placeholder={
@@ -427,7 +499,7 @@ const OTDetail: React.FC = () => {
                 Administración
               </h2>
               <fieldset
-                disabled={!isFormEditableForAdmin}
+                disabled={!isFormEditable}
                 className="grid grid-cols-1 md:grid-cols-2 gap-6"
               >
                 <Input

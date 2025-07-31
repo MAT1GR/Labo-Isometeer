@@ -6,6 +6,7 @@ import db from "../config/database";
 const router = Router();
 
 // --- Helper function to generate custom OT ID ---
+// CORREGIDO: La lógica ahora busca el máximo número secuencial del día para evitar duplicados.
 const generateCustomId = (
   date: string,
   type: string,
@@ -16,11 +17,33 @@ const generateCustomId = (
     .get(client_id) as { code: string };
   if (!client) throw new Error("Cliente inválido para generar ID");
 
-  // Lógica para el número incremental diario (N)
-  const countResult = db
-    .prepare(`SELECT COUNT(*) as count FROM work_orders WHERE date = ?`)
-    .get(date) as { count: number };
-  const sequentialNumber = (countResult.count || 0) + 1;
+  // The date string is 'YYYY-MM-DD'. We split it to avoid timezone issues.
+  const [yearStr, monthStr, dayStr] = date.split("-");
+  const year = yearStr.slice(-2);
+  const datePrefix = `${year}${monthStr}${dayStr}`;
+
+  // Lógica mejorada para el número incremental diario (N)
+  // Busca todas las OTs del mismo día para encontrar el último número usado.
+  const otsOfTheDay = db
+    .prepare("SELECT custom_id FROM work_orders WHERE date = ?")
+    .all(date) as { custom_id: string }[];
+
+  let maxSequential = 0;
+  for (const ot of otsOfTheDay) {
+    // Extrae el número secuencial del custom_id (ej: de '2507311 P 123' extrae '1')
+    if (ot.custom_id && ot.custom_id.startsWith(datePrefix)) {
+      const idWithoutPrefix = ot.custom_id.substring(datePrefix.length);
+      const sequentialMatch = idWithoutPrefix.match(/^(\d+)/);
+      if (sequentialMatch && sequentialMatch[1]) {
+        const currentSequential = parseInt(sequentialMatch[1], 10);
+        if (currentSequential > maxSequential) {
+          maxSequential = currentSequential;
+        }
+      }
+    }
+  }
+
+  const sequentialNumber = maxSequential + 1;
 
   // Mapeo de tipo a inicial
   const typeInitials: { [key: string]: string } = {
@@ -32,12 +55,8 @@ const generateCustomId = (
   };
   const typeInitial = typeInitials[type as string] || "?";
 
-  // The date string is 'YYYY-MM-DD'. We split it to avoid timezone issues.
-  const [yearStr, monthStr, dayStr] = date.split("-");
-  const year = yearStr.slice(-2);
-
   // Construir el nuevo ID con el formato AAMMDDN T CLIENTE_ID
-  return `${year}${monthStr}${dayStr}${sequentialNumber} ${typeInitial} ${client.code}`;
+  return `${datePrefix}${sequentialNumber} ${typeInitial} ${client.code}`;
 };
 
 // --- RUTA: [GET] /api/ots ---
@@ -150,7 +169,7 @@ router.post("/", (req: Request, res: Response) => {
       otData.quotation_amount,
       otData.quotation_details,
       otData.disposition,
-      otData.contract_type // Guardamos el tipo de contrato
+      otData.contract_type
     );
     const otId = info.lastInsertRowid;
     for (const act of activities) {
@@ -225,7 +244,6 @@ router.put("/:id", (req: Request, res: Response) => {
       return res.status(404).json({ error: "OT no encontrada" });
     return res.status(200).json({ message: "Observaciones guardadas." });
   }
-  // CORRECCIÓN: Se añade contract_type a la consulta de actualización
   const updateStmt = db.prepare(
     `UPDATE work_orders SET date=?, type=?, product=?, brand=?, model=?, seal_number=?, observations=?, certificate_expiry=?, status=?, quotation_amount=?, quotation_details=?, disposition=?, contract_type=?, updated_at=CURRENT_TIMESTAMP WHERE id=?`
   );
@@ -249,7 +267,7 @@ router.put("/:id", (req: Request, res: Response) => {
       otData.quotation_amount,
       otData.quotation_details,
       otData.disposition,
-      otData.contract_type, // Se pasa el valor del contrato
+      otData.contract_type,
       id
     );
     deleteActivitiesStmt.run(id);
@@ -338,20 +356,36 @@ router.delete("/:id", (req: Request, res: Response) => {
 
 // --- RUTAS DE ACCIONES DE ACTIVIDADES ---
 router.put("/activities/:activityId/start", (req: Request, res: Response) => {
-  try {
-    const { activityId } = req.params;
-    const info = db
+  const { activityId } = req.params;
+  const startTransaction = db.transaction(() => {
+    const activity = db
       .prepare(
-        "UPDATE work_order_activities SET status = 'en_progreso', started_at = CURRENT_TIMESTAMP WHERE id = ? AND status = 'pendiente'"
+        "SELECT work_order_id FROM work_order_activities WHERE id = ? AND status = 'pendiente'"
       )
-      .run(activityId);
-    if (info.changes === 0) {
-      return res
-        .status(400)
-        .json({ error: "La actividad ya fue iniciada o no se encontró." });
+      .get(activityId) as { work_order_id: number } | undefined;
+
+    if (!activity) {
+      throw new Error("La actividad ya fue iniciada o no se encontró.");
     }
+
+    // Actualizar actividad
+    db.prepare(
+      "UPDATE work_order_activities SET status = 'en_progreso', started_at = CURRENT_TIMESTAMP WHERE id = ?"
+    ).run(activityId);
+
+    // Actualizar el estado de la OT principal a 'en_progreso' si está 'pendiente'
+    db.prepare(
+      "UPDATE work_orders SET status = 'en_progreso' WHERE id = ? AND status = 'pendiente'"
+    ).run(activity.work_order_id);
+  });
+
+  try {
+    startTransaction();
     res.status(200).json({ message: "Actividad iniciada." });
-  } catch (error) {
+  } catch (error: any) {
+    if (error.message.includes("iniciada o no se encontró")) {
+      return res.status(400).json({ error: error.message });
+    }
     res.status(500).json({ error: "Error al iniciar la actividad." });
   }
 });
@@ -392,4 +426,3 @@ router.put("/activities/:activityId/stop", (req: Request, res: Response) => {
 });
 
 export default router;
-  

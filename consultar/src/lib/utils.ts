@@ -33,7 +33,7 @@ export function formatDate(dateString: string | null): string {
 }
 
 // --- NUEVA FUNCIÓN PARA FECHA Y HORA ---
-export function formatDateTime(dateString: string | null): string {
+export function formatDateTime(dateString: string | null | undefined): string {
   if (!dateString) return "";
   const date = new Date(dateString);
   return (
