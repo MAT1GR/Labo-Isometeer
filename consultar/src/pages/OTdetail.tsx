@@ -23,7 +23,7 @@ import {
   Lock,
 } from "lucide-react";
 import { mutate } from "swr";
-import { exportOtToPdf } from "../services/pdfGenerator";
+import { exportOtToPdfInternal } from "../services/pdfGenerator";
 import { formatDateTime } from "../lib/utils";
 import MultiUserSelect from "../components/ui/MultiUserSelect"; // 1. IMPORTAMOS EL NUEVO COMPONENTE
 
@@ -178,7 +178,7 @@ const OTDetail: React.FC = () => {
 
   const handleExport = () => {
     if (otData) {
-      exportOtToPdf(otData);
+      exportOtToPdfInternal(otData);
     }
   };
 
