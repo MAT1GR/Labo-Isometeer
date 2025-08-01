@@ -53,7 +53,6 @@ const generateCustomId = (
 };
 
 // --- RUTA: [GET] /api/ots ---
-// CORREGIDO: Se añade la lógica completa para manejar los filtros desde el frontend
 router.get("/", (req: Request, res: Response) => {
   const {
     role,
@@ -72,7 +71,8 @@ router.get("/", (req: Request, res: Response) => {
         c.name as client_name,
         (SELECT GROUP_CONCAT(DISTINCT u.name) 
          FROM work_order_activities wa 
-         JOIN users u ON wa.assigned_to = u.id 
+         JOIN work_order_activity_assignments waa ON wa.id = waa.activity_id
+         JOIN users u ON waa.user_id = u.id 
          WHERE wa.work_order_id = ot.id) as assigned_to_name
       FROM work_orders ot
       LEFT JOIN clients c ON ot.client_id = c.id
@@ -83,7 +83,7 @@ router.get("/", (req: Request, res: Response) => {
 
     if (role === "empleado" && assigned_to) {
       whereClauses.push(
-        `ot.id IN (SELECT work_order_id FROM work_order_activities WHERE assigned_to = ?) AND ot.authorized = 1`
+        `ot.id IN (SELECT work_order_id FROM work_order_activities wa JOIN work_order_activity_assignments waa ON wa.id = waa.activity_id WHERE waa.user_id = ?) AND ot.authorized = 1`
       );
       params.push(assigned_to);
     } else {
@@ -106,7 +106,7 @@ router.get("/", (req: Request, res: Response) => {
       }
       if (assignedToId) {
         whereClauses.push(
-          `ot.id IN (SELECT work_order_id FROM work_order_activities WHERE assigned_to = ?)`
+          `ot.id IN (SELECT work_order_id FROM work_order_activities wa JOIN work_order_activity_assignments waa ON wa.id = waa.activity_id WHERE waa.user_id = ?)`
         );
         params.push(assignedToId);
       }
@@ -181,8 +181,12 @@ router.post("/", (req: Request, res: Response) => {
      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   );
   const insertActivityStmt = db.prepare(
-    "INSERT INTO work_order_activities (work_order_id, activity, assigned_to) VALUES (?, ?, ?)"
+    "INSERT INTO work_order_activities (work_order_id, activity) VALUES (?, ?)"
   );
+  const insertAssignmentStmt = db.prepare(
+    "INSERT INTO work_order_activity_assignments (activity_id, user_id) VALUES (?, ?)"
+  );
+
   const createTransaction = db.transaction(() => {
     const final_custom_id = generateCustomId(
       otData.date,
@@ -211,15 +215,17 @@ router.post("/", (req: Request, res: Response) => {
     const otId = info.lastInsertRowid;
     for (const act of activities) {
       if (act.activity) {
-        const assignedTo = act.assigned_to ? Number(act.assigned_to) : null;
-        insertActivityStmt.run(otId, act.activity, assignedTo);
-        if (assignedTo) {
-          const points = getPointsForActivity(act.activity);
-          if (points > 0) {
-            db.prepare("UPDATE users SET points = points + ? WHERE id = ?").run(
-              points,
-              assignedTo
-            );
+        const activityInfo = insertActivityStmt.run(otId, act.activity);
+        const activityId = activityInfo.lastInsertRowid;
+        if (act.assigned_to && Array.isArray(act.assigned_to)) {
+          for (const userId of act.assigned_to) {
+            insertAssignmentStmt.run(activityId, userId);
+            const points = getPointsForActivity(act.activity);
+            if (points > 0) {
+              db.prepare(
+                "UPDATE users SET points = points + ? WHERE id = ?"
+              ).run(points, userId);
+            }
           }
         }
       }
@@ -244,20 +250,39 @@ router.post("/", (req: Request, res: Response) => {
 // [GET] /api/ots/:id
 router.get("/:id", (req: Request, res: Response) => {
   try {
-    const ot = db
-      .prepare(
-        `SELECT ot.*, c.name as client_name, c.code as client_code FROM work_orders ot JOIN clients c ON ot.client_id = c.id WHERE ot.id = ?`
-      )
+    const ot: any = db
+      .prepare(`SELECT * FROM work_orders WHERE id = ?`)
       .get(req.params.id);
+
     if (ot) {
+      // Adjuntar datos completos del cliente
+      const client = db
+        .prepare("SELECT * FROM clients WHERE id = ?")
+        .get(ot.client_id);
+      if (client) {
+        const contacts = db
+          .prepare("SELECT * FROM contacts WHERE client_id = ?")
+          .all(ot.client_id);
+        ot.client = { ...client, contacts };
+      }
+
       const activities = db
         .prepare(
-          `SELECT wa.id, wa.activity, wa.assigned_to, wa.status, wa.started_at, wa.completed_at, u.name as assigned_to_name 
+          `SELECT wa.id, wa.activity, wa.status, wa.started_at, wa.completed_at, 
+           json_group_array(json_object('id', u.id, 'name', u.name)) as assigned_users
            FROM work_order_activities wa
-           LEFT JOIN users u ON wa.assigned_to = u.id
-           WHERE wa.work_order_id = ?`
+           LEFT JOIN work_order_activity_assignments waa ON wa.id = waa.activity_id
+           LEFT JOIN users u ON waa.user_id = u.id
+           WHERE wa.work_order_id = ?
+           GROUP BY wa.id`
         )
-        .all(req.params.id);
+        .all(req.params.id)
+        .map((act: any) => ({
+          ...act,
+          assigned_users: JSON.parse(act.assigned_users).filter(
+            (u: any) => u.id !== null
+          ),
+        }));
       res.status(200).json({ ...ot, activities });
     } else {
       res.status(404).json({ error: "OT no encontrada." });
@@ -288,8 +313,12 @@ router.put("/:id", (req: Request, res: Response) => {
     "DELETE FROM work_order_activities WHERE work_order_id = ?"
   );
   const insertActivityStmt = db.prepare(
-    "INSERT INTO work_order_activities (work_order_id, activity, assigned_to) VALUES (?, ?, ?)"
+    "INSERT INTO work_order_activities (work_order_id, activity) VALUES (?, ?)"
   );
+  const insertAssignmentStmt = db.prepare(
+    "INSERT INTO work_order_activity_assignments (activity_id, user_id) VALUES (?, ?)"
+  );
+
   const updateTransaction = db.transaction(() => {
     updateStmt.run(
       otData.date,
@@ -307,11 +336,16 @@ router.put("/:id", (req: Request, res: Response) => {
       otData.contract_type,
       id
     );
-    deleteActivitiesStmt.run(id);
+    deleteActivitiesStmt.run(id); // Esto eliminará en cascada las asignaciones
     for (const act of activities) {
       if (act.activity) {
-        const assignedTo = act.assigned_to ? Number(act.assigned_to) : null;
-        insertActivityStmt.run(id, act.activity, assignedTo);
+        const activityInfo = insertActivityStmt.run(id, act.activity);
+        const activityId = activityInfo.lastInsertRowid;
+        if (act.assigned_to && Array.isArray(act.assigned_to)) {
+          for (const userId of act.assigned_to) {
+            insertAssignmentStmt.run(activityId, userId);
+          }
+        }
       }
     }
   });
@@ -368,7 +402,7 @@ router.put("/:id/deauthorize", (req, res) => {
     if (info.changes === 0) {
       return res.status(404).json({
         error:
-          "OT no encontrada o no se puede desautorizar porque no está pendiente.",
+          "OT no encontrada o no se puede desautorizar porque no está en progreso o finalizada.",
       });
     }
 

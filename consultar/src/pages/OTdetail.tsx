@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { useForm, useWatch, useFieldArray } from "react-hook-form";
+import { useForm, useWatch, useFieldArray, Controller } from "react-hook-form";
 import { otService, WorkOrder, Activity } from "../services/otService";
 import { authService, User } from "../services/auth";
 import { useAuth } from "../contexts/AuthContext";
@@ -25,6 +25,7 @@ import {
 import { mutate } from "swr";
 import { exportOtToPdf } from "../services/pdfGenerator";
 import { formatDateTime } from "../lib/utils";
+import MultiUserSelect from "../components/ui/MultiUserSelect"; // 1. IMPORTAMOS EL NUEVO COMPONENTE
 
 const activityOptions = [
   "Calibracion",
@@ -69,12 +70,13 @@ const OTDetail: React.FC = () => {
 
   const isEmployee = user?.role === "empleado";
 
-  // CORRECCIÓN: Filtra TODAS las actividades del empleado, no solo la primera.
   const myActivities = useMemo(() => {
     if (isEmployee && otData?.activities) {
-      return otData.activities.filter((act) => act.assigned_to === user.id);
+      return otData.activities.filter((act) =>
+        act.assigned_users?.some((u) => u.id === user.id)
+      );
     }
-    return []; // Devuelve un array vacío si no es empleado o no hay actividades
+    return [];
   }, [otData, user, isEmployee]);
 
   const isOtStartedOrLater = useMemo(() => {
@@ -122,6 +124,10 @@ const OTDetail: React.FC = () => {
           certificate_expiry: ot.certificate_expiry
             ? new Date(ot.certificate_expiry).toISOString().split("T")[0]
             : "",
+          activities: ot.activities?.map((act) => ({
+            ...act,
+            assigned_to: act.assigned_users?.map((u) => u.id) || [],
+          })),
         };
         reset(formattedOt);
       } catch (err: any) {
@@ -238,7 +244,6 @@ const OTDetail: React.FC = () => {
           )}
       </div>
 
-      {/* CORRECCIÓN: Renderiza una lista de tareas si el empleado tiene varias */}
       {isEmployee && myActivities.length > 0 && (
         <div className="bg-blue-50 dark:bg-blue-900/30 dark:border dark:border-blue-800/50 p-6 rounded-lg shadow-sm">
           <h2 className="text-lg font-semibold text-blue-800 dark:text-blue-300 mb-4">
@@ -378,7 +383,7 @@ const OTDetail: React.FC = () => {
                 Información del Cliente
               </h2>
               <Input label="Empresa" value={otData.client_name} readOnly />
-              <Input label="Nº Cliente" value={otData.client_code} readOnly />
+              <Input label="Nº Cliente" value={otData.client_id} readOnly />
             </div>
           )}
 
@@ -423,7 +428,7 @@ const OTDetail: React.FC = () => {
                 <Button
                   type="button"
                   size="sm"
-                  onClick={() => append({ activity: "", assigned_to: null })}
+                  onClick={() => append({ activity: "", assigned_to: [] })}
                 >
                   <PlusCircle className="h-4 w-4 mr-2" /> Agregar Actividad
                 </Button>
@@ -433,41 +438,53 @@ const OTDetail: React.FC = () => {
               {fields.map((field, index) => (
                 <div
                   key={field.id}
-                  className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center bg-gray-50 dark:bg-gray-700/50 p-4 rounded-md"
+                  className="grid grid-cols-1 md:grid-cols-[2fr,3fr,auto] gap-4 items-start bg-gray-50 dark:bg-gray-700/50 p-4 rounded-md"
                 >
-                  <select
-                    {...register(`activities.${index}.activity`)}
-                    className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
-                    disabled={!isFormEditable}
-                  >
-                    <option value="">Seleccionar actividad...</option>
-                    {getAvailableActivities(index).map((opt) => (
-                      <option key={opt} value={opt}>
-                        {opt}
-                      </option>
-                    ))}
-                  </select>
-                  <select
-                    {...register(`activities.${index}.assigned_to`)}
-                    className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
-                    disabled={!isFormEditable}
-                  >
-                    <option value="">Asignar a...</option>
-                    {users.map((u) => (
-                      <option key={u.id} value={u.id}>
-                        {u.name}
-                      </option>
-                    ))}
-                  </select>
-                  {isFormEditable && (
-                    <Button
-                      type="button"
-                      variant="danger"
-                      size="sm"
-                      onClick={() => remove(index)}
+                  <div>
+                    <label className="text-sm font-medium mb-1 dark:text-gray-300">
+                      Actividad
+                    </label>
+                    <select
+                      {...register(`activities.${index}.activity`)}
+                      className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
+                      disabled={!isFormEditable}
                     >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                      <option value="">Seleccionar actividad...</option>
+                      {getAvailableActivities(index).map((opt) => (
+                        <option key={opt} value={opt}>
+                          {opt}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium mb-1 dark:text-gray-300">
+                      Asignar a
+                    </label>
+                    <Controller
+                      control={control}
+                      name={`activities.${index}.assigned_to` as any}
+                      render={({ field }) => (
+                        <MultiUserSelect
+                          users={users}
+                          selectedUserIds={field.value || []}
+                          onChange={field.onChange}
+                          disabled={!isFormEditable}
+                        />
+                      )}
+                    />
+                  </div>
+                  {isFormEditable && (
+                    <div className="self-end">
+                      <Button
+                        type="button"
+                        variant="danger"
+                        size="sm"
+                        onClick={() => remove(index)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
                   )}
                 </div>
               ))}

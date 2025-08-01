@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useForm, useWatch, useFieldArray } from "react-hook-form";
+import { useForm, useWatch, useFieldArray, Controller } from "react-hook-form";
 import { otService, WorkOrder } from "../services/otService";
 import { clientService, Client } from "../services/clientService";
 import { authService, User } from "../services/auth";
@@ -11,6 +11,7 @@ import Input from "../components/ui/Input";
 import Button from "../components/ui/Button";
 import { ArrowLeft, Save, PlusCircle, Trash2, Loader } from "lucide-react";
 import axiosInstance from "../api/axiosInstance";
+import MultiUserSelect from "../components/ui/MultiUserSelect"; // 1. IMPORTAMOS EL NUEVO COMPONENTE
 
 type OTCreateFormData = Omit<
   WorkOrder,
@@ -47,7 +48,7 @@ const OTCreate: React.FC = () => {
     defaultValues: {
       date: new Date().toISOString().split("T")[0],
       status: "pendiente",
-      activities: [{ activity: "", assigned_to: null }],
+      activities: [{ activity: "", assigned_to: [] }],
       contract_type: "Contrato de Producción",
     },
   });
@@ -294,7 +295,7 @@ const OTCreate: React.FC = () => {
             <Button
               type="button"
               size="sm"
-              onClick={() => append({ activity: "", assigned_to: null })}
+              onClick={() => append({ activity: "", assigned_to: [] })}
             >
               <PlusCircle className="h-4 w-4 mr-2" /> Agregar Actividad
             </Button>
@@ -303,38 +304,51 @@ const OTCreate: React.FC = () => {
             {fields.map((field, index) => (
               <div
                 key={field.id}
-                className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center bg-gray-50 dark:bg-gray-700/50 p-4 rounded-md"
+                className="grid grid-cols-1 md:grid-cols-[2fr,3fr,auto] gap-4 items-start bg-gray-50 dark:bg-gray-700/50 p-4 rounded-md"
               >
-                <select
-                  {...register(`activities.${index}.activity`)}
-                  className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
-                >
-                  <option value="">Seleccionar actividad...</option>
-                  {getAvailableActivities(index).map((opt) => (
-                    <option key={opt} value={opt}>
-                      {opt}
-                    </option>
-                  ))}
-                </select>
-                <select
-                  {...register(`activities.${index}.assigned_to`)}
-                  className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
-                >
-                  <option value="">Asignar a...</option>
-                  {users.map((u) => (
-                    <option key={u.id} value={u.id}>
-                      {u.name}
-                    </option>
-                  ))}
-                </select>
-                <Button
-                  type="button"
-                  variant="danger"
-                  size="sm"
-                  onClick={() => remove(index)}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
+                <div>
+                  <label className="text-sm font-medium mb-1 dark:text-gray-300">
+                    Actividad
+                  </label>
+                  <select
+                    {...register(`activities.${index}.activity`)}
+                    className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
+                  >
+                    <option value="">Seleccionar actividad...</option>
+                    {getAvailableActivities(index).map((opt) => (
+                      <option key={opt} value={opt}>
+                        {opt}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-sm font-medium mb-1 dark:text-gray-300">
+                    Asignar a
+                  </label>
+                  <Controller
+                    control={control}
+                    name={`activities.${index}.assigned_to` as any}
+                    render={({ field }) => (
+                      <MultiUserSelect
+                        users={users}
+                        selectedUserIds={field.value || []}
+                        onChange={field.onChange}
+                      />
+                    )}
+                  />
+                </div>
+
+                <div className="self-end">
+                  <Button
+                    type="button"
+                    variant="danger"
+                    size="sm"
+                    onClick={() => remove(index)}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
             ))}
           </div>

@@ -55,7 +55,7 @@ router.delete("/:id", (req: Request, res: Response) => {
     // Verificar si el usuario tiene OTs asignadas
     const otsAsignadas = db
       .prepare(
-        "SELECT COUNT(*) as count FROM work_order_activities WHERE assigned_to = ?"
+        "SELECT COUNT(*) as count FROM work_order_activity_assignments WHERE user_id = ?"
       )
       .get(id) as { count: number };
 

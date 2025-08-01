@@ -2,24 +2,27 @@
 
 import axiosInstance from "../api/axiosInstance";
 import { User } from "./auth";
+import { Client } from "./clientService"; // Importamos la interfaz del cliente
 
 export interface Activity {
   id: number;
   activity: string;
-  assigned_to: number | null;
-  assigned_to_name?: string;
+  assigned_to: number[]; // Array de IDs de usuario
+  assigned_users?: { id: number; name: string }[]; // Array de objetos de usuario
   status: "pendiente" | "en_progreso" | "finalizada";
   started_at?: string;
   completed_at?: string;
 }
 
 export interface WorkOrder {
+  client_name: string | number | readonly string[] | undefined;
   completed_at: any;
   id: number;
   custom_id?: string;
   date: string;
   type: string;
   client_id: number;
+  client?: Client; // Objeto de cliente completo
   activities?: Activity[];
   product: string;
   brand?: string;
@@ -37,8 +40,6 @@ export interface WorkOrder {
   contract_type?: string;
   created_at: string;
   updated_at?: string;
-  client_name?: string;
-  client_code?: string;
   assigned_to_name?: string;
 }
 

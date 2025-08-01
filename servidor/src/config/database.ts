@@ -65,12 +65,18 @@ db.exec(`
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     work_order_id INTEGER NOT NULL,
     activity TEXT NOT NULL,
-    assigned_to INTEGER,
     status TEXT NOT NULL DEFAULT 'pendiente' CHECK(status IN ('pendiente', 'en_progreso', 'finalizada')),
     started_at DATETIME,
     completed_at DATETIME,
-    FOREIGN KEY (work_order_id) REFERENCES work_orders(id) ON DELETE CASCADE,
-    FOREIGN KEY (assigned_to) REFERENCES users(id)
+    FOREIGN KEY (work_order_id) REFERENCES work_orders(id) ON DELETE CASCADE
+  );
+
+  CREATE TABLE IF NOT EXISTS work_order_activity_assignments (
+    activity_id INTEGER NOT NULL,
+    user_id INTEGER NOT NULL,
+    FOREIGN KEY (activity_id) REFERENCES work_order_activities(id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    PRIMARY KEY (activity_id, user_id)
   );
 
   CREATE TABLE IF NOT EXISTS contracts (
