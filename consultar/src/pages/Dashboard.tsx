@@ -16,6 +16,8 @@ import {
   AlertCircle,
   Clock,
   ChevronRight,
+  Activity,
+  CheckCircle2,
 } from "lucide-react";
 import {
   BarChart,
@@ -36,6 +38,7 @@ import { otService, UserSummaryItem } from "../services/otService";
 import useSWR from "swr";
 import { fetcher } from "../api/axiosInstance";
 import { useNavigate } from "react-router-dom";
+import { cn } from "../lib/utils";
 
 // --- Interfaces para los datos del dashboard de Admin ---
 interface DashboardStats {
@@ -225,49 +228,36 @@ const EmpleadoDashboard: React.FC = () => {
     data: summaryData,
     error,
     isLoading,
-  } = useSWR(
-    user ? `/ots/user-summary/${user.id}` : null,
-    () => otService.getUserSummary(user!.id)
+  } = useSWR(user ? `/ots/user-summary/${user.id}` : null, () =>
+    otService.getUserSummary(user!.id)
   );
 
   const inProgressRef = useRef<HTMLDivElement>(null);
   const pendingRef = useRef<HTMLDivElement>(null);
   const completedRef = useRef<HTMLDivElement>(null);
 
-  const { chartData, pending, inProgress, completed } = useMemo(() => {
+  const { pending, inProgress, completed } = useMemo(() => {
     if (!summaryData) {
-      return { chartData: [], pending: [], inProgress: [], completed: [] };
+      return { pending: [], inProgress: [], completed: [] };
     }
     const pending = summaryData.filter((t) => t.status === "pendiente");
     const inProgress = summaryData.filter((t) => t.status === "en_progreso");
     const completed = summaryData.filter((t) => t.status === "finalizada");
-
-    const chartData = [
-      { name: "En Progreso", Tareas: inProgress.length, fill: "#3b82f6" },
-      { name: "Pendientes", Tareas: pending.length, fill: "#f59e0b" },
-      { name: "Finalizadas", Tareas: completed.length, fill: "#22c55e" },
-    ];
-    return { chartData, pending, inProgress, completed };
+    return { pending, inProgress, completed };
   }, [summaryData]);
 
-  const handleBarClick = (data: any) => {
-    const status = data.activePayload[0].payload.name;
-    let ref;
-    if (status === "En Progreso") ref = inProgressRef;
-    if (status === "Pendientes") ref = pendingRef;
-    if (status === "Finalizadas") ref = completedRef;
-
-    if (ref && ref.current) {
-      ref.current.scrollIntoView({ behavior: "smooth", block: "center" });
+  const scrollTo = (ref: React.RefObject<HTMLDivElement>) => {
+    if (ref.current) {
+      ref.current.scrollIntoView({ behavior: "smooth", block: "start" });
     }
   };
 
   const TaskCard: React.FC<{ task: UserSummaryItem }> = ({ task }) => (
     <div
-      className="p-3 bg-white dark:bg-gray-800 rounded-lg shadow-sm border dark:border-gray-700 cursor-pointer hover:border-blue-500 hover:shadow-md transition-all group"
+      className="p-3 bg-white dark:bg-gray-800 rounded-lg shadow-sm border dark:border-gray-700 cursor-pointer hover:border-blue-500 dark:hover:border-blue-400 hover:shadow-md transition-all group"
       onClick={() => navigate(`/ot/editar/${task.id}`)}
     >
-      <div className="flex justify-between items-start">
+      <div className="flex justify-between items-center">
         <div>
           <p className="font-bold text-blue-600 dark:text-blue-400">
             {task.custom_id}
@@ -277,143 +267,145 @@ const EmpleadoDashboard: React.FC = () => {
             {task.client_name}
           </p>
         </div>
-        <div className="text-right flex items-center gap-2">
+        <div className="text-right flex items-center gap-3">
           <div>
             <p className="text-xs font-medium capitalize">{task.activity}</p>
             <p className="text-xs text-gray-500 dark:text-gray-400">
               {formatDate(task.ot_date)}
             </p>
           </div>
-          <ChevronRight className="h-5 w-5 text-gray-400 group-hover:text-blue-500 transition-colors" />
+          <ChevronRight className="h-5 w-5 text-gray-400 group-hover:text-blue-500 dark:group-hover:text-blue-400 transition-colors" />
         </div>
       </div>
     </div>
   );
 
+  const StatusCard: React.FC<{
+    title: string;
+    count: number;
+    icon: React.ElementType;
+    colorClasses: string;
+    onClick: () => void;
+  }> = ({ title, count, icon: Icon, colorClasses, onClick }) => (
+    <Card
+      className={cn(
+        "cursor-pointer group hover:shadow-xl hover:-translate-y-1 transition-all",
+        colorClasses
+      )}
+      onClick={onClick}
+    >
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <div className="bg-white/20 p-3 rounded-full">
+            <Icon className="h-6 w-6 text-white" />
+          </div>
+          <div>
+            <p className="text-white font-semibold text-lg">{title}</p>
+            <p className="text-white/80 text-sm">
+              {count} {count === 1 ? "tarea" : "tareas"}
+            </p>
+          </div>
+        </div>
+        <p className="text-4xl font-bold text-white/90">{count}</p>
+      </div>
+    </Card>
+  );
+
   return (
-    <div className="space-y-6">
-      <div className="text-center p-6 bg-white dark:bg-gray-800 rounded-lg shadow-sm border dark:border-gray-700">
-        <Smile className="h-12 w-12 mx-auto text-blue-500" />
-        <h1 className="mt-2 text-3xl font-bold">¡Hola, {user?.name}!</h1>
+    <div className="space-y-8">
+      <div>
+        <h1 className="text-3xl font-bold">¡Hola, {user?.name}!</h1>
         <p className="mt-1 text-gray-600 dark:text-gray-300">
-          Este es el resumen de tus tareas activas.
+          Bienvenido a tu panel de tareas. Aquí tienes un resumen de tu trabajo.
         </p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <Card className="lg:col-span-1">
-          <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
-            <BarChart3 /> Tareas por Estado
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <StatusCard
+          title="En Progreso"
+          count={inProgress.length}
+          icon={Activity}
+          colorClasses="bg-gradient-to-br from-blue-500 to-blue-600"
+          onClick={() => scrollTo(inProgressRef)}
+        />
+        <StatusCard
+          title="Pendientes"
+          count={pending.length}
+          icon={Clock}
+          colorClasses="bg-gradient-to-br from-yellow-500 to-yellow-600"
+          onClick={() => scrollTo(pendingRef)}
+        />
+        <StatusCard
+          title="Finalizadas"
+          count={completed.length}
+          icon={CheckCircle2}
+          colorClasses="bg-gradient-to-br from-green-500 to-green-600"
+          onClick={() => scrollTo(completedRef)}
+        />
+      </div>
+
+      <div ref={inProgressRef} className="scroll-mt-24">
+        <Card>
+          <h2 className="text-xl font-semibold mb-4 text-blue-600 dark:text-blue-400">
+            <Activity className="inline-block mr-2" />
+            En Progreso
           </h2>
-          <div className="h-60">
-            {isLoading && <Loader className="animate-spin" />}
-            {error && <AlertCircle className="text-red-500" />}
-            {summaryData && (
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart
-                  data={chartData}
-                  layout="vertical"
-                  barSize={25}
-                  onClick={handleBarClick}
-                >
-                  <CartesianGrid
-                    stroke="currentColor"
-                    strokeOpacity={0.1}
-                    horizontal={false}
-                  />
-                  <XAxis type="number" hide />
-                  <YAxis
-                    dataKey="name"
-                    type="category"
-                    axisLine={false}
-                    tickLine={false}
-                    tick={{ fill: "currentColor", fontSize: 14 }}
-                    width={90}
-                  />
-                  <Tooltip
-                    cursor={{ fill: "rgba(200, 200, 200, 0.1)" }}
-                    contentStyle={{
-                      backgroundColor: "rgba(30,41,59,0.9)",
-                      border: "none",
-                      borderRadius: "0.5rem",
-                    }}
-                  />
-                  <Bar dataKey="Tareas" cursor="pointer">
-                    <LabelList
-                      dataKey="Tareas"
-                      position="right"
-                      offset={10}
-                      fill="currentColor"
-                      fontSize={14}
-                      fontWeight="bold"
-                    />
-                    {chartData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.fill} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
+          <div className="space-y-3 max-h-96 overflow-y-auto pr-2">
+            {isLoading ? (
+              <p className="text-sm text-gray-500">Cargando tareas...</p>
+            ) : inProgress.length > 0 ? (
+              inProgress.map((task) => (
+                <TaskCard key={`${task.id}-${task.activity}`} task={task} />
+              ))
+            ) : (
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                Ninguna tarea en progreso.
+              </p>
             )}
           </div>
         </Card>
-
-        <div className="lg:col-span-2 space-y-6">
-          <Card ref={inProgressRef}>
-            <h2 className="text-xl font-semibold mb-4 text-blue-600 dark:text-blue-400">
-              En Progreso ({inProgress.length})
-            </h2>
-            <div className="space-y-3 max-h-60 overflow-y-auto pr-2">
-              {inProgress.length > 0 ? (
-                inProgress.map((task) => (
-                  <TaskCard key={`${task.id}-${task.activity}`} task={task} />
-                ))
-              ) : (
-                <p className="text-sm text-gray-500">
-                  Ninguna tarea en progreso.
-                </p>
-              )}
-            </div>
-          </Card>
-        </div>
       </div>
 
-      <Card>
-        <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
-          <ListTodo /> Lista de Tareas
-        </h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div ref={pendingRef}>
-            <h3 className="font-semibold text-yellow-600 dark:text-yellow-400 mb-3">
-              Pendientes ({pending.length})
-            </h3>
-            <div className="space-y-3 max-h-96 overflow-y-auto pr-2">
-              {pending.length > 0 ? (
-                pending.map((task) => (
-                  <TaskCard key={`${task.id}-${task.activity}`} task={task} />
-                ))
-              ) : (
-                <p className="text-sm text-gray-500">¡Sin pendientes!</p>
-              )}
-            </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+        <Card ref={pendingRef} className="scroll-mt-24">
+          <h3 className="text-xl font-semibold text-yellow-600 dark:text-yellow-400 mb-3">
+            <Clock className="inline-block mr-2" />
+            Pendientes
+          </h3>
+          <div className="space-y-3 max-h-96 overflow-y-auto pr-2">
+            {isLoading ? (
+              <p className="text-sm text-gray-500">Cargando tareas...</p>
+            ) : pending.length > 0 ? (
+              pending.map((task) => (
+                <TaskCard key={`${task.id}-${task.activity}`} task={task} />
+              ))
+            ) : (
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                ¡Sin pendientes!
+              </p>
+            )}
           </div>
-          <div ref={completedRef}>
-            <h3 className="font-semibold text-green-600 dark:text-green-400 mb-3">
-              Finalizadas ({completed.length})
-            </h3>
-            <div className="space-y-3 max-h-96 overflow-y-auto pr-2">
-              {completed.length > 0 ? (
-                completed.map((task) => (
-                  <TaskCard key={`${task.id}-${task.activity}`} task={task} />
-                ))
-              ) : (
-                <p className="text-sm text-gray-500">
-                  No hay tareas finalizadas recientemente.
-                </p>
-              )}
-            </div>
+        </Card>
+        <Card ref={completedRef} className="scroll-mt-24">
+          <h3 className="text-xl font-semibold text-green-600 dark:text-green-400 mb-3">
+            <CheckCircle2 className="inline-block mr-2" />
+            Finalizadas
+          </h3>
+          <div className="space-y-3 max-h-96 overflow-y-auto pr-2">
+            {isLoading ? (
+              <p className="text-sm text-gray-500">Cargando tareas...</p>
+            ) : completed.length > 0 ? (
+              completed.map((task) => (
+                <TaskCard key={`${task.id}-${task.activity}`} task={task} />
+              ))
+            ) : (
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                No hay tareas finalizadas recientemente.
+              </p>
+            )}
           </div>
-        </div>
-      </Card>
+        </Card>
+      </div>
     </div>
   );
 };
