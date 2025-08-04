@@ -7,6 +7,8 @@ import { Client } from "./clientService"; // Importamos la interfaz del cliente
 export interface Activity {
   id: number;
   activity: string;
+  norm?: string;
+  price_without_vat?: number;
   assigned_to: number[]; // Array de IDs de usuario
   assigned_users?: { id: number; name: string }[]; // Array de objetos de usuario
   status: "pendiente" | "en_progreso" | "finalizada";
@@ -118,7 +120,6 @@ class OTService {
   async stopActivity(activityId: number): Promise<void> {
     await axiosInstance.put(`/ots/activities/${activityId}/stop`);
   }
-
   async getUserSummary(userId: number): Promise<UserSummaryItem[]> {
     const response = await axiosInstance.get(`/ots/user-summary/${userId}`);
     return response.data;

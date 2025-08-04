@@ -65,6 +65,8 @@ db.exec(`
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     work_order_id INTEGER NOT NULL,
     activity TEXT NOT NULL,
+    norm TEXT,
+    price_without_vat REAL,
     status TEXT NOT NULL DEFAULT 'pendiente' CHECK(status IN ('pendiente', 'en_progreso', 'finalizada')),
     started_at DATETIME,
     completed_at DATETIME,

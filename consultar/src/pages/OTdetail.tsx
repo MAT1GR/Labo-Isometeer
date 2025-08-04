@@ -21,14 +21,9 @@ import {
   Clock,
   CalendarCheck,
   Lock,
-  Users as UsersIcon,
-  FileText, // Icono para reporte interno
 } from "lucide-react";
 import { mutate } from "swr";
-import {
-  exportOtToPdfClient,
-  exportOtToPdfInternal,
-} from "../services/pdfGenerator";
+import { exportOtToPdfInternal } from "../services/pdfGenerator";
 import { formatDateTime } from "../lib/utils";
 import MultiUserSelect from "../components/ui/MultiUserSelect";
 
@@ -181,13 +176,7 @@ const OTDetail: React.FC = () => {
     await loadData();
   };
 
-  const handleExportClient = () => {
-    if (otData) {
-      exportOtToPdfClient(otData);
-    }
-  };
-
-  const handleExportInternal = () => {
+  const handleExport = () => {
     if (otData) {
       exportOtToPdfInternal(otData);
     }
@@ -211,33 +200,19 @@ const OTDetail: React.FC = () => {
       onSubmit={handleSubmit(onSubmit)}
       className="space-y-8 bg-gray-50 dark:bg-gray-900 p-6 rounded-lg"
     >
-      <div className="flex justify-between items-center flex-wrap gap-4">
+      <div className="flex justify-between items-center">
         <Button type="button" variant="ghost" onClick={() => navigate("/ot")}>
           <ArrowLeft className="mr-2 h-5 w-5" />
           Volver
         </Button>
-        <h1 className="text-2xl font-bold text-center">
+        <h1 className="text-2xl font-bold">
           Detalle de OT: {otData.custom_id || `#${otData.id}`}
         </h1>
-        <div className="flex gap-2 flex-wrap">
-          <Button
-            type="button"
-            variant="secondary"
-            onClick={handleExportClient}
-          >
-            <UsersIcon className="mr-2 h-5 w-5" />
-            PDF Cliente
+        <div className="flex gap-2">
+          <Button type="button" variant="secondary" onClick={handleExport}>
+            <Download className="mr-2 h-5 w-5" />
+            Exportar a PDF
           </Button>
-          {canViewAdminContent() && (
-            <Button
-              type="button"
-              variant="outline"
-              onClick={handleExportInternal}
-            >
-              <FileText className="mr-2 h-5 w-5" />
-              PDF Interno
-            </Button>
-          )}
           <Button
             type="submit"
             disabled={
@@ -245,7 +220,7 @@ const OTDetail: React.FC = () => {
             }
           >
             <Save className="mr-2 h-5 w-5" />
-            Guardar
+            Guardar Cambios
           </Button>
         </div>
       </div>
@@ -407,8 +382,8 @@ const OTDetail: React.FC = () => {
               <h2 className="text-lg font-semibold text-blue-700 dark:text-blue-400 col-span-full">
                 Información del Cliente
               </h2>
-              <Input label="Empresa" value={otData.client?.name} readOnly />
-              <Input label="Nº Cliente" value={otData.client?.code} readOnly />
+              <Input label="Empresa" value={otData.client_name} readOnly />
+              <Input label="Nº Cliente" value={otData.client_id} readOnly />
             </div>
           )}
 
@@ -463,7 +438,7 @@ const OTDetail: React.FC = () => {
               {fields.map((field, index) => (
                 <div
                   key={field.id}
-                  className="grid grid-cols-1 md:grid-cols-[2fr,3fr,auto] gap-4 items-start bg-gray-50 dark:bg-gray-700/50 p-4 rounded-md"
+                  className="grid grid-cols-1 md:grid-cols-[2fr,3fr,2fr,2fr,auto] gap-4 items-start bg-gray-50 dark:bg-gray-700/50 p-4 rounded-md"
                 >
                   <div>
                     <label className="text-sm font-medium mb-1 dark:text-gray-300">
@@ -497,6 +472,30 @@ const OTDetail: React.FC = () => {
                           disabled={!isFormEditable}
                         />
                       )}
+                    />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium mb-1 dark:text-gray-300">
+                      Norma
+                    </label>
+                    <Input
+                      placeholder="Ej: IEC 60601"
+                      {...register(`activities.${index}.norm`)}
+                      disabled={!isFormEditable}
+                    />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium mb-1 dark:text-gray-300">
+                      Precio sin IVA
+                    </label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      placeholder="0.00"
+                      {...register(`activities.${index}.price_without_vat`, {
+                        valueAsNumber: true,
+                      })}
+                      disabled={!isFormEditable}
                     />
                   </div>
                   {isFormEditable && (

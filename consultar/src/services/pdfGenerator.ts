@@ -243,7 +243,7 @@ export const exportOtToPdfInternal = async (otData: WorkOrder) => {
     head: [["Campo", "Información"]],
     body: [
       ["Cotización", otData.quotation_details || "N/A"],
-      ["Monto", formatCurrency(otData.quotation_amount || 0)],
+      ["Monto Total OT", formatCurrency(otData.quotation_amount || 0)],
       ["Fecha Estimada de Entrega", estimatedDate],
       ["Estado Actual", otData.status],
       ["Autorizado", otData.authorized ? "Sí" : "No"],
@@ -257,9 +257,11 @@ export const exportOtToPdfInternal = async (otData: WorkOrder) => {
   if (otData.activities && otData.activities.length > 0) {
     autoTable(jspdfDoc, {
       startY: (jspdfDoc as any).lastAutoTable.finalY + 10,
-      head: [["Actividad", "Asignado a", "Estado"]],
+      head: [["Actividad", "Norma", "Precio s/IVA", "Asignado a", "Estado"]],
       body: otData.activities.map((act) => [
         act.activity,
+        act.norm || "N/A",
+        formatCurrency(act.price_without_vat || 0),
         act.assigned_users?.map((u) => u.name).join(", ") || "Sin asignar",
         act.status,
       ]),

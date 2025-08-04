@@ -11,7 +11,7 @@ import Input from "../components/ui/Input";
 import Button from "../components/ui/Button";
 import { ArrowLeft, Save, PlusCircle, Trash2, Loader } from "lucide-react";
 import axiosInstance from "../api/axiosInstance";
-import MultiUserSelect from "../components/ui/MultiUserSelect"; // 1. IMPORTAMOS EL NUEVO COMPONENTE
+import MultiUserSelect from "../components/ui/MultiUserSelect";
 
 type OTCreateFormData = Omit<
   WorkOrder,
@@ -48,7 +48,7 @@ const OTCreate: React.FC = () => {
     defaultValues: {
       date: new Date().toISOString().split("T")[0],
       status: "pendiente",
-      activities: [{ activity: "", assigned_to: [] }],
+      activities: [{ activity: "", assigned_to: [], norm: "" }],
       contract_type: "Contrato de Producción",
     },
   });
@@ -304,7 +304,7 @@ const OTCreate: React.FC = () => {
             {fields.map((field, index) => (
               <div
                 key={field.id}
-                className="grid grid-cols-1 md:grid-cols-[2fr,3fr,auto] gap-4 items-start bg-gray-50 dark:bg-gray-700/50 p-4 rounded-md"
+                className="grid grid-cols-1 md:grid-cols-[2fr,3fr,2fr,2fr,auto] gap-4 items-start bg-gray-50 dark:bg-gray-700/50 p-4 rounded-md"
               >
                 <div>
                   <label className="text-sm font-medium mb-1 dark:text-gray-300">
@@ -338,7 +338,28 @@ const OTCreate: React.FC = () => {
                     )}
                   />
                 </div>
-
+                <div>
+                  <label className="text-sm font-medium mb-1 dark:text-gray-300">
+                    Norma
+                  </label>
+                  <Input
+                    placeholder="Ej: IEC 60601"
+                    {...register(`activities.${index}.norm`)}
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium mb-1 dark:text-gray-300">
+                    Precio sin IVA
+                  </label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    placeholder="0.00"
+                    {...register(`activities.${index}.price_without_vat`, {
+                      valueAsNumber: true,
+                    })}
+                  />
+                </div>
                 <div className="self-end">
                   <Button
                     type="button"

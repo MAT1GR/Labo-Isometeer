@@ -176,9 +176,9 @@ router.post("/", (req: Request, res: Response) => {
   const insertOTStmt = db.prepare(
     `INSERT INTO work_orders (
       custom_id, date, type, client_id, product, brand, model, 
-      seal_number, observations, certificate_expiry, created_by, status,
+      seal_number, observations, certificate_expiry, collaborator_observations, created_by, status,
       quotation_amount, quotation_details, disposition, contract_type
-     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   );
   const insertActivityStmt = db.prepare(
     "INSERT INTO work_order_activities (work_order_id, activity) VALUES (?, ?)"
@@ -205,6 +205,7 @@ router.post("/", (req: Request, res: Response) => {
       otData.seal_number,
       otData.observations,
       otData.certificate_expiry,
+      otData.collaborator_observations,
       created_by,
       "pendiente",
       otData.quotation_amount,
@@ -307,7 +308,7 @@ router.put("/:id", (req: Request, res: Response) => {
     return res.status(200).json({ message: "Observaciones guardadas." });
   }
   const updateStmt = db.prepare(
-    `UPDATE work_orders SET date=?, type=?, product=?, brand=?, model=?, seal_number=?, observations=?, certificate_expiry=?, status=?, quotation_amount=?, quotation_details=?, disposition=?, contract_type=?, updated_at=CURRENT_TIMESTAMP WHERE id=?`
+    `UPDATE work_orders SET date=?, type=?, product=?, brand=?, model=?, seal_number=?, observations=?, certificate_expiry=?, status=?, quotation_amount=?, quotation_details=?, disposition=?, contract_type=?, collaborator_observations=?, updated_at=CURRENT_TIMESTAMP WHERE id=?`
   );
   const deleteActivitiesStmt = db.prepare(
     "DELETE FROM work_order_activities WHERE work_order_id = ?"
@@ -334,6 +335,7 @@ router.put("/:id", (req: Request, res: Response) => {
       otData.quotation_details,
       otData.disposition,
       otData.contract_type,
+      otData.collaborator_observations,
       id
     );
     deleteActivitiesStmt.run(id); // Esto eliminará en cascada las asignaciones
