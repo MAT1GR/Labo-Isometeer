@@ -107,7 +107,7 @@ export const exportOtToPdfClient = async (otData: WorkOrder) => {
   // --- SECCIÓN DATOS DEL CLIENTE ---
   autoTable(jspdfDoc, {
     startY: 40,
-    head: [["Datos del Cliente"]],
+    head: [["Campo", "Información"]],
     body: [
       ["Empresa", otData.client?.name || "N/A"],
       ["Nº Cliente", otData.client?.code || "N/A"],
@@ -141,7 +141,7 @@ export const exportOtToPdfClient = async (otData: WorkOrder) => {
   // --- SECCIÓN DATOS DEL PRODUCTO ---
   autoTable(jspdfDoc, {
     startY: (jspdfDoc as any).lastAutoTable.finalY + 10,
-    head: [["Datos del Producto y Servicio"]],
+    head: [["Campo", "Información"]],
     body: [
       ["Tipo de OT", otData.type],
       ["Producto", otData.product],
@@ -162,7 +162,7 @@ export const exportOtToPdfClient = async (otData: WorkOrder) => {
   );
   autoTable(jspdfDoc, {
     startY: (jspdfDoc as any).lastAutoTable.finalY + 10,
-    head: [["Plazo de Entrega"]],
+    head: [["Campo", "Información"]],
     body: [["Fecha Estimada de Entrega", estimatedDate]],
     theme: "grid",
     headStyles: { fillColor: [79, 70, 229] },
@@ -203,12 +203,9 @@ export const exportOtToPdfInternal = async (otData: WorkOrder) => {
   // --- DATOS DEL CLIENTE ---
   autoTable(jspdfDoc, {
     startY: 40,
-    head: [["Datos del Cliente"]],
+    head: [["Campo", "Información"]],
     body: [
-      [
-        "Empresa",
-        (otData.client?.name || otData.client_name || "N/A").toString(),
-      ],
+      ["Empresa", otData.client?.name || "N/A"],
       ["Nº Cliente", otData.client?.code || "N/A"],
     ],
     theme: "grid",
@@ -218,7 +215,7 @@ export const exportOtToPdfInternal = async (otData: WorkOrder) => {
   // --- DATOS DEL PRODUCTO ---
   autoTable(jspdfDoc, {
     startY: (jspdfDoc as any).lastAutoTable.finalY + 10,
-    head: [["Datos del Producto y Servicio"]],
+    head: [["Campo", "Información"]],
     body: [
       ["Tipo de OT", otData.type],
       ["Producto", otData.product],
@@ -226,6 +223,11 @@ export const exportOtToPdfInternal = async (otData: WorkOrder) => {
       ["Modelo", otData.model || "N/A"],
       ["Nº de Lacre", otData.seal_number || "N/A"],
       ["Vto. Certificado", formatDate(otData.certificate_expiry ?? null)],
+      ["Observaciones (Cliente)", otData.observations || "N/A"],
+      [
+        "Observaciones (Colaborador)",
+        otData.collaborator_observations || "N/A",
+      ],
     ],
     theme: "grid",
     headStyles: { fillColor: [37, 99, 235] },
@@ -238,27 +240,17 @@ export const exportOtToPdfInternal = async (otData: WorkOrder) => {
   );
   autoTable(jspdfDoc, {
     startY: (jspdfDoc as any).lastAutoTable.finalY + 10,
-    head: [["Estadísticas y Cotización"]],
+    head: [["Campo", "Información"]],
     body: [
       ["Cotización", otData.quotation_details || "N/A"],
       ["Monto", formatCurrency(otData.quotation_amount || 0)],
       ["Fecha Estimada de Entrega", estimatedDate],
       ["Estado Actual", otData.status],
+      ["Autorizado", otData.authorized ? "Sí" : "No"],
+      ["Disposición", otData.disposition || "N/A"],
     ],
     theme: "grid",
     headStyles: { fillColor: [79, 70, 229] },
-  });
-
-  // --- OBSERVACIONES ---
-  autoTable(jspdfDoc, {
-    startY: (jspdfDoc as any).lastAutoTable.finalY + 10,
-    head: [["Observaciones"]],
-    body: [
-      ["Generales", otData.observations || "Sin observaciones."],
-      ["Colaborador", otData.collaborator_observations || "Sin observaciones."],
-    ],
-    theme: "grid",
-    headStyles: { fillColor: [217, 119, 6] },
   });
 
   // --- ACTIVIDADES CON ASIGNACIÓN ---
