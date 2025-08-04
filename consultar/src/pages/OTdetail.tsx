@@ -23,9 +23,9 @@ import {
   Lock,
 } from "lucide-react";
 import { mutate } from "swr";
-import { exportOtToPdfInternal } from "../services/pdfGenerator";
 import { formatDateTime } from "../lib/utils";
 import MultiUserSelect from "../components/ui/MultiUserSelect";
+import ExportOtModal from "../components/ui/ExportOtModal";
 
 const activityOptions = [
   "Calibracion",
@@ -60,6 +60,7 @@ const OTDetail: React.FC = () => {
   const [otData, setOtData] = useState<WorkOrder | null>(null);
   const [users, setUsers] = useState<User[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
 
   const watchedActivities = useWatch({ control, name: "activities" });
   const otType = useWatch({ control, name: "type" });
@@ -176,12 +177,6 @@ const OTDetail: React.FC = () => {
     await loadData();
   };
 
-  const handleExport = () => {
-    if (otData) {
-      exportOtToPdfInternal(otData);
-    }
-  };
-
   if (error) return <div className="p-8 text-red-500 text-center">{error}</div>;
   if (!otData)
     return <div className="p-8 text-center">Cargando datos de la OT...</div>;
@@ -196,385 +191,402 @@ const OTDetail: React.FC = () => {
   };
 
   return (
-    <form
-      onSubmit={handleSubmit(onSubmit)}
-      className="space-y-8 bg-gray-50 dark:bg-gray-900 p-6 rounded-lg"
-    >
-      <div className="flex justify-between items-center">
-        <Button type="button" variant="ghost" onClick={() => navigate("/ot")}>
-          <ArrowLeft className="mr-2 h-5 w-5" />
-          Volver
-        </Button>
-        <h1 className="text-2xl font-bold">
-          Detalle de OT: {otData.custom_id || `#${otData.id}`}
-        </h1>
-        <div className="flex gap-2">
-          <Button type="button" variant="secondary" onClick={handleExport}>
-            <Download className="mr-2 h-5 w-5" />
-            Exportar a PDF
+    <>
+      <ExportOtModal
+        isOpen={isExportModalOpen}
+        onClose={() => setIsExportModalOpen(false)}
+        otData={otData}
+      />
+      <form
+        onSubmit={handleSubmit(onSubmit)}
+        className="space-y-8 bg-gray-50 dark:bg-gray-900 p-6 rounded-lg"
+      >
+        <div className="flex justify-between items-center flex-wrap gap-4">
+          <Button type="button" variant="ghost" onClick={() => navigate("/ot")}>
+            <ArrowLeft className="mr-2 h-5 w-5" />
+            Volver
           </Button>
-          <Button
-            type="submit"
-            disabled={
-              isSubmitting || !isDirty || (isEmployee && isOtStartedOrLater)
-            }
-          >
-            <Save className="mr-2 h-5 w-5" />
-            Guardar Cambios
-          </Button>
+          <h1 className="text-2xl font-bold text-center">
+            Detalle de OT: {otData.custom_id || `#${otData.id}`}
+          </h1>
+          <div className="flex gap-2 flex-wrap">
+            {!isEmployee && (
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => setIsExportModalOpen(true)}
+              >
+                <Download className="mr-2 h-5 w-5" />
+                Exportar PDF
+              </Button>
+            )}
+            <Button
+              type="submit"
+              disabled={
+                isSubmitting || !isDirty || (isEmployee && isOtStartedOrLater)
+              }
+            >
+              <Save className="mr-2 h-5 w-5" />
+              Guardar
+            </Button>
+          </div>
         </div>
-      </div>
 
-      <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm flex flex-wrap justify-center items-center gap-4">
-        {canAuthorizeOT() && !otData.authorized && (
-          <Button
-            type="button"
-            onClick={handleAuthorize}
-            className="bg-green-600 hover:bg-green-700"
-          >
-            <CheckSquare className="mr-2 h-5 w-5" /> Autorizar OT
-          </Button>
-        )}
-        {canAuthorizeOT() &&
-          otData.authorized &&
-          otData.status === "pendiente" && (
-            <Button type="button" onClick={handleDeauthorize} variant="danger">
-              <XSquare className="mr-2 h-5 w-5" /> Desautorizar OT
+        <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm flex flex-wrap justify-center items-center gap-4">
+          {canAuthorizeOT() && !otData.authorized && (
+            <Button
+              type="button"
+              onClick={handleAuthorize}
+              className="bg-green-600 hover:bg-green-700"
+            >
+              <CheckSquare className="mr-2 h-5 w-5" /> Autorizar OT
             </Button>
           )}
-      </div>
-
-      {isEmployee && myActivities.length > 0 && (
-        <div className="bg-blue-50 dark:bg-blue-900/30 dark:border dark:border-blue-800/50 p-6 rounded-lg shadow-sm">
-          <h2 className="text-lg font-semibold text-blue-800 dark:text-blue-300 mb-4">
-            Mis Tareas en esta OT
-          </h2>
-          <div className="space-y-4">
-            {myActivities.map((activity) => (
-              <div
-                key={activity.id}
-                className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4"
+          {canAuthorizeOT() &&
+            otData.authorized &&
+            otData.status === "pendiente" && (
+              <Button
+                type="button"
+                onClick={handleDeauthorize}
+                variant="danger"
               >
-                <div className="flex-1">
-                  <p className="font-bold">{activity.activity}</p>
-                  <div className="grid grid-cols-2 gap-4 text-xs mt-2 text-gray-600 dark:text-gray-400">
-                    <div className="flex items-center gap-2">
-                      <Clock className="h-4 w-4" />
-                      <span>
-                        Inicio: {formatDateTime(activity.started_at) || "N/A"}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <CalendarCheck className="h-4 w-4" />
-                      <span>
-                        Fin: {formatDateTime(activity.completed_at) || "N/A"}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-                <div className="flex items-center gap-4">
-                  <span
-                    className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                      activity.status === "finalizada"
-                        ? "bg-green-100 text-green-800"
-                        : activity.status === "en_progreso"
-                        ? "bg-blue-100 text-blue-800"
-                        : "bg-yellow-100 text-yellow-800"
-                    }`}
-                  >
-                    {activity.status.replace("_", " ")}
-                  </span>
-                  {otData.authorized && (
-                    <>
-                      {activity.status === "pendiente" && (
-                        <Button
-                          type="button"
-                          size="sm"
-                          onClick={() => handleStartActivity(activity.id)}
-                          className="bg-green-600 hover:bg-green-700"
-                        >
-                          <Play className="h-4 w-4" />
-                        </Button>
-                      )}
-                      {activity.status === "en_progreso" && (
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="danger"
-                          onClick={() => handleStopActivity(activity.id)}
-                        >
-                          <StopCircle className="h-4 w-4" />
-                        </Button>
-                      )}
-                    </>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
+                <XSquare className="mr-2 h-5 w-5" /> Desautorizar OT
+              </Button>
+            )}
         </div>
-      )}
 
-      {canViewAdminContent() && isOtStartedOrLater && (
-        <div className="bg-yellow-50 dark:bg-yellow-900/30 border-l-4 border-yellow-400 p-4 rounded-md">
-          <div className="flex items-center">
-            <div className="flex-shrink-0">
-              <Lock className="h-5 w-5 text-yellow-500" />
-            </div>
-            <div className="ml-3">
-              <p className="text-sm text-yellow-700 dark:text-yellow-200">
-                La edición de los datos principales está bloqueada porque la OT
-                ya se encuentra "{otData.status.replace("_", " ")}".
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      <div className="bg-white dark:bg-gray-800 dark:border dark:border-gray-700 p-6 rounded-lg shadow-sm space-y-8">
-        <fieldset disabled={!isFormEditable}>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 border-b dark:border-gray-700 pb-6">
-            <h2 className="text-lg font-semibold text-blue-700 dark:text-blue-400 col-span-full">
-              OT Seleccionada
+        {isEmployee && myActivities.length > 0 && (
+          <div className="bg-blue-50 dark:bg-blue-900/30 dark:border dark:border-blue-800/50 p-6 rounded-lg shadow-sm">
+            <h2 className="text-lg font-semibold text-blue-800 dark:text-blue-300 mb-4">
+              Mis Tareas en esta OT
             </h2>
-            <Input label="Fecha" type="date" {...register("date")} />
-            <div>
-              <label className="text-sm font-medium dark:text-gray-300">
-                Tipo de OT
-              </label>
-              <select
-                {...register("type")}
-                className="w-full mt-1 p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
-              >
-                <option value="Produccion">Producción</option>
-                <option value="Calibracion">Calibración</option>
-                <option value="Ensayo SE">Ensayo SE</option>
-                <option value="Ensayo EE">Ensayo EE</option>
-                <option value="Otros Servicios">Otros Servicios</option>
-              </select>
-            </div>
-            <div>
-              <label className="text-sm font-medium dark:text-gray-300">
-                Contrato
-              </label>
-              <select
-                {...register("contract_type")}
-                className="w-full mt-1 p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
-              >
-                <option value="Contrato de Producción">
-                  Contrato de Producción
-                </option>
-                <option value="Contrato de Calibración">
-                  Contrato de Calibración
-                </option>
-                <option value="Contrato de Ensayo">Contrato de Ensayo</option>
-              </select>
-            </div>
-            <Input
-              label="ID de OT"
-              value={otData.custom_id || `Interno #${id}`}
-              readOnly
-            />
-          </div>
-
-          {!isEmployee && (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 border-b dark:border-gray-700 pb-6">
-              <h2 className="text-lg font-semibold text-blue-700 dark:text-blue-400 col-span-full">
-                Información del Cliente
-              </h2>
-              <Input label="Empresa" value={otData.client_name} readOnly />
-              <Input label="Nº Cliente" value={otData.client_id} readOnly />
-            </div>
-          )}
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 border-b dark:border-gray-700 pb-6">
-            <h2 className="text-lg font-semibold text-blue-700 dark:text-blue-400 col-span-full">
-              Producto
-            </h2>
-            <Input label="Nombre" {...register("product")} />
-            <Input label="Marca" {...register("brand")} />
-            <Input label="Modelo" {...register("model")} />
-            <Input
-              label="Nº de Lacre"
-              {...register("seal_number")}
-              disabled={!isLacreEnabled}
-            />
-            <Input
-              label="Vto. del Certificado"
-              type="date"
-              {...register("certificate_expiry")}
-              disabled={!isLacreEnabled}
-            />
-            <div className="col-span-full">
-              <label className="text-sm font-medium dark:text-gray-300">
-                Observaciones (Generales)
-              </label>
-              <textarea
-                {...register("observations")}
-                className="w-full mt-1 p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
-                rows={3}
-              ></textarea>
-            </div>
-          </div>
-        </fieldset>
-
-        {!isEmployee && (
-          <div className="border-b dark:border-gray-700 pb-6">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-lg font-semibold text-blue-700 dark:text-blue-400">
-                Actividades y Asignaciones
-              </h2>
-              {isFormEditable && (
-                <Button
-                  type="button"
-                  size="sm"
-                  onClick={() => append({ activity: "", assigned_to: [] })}
-                >
-                  <PlusCircle className="h-4 w-4 mr-2" /> Agregar Actividad
-                </Button>
-              )}
-            </div>
             <div className="space-y-4">
-              {fields.map((field, index) => (
+              {myActivities.map((activity) => (
                 <div
-                  key={field.id}
-                  className="grid grid-cols-1 md:grid-cols-[2fr,3fr,2fr,2fr,auto] gap-4 items-start bg-gray-50 dark:bg-gray-700/50 p-4 rounded-md"
+                  key={activity.id}
+                  className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4"
                 >
-                  <div>
-                    <label className="text-sm font-medium mb-1 dark:text-gray-300">
-                      Actividad
-                    </label>
-                    <select
-                      {...register(`activities.${index}.activity`)}
-                      className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
-                      disabled={!isFormEditable}
-                    >
-                      <option value="">Seleccionar actividad...</option>
-                      {getAvailableActivities(index).map((opt) => (
-                        <option key={opt} value={opt}>
-                          {opt}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium mb-1 dark:text-gray-300">
-                      Asignar a
-                    </label>
-                    <Controller
-                      control={control}
-                      name={`activities.${index}.assigned_to` as any}
-                      render={({ field }) => (
-                        <MultiUserSelect
-                          users={users}
-                          selectedUserIds={field.value || []}
-                          onChange={field.onChange}
-                          disabled={!isFormEditable}
-                        />
-                      )}
-                    />
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium mb-1 dark:text-gray-300">
-                      Norma
-                    </label>
-                    <Input
-                      placeholder="Ej: IEC 60601"
-                      {...register(`activities.${index}.norm`)}
-                      disabled={!isFormEditable}
-                    />
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium mb-1 dark:text-gray-300">
-                      Precio sin IVA
-                    </label>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      placeholder="0.00"
-                      {...register(`activities.${index}.price_without_vat`, {
-                        valueAsNumber: true,
-                      })}
-                      disabled={!isFormEditable}
-                    />
-                  </div>
-                  {isFormEditable && (
-                    <div className="self-end">
-                      <Button
-                        type="button"
-                        variant="danger"
-                        size="sm"
-                        onClick={() => remove(index)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                  <div className="flex-1">
+                    <p className="font-bold">{activity.activity}</p>
+                    <div className="grid grid-cols-2 gap-4 text-xs mt-2 text-gray-600 dark:text-gray-400">
+                      <div className="flex items-center gap-2">
+                        <Clock className="h-4 w-4" />
+                        <span>
+                          Inicio: {formatDateTime(activity.started_at) || "N/A"}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <CalendarCheck className="h-4 w-4" />
+                        <span>
+                          Fin: {formatDateTime(activity.completed_at) || "N/A"}
+                        </span>
+                      </div>
                     </div>
-                  )}
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <span
+                      className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                        activity.status === "finalizada"
+                          ? "bg-green-100 text-green-800"
+                          : activity.status === "en_progreso"
+                          ? "bg-blue-100 text-blue-800"
+                          : "bg-yellow-100 text-yellow-800"
+                      }`}
+                    >
+                      {activity.status.replace("_", " ")}
+                    </span>
+                    {otData.authorized && (
+                      <>
+                        {activity.status === "pendiente" && (
+                          <Button
+                            type="button"
+                            size="sm"
+                            onClick={() => handleStartActivity(activity.id)}
+                            className="bg-green-600 hover:bg-green-700"
+                          >
+                            <Play className="h-4 w-4" />
+                          </Button>
+                        )}
+                        {activity.status === "en_progreso" && (
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="danger"
+                            onClick={() => handleStopActivity(activity.id)}
+                          >
+                            <StopCircle className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
           </div>
         )}
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          <div className="col-span-full">
-            <h2 className="text-lg font-semibold text-blue-700 dark:text-blue-400 mb-4">
-              Observaciones del Colaborador
-            </h2>
-            <textarea
-              {...register("collaborator_observations")}
-              disabled={isEmployee && isOtStartedOrLater}
-              className="w-full mt-1 p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
-              rows={4}
-              placeholder={
-                isEmployee
-                  ? "Añade tus observaciones aquí..."
-                  : "Visible para el empleado asignado..."
-              }
-            ></textarea>
+        {canViewAdminContent() && isOtStartedOrLater && (
+          <div className="bg-yellow-50 dark:bg-yellow-900/30 border-l-4 border-yellow-400 p-4 rounded-md">
+            <div className="flex items-center">
+              <div className="flex-shrink-0">
+                <Lock className="h-5 w-5 text-yellow-500" />
+              </div>
+              <div className="ml-3">
+                <p className="text-sm text-yellow-700 dark:text-yellow-200">
+                  La edición de los datos principales está bloqueada porque la
+                  OT ya se encuentra "{otData.status.replace("_", " ")}".
+                </p>
+              </div>
+            </div>
           </div>
+        )}
 
-          {canViewAdminContent() && (
-            <div className="col-span-full">
-              <h2 className="text-lg font-semibold text-blue-700 dark:text-blue-400 mb-4">
-                Administración
+        <div className="bg-white dark:bg-gray-800 dark:border dark:border-gray-700 p-6 rounded-lg shadow-sm space-y-8">
+          <fieldset disabled={!isFormEditable}>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6 border-b dark:border-gray-700 pb-6">
+              <h2 className="text-lg font-semibold text-blue-700 dark:text-blue-400 col-span-full">
+                OT Seleccionada
               </h2>
-              <fieldset
-                disabled={!isFormEditable}
-                className="grid grid-cols-1 md:grid-cols-2 gap-6"
-              >
+              <Input label="Fecha" type="date" {...register("date")} />
+              <div>
+                <label className="text-sm font-medium dark:text-gray-300">
+                  Tipo de OT
+                </label>
+                <select
+                  {...register("type")}
+                  className="w-full mt-1 p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
+                >
+                  <option value="Produccion">Producción</option>
+                  <option value="Calibracion">Calibración</option>
+                  <option value="Ensayo SE">Ensayo SE</option>
+                  <option value="Ensayo EE">Ensayo EE</option>
+                  <option value="Otros Servicios">Otros Servicios</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-sm font-medium dark:text-gray-300">
+                  Contrato
+                </label>
+                <select
+                  {...register("contract_type")}
+                  className="w-full mt-1 p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
+                >
+                  <option value="Contrato de Producción">
+                    Contrato de Producción
+                  </option>
+                  <option value="Contrato de Calibración">
+                    Contrato de Calibración
+                  </option>
+                  <option value="Contrato de Ensayo">Contrato de Ensayo</option>
+                </select>
+              </div>
+              <Input
+                label="ID de OT"
+                value={otData.custom_id || `Interno #${id}`}
+                readOnly
+              />
+            </div>
+
+            {!isEmployee && (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 border-b dark:border-gray-700 pb-6">
+                <h2 className="text-lg font-semibold text-blue-700 dark:text-blue-400 col-span-full">
+                  Información del Cliente
+                </h2>
+                <Input label="Empresa" value={otData.client?.name} readOnly />
                 <Input
-                  label="Cotización (Detalles)"
-                  {...register("quotation_details")}
+                  label="Nº Cliente"
+                  value={otData.client?.code}
+                  readOnly
                 />
-                <Input
-                  label="Cotización (Monto)"
-                  type="number"
-                  step="0.01"
-                  {...register("quotation_amount")}
-                />
-                <Input label="Disposición" {...register("disposition")} />
-                <div>
-                  <label className="text-sm font-medium dark:text-gray-300">
-                    Estado Final
-                  </label>
-                  <select
-                    {...register("status")}
-                    className="w-full mt-1 p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 border-b dark:border-gray-700 pb-6">
+              <h2 className="text-lg font-semibold text-blue-700 dark:text-blue-400 col-span-full">
+                Producto
+              </h2>
+              <Input label="Nombre" {...register("product")} />
+              <Input label="Marca" {...register("brand")} />
+              <Input label="Modelo" {...register("model")} />
+              <Input
+                label="Nº de Lacre"
+                {...register("seal_number")}
+                disabled={!isLacreEnabled}
+              />
+              <Input
+                label="Vto. del Certificado"
+                type="date"
+                {...register("certificate_expiry")}
+                disabled={!isLacreEnabled}
+              />
+              <div className="col-span-full">
+                <label className="text-sm font-medium dark:text-gray-300">
+                  Observaciones (Generales)
+                </label>
+                <textarea
+                  {...register("observations")}
+                  className="w-full mt-1 p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
+                  rows={3}
+                ></textarea>
+              </div>
+            </div>
+          </fieldset>
+
+          {!isEmployee && (
+            <div className="border-b dark:border-gray-700 pb-6">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-lg font-semibold text-blue-700 dark:text-blue-400">
+                  Actividades y Asignaciones
+                </h2>
+                {isFormEditable && (
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={() => append({ activity: "", assigned_to: [] })}
                   >
-                    <option value="pendiente">Pendiente</option>
-                    <option value="en_progreso">En Progreso</option>
-                    <option value="finalizada">Finalizada</option>
-                    <option value="facturada">Facturada</option>
-                    <option value="cierre">Cierre</option>
-                  </select>
-                </div>
-              </fieldset>
+                    <PlusCircle className="h-4 w-4 mr-2" /> Agregar Actividad
+                  </Button>
+                )}
+              </div>
+              <div className="space-y-4">
+                {fields.map((field, index) => (
+                  <div
+                    key={field.id}
+                    className="bg-gray-50 dark:bg-gray-700/50 p-4 rounded-md space-y-4"
+                  >
+                    <div className="grid grid-cols-1 md:grid-cols-[1fr,2fr,auto] gap-4 items-start">
+                      <div>
+                        <label className="text-sm font-medium mb-1 dark:text-gray-300">
+                          Actividad
+                        </label>
+                        <select
+                          {...register(`activities.${index}.activity`)}
+                          className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
+                          disabled={!isFormEditable}
+                        >
+                          <option value="">Seleccionar actividad...</option>
+                          {getAvailableActivities(index).map((opt) => (
+                            <option key={opt} value={opt}>
+                              {opt}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium mb-1 dark:text-gray-300">
+                          Asignar a
+                        </label>
+                        <Controller
+                          control={control}
+                          name={`activities.${index}.assigned_to` as any}
+                          render={({ field }) => (
+                            <MultiUserSelect
+                              users={users}
+                              selectedUserIds={field.value || []}
+                              onChange={field.onChange}
+                              disabled={!isFormEditable}
+                            />
+                          )}
+                        />
+                      </div>
+                      {isFormEditable && (
+                        <div className="self-end">
+                          <Button
+                            type="button"
+                            variant="danger"
+                            size="sm"
+                            onClick={() => remove(index)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <Input
+                        label="Norma"
+                        {...register(`activities.${index}.norma`)}
+                        disabled={!isFormEditable}
+                        placeholder="Ej: IEC 60601"
+                      />
+                      <Input
+                        label="Precio (Sin IVA)"
+                        type="number"
+                        step="0.01"
+                        {...register(`activities.${index}.precio_sin_iva`, {
+                          valueAsNumber: true,
+                        })}
+                        disabled={!isFormEditable}
+                        placeholder="Ej: 15000"
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div className="col-span-full">
+              <h2 className="text-lg font-semibold text-blue-700 dark:text-blue-400 mb-4">
+                Observaciones del Colaborador
+              </h2>
+              <textarea
+                {...register("collaborator_observations")}
+                disabled={isEmployee && isOtStartedOrLater}
+                className="w-full mt-1 p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
+                rows={4}
+                placeholder={
+                  isEmployee
+                    ? "Añade tus observaciones aquí..."
+                    : "Visible para el empleado asignado..."
+                }
+              ></textarea>
+            </div>
+
+            {canViewAdminContent() && (
+              <div className="col-span-full">
+                <h2 className="text-lg font-semibold text-blue-700 dark:text-blue-400 mb-4">
+                  Administración
+                </h2>
+                <fieldset
+                  disabled={!isFormEditable}
+                  className="grid grid-cols-1 md:grid-cols-2 gap-6"
+                >
+                  <Input
+                    label="Cotización (Detalles)"
+                    {...register("quotation_details")}
+                  />
+                  <Input
+                    label="Cotización (Monto)"
+                    type="number"
+                    step="0.01"
+                    {...register("quotation_amount")}
+                  />
+                  <Input label="Disposición" {...register("disposition")} />
+                  <div>
+                    <label className="text-sm font-medium dark:text-gray-300">
+                      Estado Final
+                    </label>
+                    <select
+                      {...register("status")}
+                      className="w-full mt-1 p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
+                    >
+                      <option value="pendiente">Pendiente</option>
+                      <option value="en_progreso">En Progreso</option>
+                      <option value="finalizada">Finalizada</option>
+                      <option value="facturada">Facturada</option>
+                      <option value="cierre">Cierre</option>
+                    </select>
+                  </div>
+                </fieldset>
+              </div>
+            )}
+          </div>
         </div>
-      </div>
-    </form>
+      </form>
+    </>
   );
 };
 

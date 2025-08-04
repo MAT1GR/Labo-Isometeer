@@ -181,7 +181,7 @@ router.post("/", (req: Request, res: Response) => {
      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   );
   const insertActivityStmt = db.prepare(
-    "INSERT INTO work_order_activities (work_order_id, activity) VALUES (?, ?)"
+    "INSERT INTO work_order_activities (work_order_id, activity, norma, precio_sin_iva) VALUES (?, ?, ?, ?)"
   );
   const insertAssignmentStmt = db.prepare(
     "INSERT INTO work_order_activity_assignments (activity_id, user_id) VALUES (?, ?)"
@@ -216,7 +216,12 @@ router.post("/", (req: Request, res: Response) => {
     const otId = info.lastInsertRowid;
     for (const act of activities) {
       if (act.activity) {
-        const activityInfo = insertActivityStmt.run(otId, act.activity);
+        const activityInfo = insertActivityStmt.run(
+          otId,
+          act.activity,
+          act.norma,
+          act.precio_sin_iva
+        );
         const activityId = activityInfo.lastInsertRowid;
         if (act.assigned_to && Array.isArray(act.assigned_to)) {
           for (const userId of act.assigned_to) {
@@ -269,7 +274,7 @@ router.get("/:id", (req: Request, res: Response) => {
 
       const activities = db
         .prepare(
-          `SELECT wa.id, wa.activity, wa.status, wa.started_at, wa.completed_at, 
+          `SELECT wa.id, wa.activity, wa.norma, wa.precio_sin_iva, wa.status, wa.started_at, wa.completed_at, 
            json_group_array(json_object('id', u.id, 'name', u.name)) as assigned_users
            FROM work_order_activities wa
            LEFT JOIN work_order_activity_assignments waa ON wa.id = waa.activity_id
@@ -314,7 +319,7 @@ router.put("/:id", (req: Request, res: Response) => {
     "DELETE FROM work_order_activities WHERE work_order_id = ?"
   );
   const insertActivityStmt = db.prepare(
-    "INSERT INTO work_order_activities (work_order_id, activity) VALUES (?, ?)"
+    "INSERT INTO work_order_activities (work_order_id, activity, norma, precio_sin_iva) VALUES (?, ?, ?, ?)"
   );
   const insertAssignmentStmt = db.prepare(
     "INSERT INTO work_order_activity_assignments (activity_id, user_id) VALUES (?, ?)"
@@ -341,7 +346,12 @@ router.put("/:id", (req: Request, res: Response) => {
     deleteActivitiesStmt.run(id); // Esto eliminará en cascada las asignaciones
     for (const act of activities) {
       if (act.activity) {
-        const activityInfo = insertActivityStmt.run(id, act.activity);
+        const activityInfo = insertActivityStmt.run(
+          id,
+          act.activity,
+          act.norma,
+          act.precio_sin_iva
+        );
         const activityId = activityInfo.lastInsertRowid;
         if (act.assigned_to && Array.isArray(act.assigned_to)) {
           for (const userId of act.assigned_to) {

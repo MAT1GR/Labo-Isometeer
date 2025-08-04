@@ -54,7 +54,7 @@ db.exec(`
     quotation_details TEXT,
     disposition TEXT,
     authorized BOOLEAN NOT NULL DEFAULT FALSE,
-    contract_type TEXT DEFAULT 'Contrato de Producción', -- CAMBIO DE NOMBRE
+    contract_type TEXT DEFAULT 'Contrato de Producción',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP, 
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE,
@@ -65,8 +65,8 @@ db.exec(`
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     work_order_id INTEGER NOT NULL,
     activity TEXT NOT NULL,
-    norm TEXT,
-    price_without_vat REAL,
+    norma TEXT,
+    precio_sin_iva REAL,
     status TEXT NOT NULL DEFAULT 'pendiente' CHECK(status IN ('pendiente', 'en_progreso', 'finalizada')),
     started_at DATETIME,
     completed_at DATETIME,
@@ -93,7 +93,7 @@ db.exec(`
 const seedContracts = () => {
   const contracts = [
     {
-      name: "Contrato de Producción", // CAMBIO DE NOMBRE
+      name: "Contrato de Producción",
       content:
         "Este es el texto por defecto para el Contrato de Producción. El administrador puede editar este contenido o subir un PDF.",
     },

@@ -48,7 +48,9 @@ const OTCreate: React.FC = () => {
     defaultValues: {
       date: new Date().toISOString().split("T")[0],
       status: "pendiente",
-      activities: [{ activity: "", assigned_to: [], norm: "" }],
+      activities: [
+        { activity: "", assigned_to: [], norma: "", precio_sin_iva: undefined },
+      ],
       contract_type: "Contrato de Producción",
     },
   });
@@ -131,6 +133,7 @@ const OTCreate: React.FC = () => {
         ...data,
         client_id: Number(data.client_id),
         created_by: user.id,
+        collaborator_observations: null, // FIX: Explicitly add null for this field
       };
       const newOt = await otService.createOT(dataToSubmit);
       navigate(`/ot/editar/${newOt.id}`);
@@ -295,7 +298,14 @@ const OTCreate: React.FC = () => {
             <Button
               type="button"
               size="sm"
-              onClick={() => append({ activity: "", assigned_to: [] })}
+              onClick={() =>
+                append({
+                  activity: "",
+                  assigned_to: [],
+                  norma: "",
+                  precio_sin_iva: undefined,
+                })
+              }
             >
               <PlusCircle className="h-4 w-4 mr-2" /> Agregar Actividad
             </Button>
@@ -304,71 +314,67 @@ const OTCreate: React.FC = () => {
             {fields.map((field, index) => (
               <div
                 key={field.id}
-                className="grid grid-cols-1 md:grid-cols-[2fr,3fr,2fr,2fr,auto] gap-4 items-start bg-gray-50 dark:bg-gray-700/50 p-4 rounded-md"
+                className="bg-gray-50 dark:bg-gray-700/50 p-4 rounded-md space-y-4"
               >
-                <div>
-                  <label className="text-sm font-medium mb-1 dark:text-gray-300">
-                    Actividad
-                  </label>
-                  <select
-                    {...register(`activities.${index}.activity`)}
-                    className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
-                  >
-                    <option value="">Seleccionar actividad...</option>
-                    {getAvailableActivities(index).map((opt) => (
-                      <option key={opt} value={opt}>
-                        {opt}
-                      </option>
-                    ))}
-                  </select>
+                <div className="grid grid-cols-1 md:grid-cols-[1fr,2fr,auto] gap-4 items-start">
+                  <div>
+                    <label className="text-sm font-medium mb-1 dark:text-gray-300">
+                      Actividad
+                    </label>
+                    <select
+                      {...register(`activities.${index}.activity`)}
+                      className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
+                    >
+                      <option value="">Seleccionar actividad...</option>
+                      {getAvailableActivities(index).map((opt) => (
+                        <option key={opt} value={opt}>
+                          {opt}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium mb-1 dark:text-gray-300">
+                      Asignar a
+                    </label>
+                    <Controller
+                      control={control}
+                      name={`activities.${index}.assigned_to` as any}
+                      render={({ field }) => (
+                        <MultiUserSelect
+                          users={users}
+                          selectedUserIds={field.value || []}
+                          onChange={field.onChange}
+                        />
+                      )}
+                    />
+                  </div>
+                  <div className="self-end">
+                    <Button
+                      type="button"
+                      variant="danger"
+                      size="sm"
+                      onClick={() => remove(index)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
-                <div>
-                  <label className="text-sm font-medium mb-1 dark:text-gray-300">
-                    Asignar a
-                  </label>
-                  <Controller
-                    control={control}
-                    name={`activities.${index}.assigned_to` as any}
-                    render={({ field }) => (
-                      <MultiUserSelect
-                        users={users}
-                        selectedUserIds={field.value || []}
-                        onChange={field.onChange}
-                      />
-                    )}
-                  />
-                </div>
-                <div>
-                  <label className="text-sm font-medium mb-1 dark:text-gray-300">
-                    Norma
-                  </label>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <Input
+                    label="Norma"
+                    {...register(`activities.${index}.norma`)}
                     placeholder="Ej: IEC 60601"
-                    {...register(`activities.${index}.norm`)}
                   />
-                </div>
-                <div>
-                  <label className="text-sm font-medium mb-1 dark:text-gray-300">
-                    Precio sin IVA
-                  </label>
                   <Input
+                    label="Precio (Sin IVA)"
                     type="number"
                     step="0.01"
-                    placeholder="0.00"
-                    {...register(`activities.${index}.price_without_vat`, {
+                    {...register(`activities.${index}.precio_sin_iva`, {
                       valueAsNumber: true,
                     })}
+                    placeholder="Ej: 15000"
                   />
-                </div>
-                <div className="self-end">
-                  <Button
-                    type="button"
-                    variant="danger"
-                    size="sm"
-                    onClick={() => remove(index)}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
                 </div>
               </div>
             ))}
