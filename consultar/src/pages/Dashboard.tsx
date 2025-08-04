@@ -1,6 +1,6 @@
 // RUTA: /cliente/src/pages/Dashboard.tsx
 
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useMemo, useRef } from "react";
 import { useAuth } from "../contexts/AuthContext";
 import Card from "../components/ui/Card";
 import { formatCurrency, formatDate } from "../lib/utils";
@@ -9,10 +9,13 @@ import {
   Users,
   Smile,
   BarChart3,
-  Calendar,
-  Clock,
+  ListTodo,
   TrendingUp,
   PieChart as PieIcon,
+  Loader,
+  AlertCircle,
+  Clock,
+  ChevronRight,
 } from "lucide-react";
 import {
   BarChart,
@@ -23,17 +26,16 @@ import {
   Tooltip,
   ResponsiveContainer,
   LabelList,
-  ReferenceLine,
   PieChart,
   Pie,
   Cell,
   AreaChart,
   Area,
 } from "recharts";
-import { otService, TimelineOt } from "../services/otService";
+import { otService, UserSummaryItem } from "../services/otService";
 import useSWR from "swr";
 import { fetcher } from "../api/axiosInstance";
-import Button from "../components/ui/Button";
+import { useNavigate } from "react-router-dom";
 
 // --- Interfaces para los datos del dashboard de Admin ---
 interface DashboardStats {
@@ -67,23 +69,6 @@ const AdminDirectorDashboard: React.FC = () => {
     recentOrders: RecentOrder[];
     monthlyRevenue: MonthlyRevenue[];
   }>("/dashboard/stats", fetcher);
-
-  const getStatusColor = (status: string) => {
-    switch (status.toLowerCase()) {
-      case "pendiente":
-        return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-300";
-      case "en_progreso":
-        return "bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300";
-      case "finalizada":
-        return "bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300";
-      case "facturada":
-        return "bg-purple-100 text-purple-800 dark:bg-purple-900/50 dark:text-purple-300";
-      case "cierre":
-        return "bg-gray-200 text-gray-800 dark:bg-gray-600 dark:text-gray-100";
-      default:
-        return "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200";
-    }
-  };
 
   if (isLoading)
     return (
@@ -232,96 +217,78 @@ const AdminDirectorDashboard: React.FC = () => {
   );
 };
 
-// --- DASHBOARD DEL EMPLEADO RECONSTRUIDO CON GRÁFICO MEJORADO ---
+// --- NUEVO DASHBOARD DEL EMPLEADO ---
 const EmpleadoDashboard: React.FC = () => {
   const { user } = useAuth();
-  const [date, setDate] = useState({
-    year: new Date().getFullYear(),
-    month: new Date().getMonth() + 1,
-  });
-
+  const navigate = useNavigate();
   const {
-    data: timelineData,
+    data: summaryData,
     error,
     isLoading,
   } = useSWR(
-    user ? `/ots/timeline/${user.id}/${date.year}/${date.month}` : null,
-    () =>
-      otService.getTimelineData({
-        year: date.year,
-        month: date.month,
-        assigned_to: user!.id,
-      })
+    user ? `/ots/user-summary/${user.id}` : null,
+    () => otService.getUserSummary(user!.id)
   );
 
-  const daysInMonth = new Date(date.year, date.month, 0).getDate();
-  const today = new Date();
-  const isCurrentMonth =
-    today.getFullYear() === date.year && today.getMonth() + 1 === date.month;
+  const inProgressRef = useRef<HTMLDivElement>(null);
+  const pendingRef = useRef<HTMLDivElement>(null);
+  const completedRef = useRef<HTMLDivElement>(null);
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "finalizada":
-        return "#22c55e";
-      case "en_progreso":
-        return "#3b82f6";
-      case "pendiente":
-        return "#f59e0b";
-      default:
-        return "#6b7280";
+  const { chartData, pending, inProgress, completed } = useMemo(() => {
+    if (!summaryData) {
+      return { chartData: [], pending: [], inProgress: [], completed: [] };
+    }
+    const pending = summaryData.filter((t) => t.status === "pendiente");
+    const inProgress = summaryData.filter((t) => t.status === "en_progreso");
+    const completed = summaryData.filter((t) => t.status === "finalizada");
+
+    const chartData = [
+      { name: "En Progreso", Tareas: inProgress.length, fill: "#3b82f6" },
+      { name: "Pendientes", Tareas: pending.length, fill: "#f59e0b" },
+      { name: "Finalizadas", Tareas: completed.length, fill: "#22c55e" },
+    ];
+    return { chartData, pending, inProgress, completed };
+  }, [summaryData]);
+
+  const handleBarClick = (data: any) => {
+    const status = data.activePayload[0].payload.name;
+    let ref;
+    if (status === "En Progreso") ref = inProgressRef;
+    if (status === "Pendientes") ref = pendingRef;
+    if (status === "Finalizadas") ref = completedRef;
+
+    if (ref && ref.current) {
+      ref.current.scrollIntoView({ behavior: "smooth", block: "center" });
     }
   };
 
-  const chartData = useMemo(() => {
-    if (!timelineData) return [];
-    return timelineData
-      .map((ot) => {
-        const start = new Date(ot.started_at);
-        const end = ot.completed_at ? new Date(ot.completed_at) : today;
-        let startDay =
-          start.getUTCFullYear() === date.year &&
-          start.getUTCMonth() + 1 === date.month
-            ? start.getUTCDate()
-            : 1;
-        let endDay =
-          end.getUTCFullYear() === date.year &&
-          end.getUTCMonth() + 1 === date.month
-            ? end.getUTCDate()
-            : daysInMonth;
-        endDay = Math.min(endDay, daysInMonth);
-        startDay = Math.max(startDay, 1);
-        return {
-          name: ot.custom_id || `OT #${ot.id}`,
-          product: ot.product,
-          startPadding: startDay - 1,
-          duration: endDay - startDay + 1,
-          fill: getStatusColor(ot.status),
-          startDateStr: formatDate(ot.started_at),
-          endDateStr: ot.completed_at
-            ? formatDate(ot.completed_at)
-            : "En progreso",
-          totalDuration: ot.duration_minutes,
-        };
-      })
-      .reverse();
-  }, [timelineData, date.year, date.month]);
-
-  const CustomTooltip = ({ active, payload, label }: any) => {
-    if (active && payload && payload.length) {
-      const data = payload[0].payload;
-      return (
-        <div className="p-3 bg-gray-800 text-white rounded-lg border border-gray-700 shadow-lg">
-          <p className="font-bold text-blue-400">{`${label}: ${data.product}`}</p>
-          <p className="text-sm">Inició: {data.startDateStr}</p>
-          <p className="text-sm">Finalizó: {data.endDateStr}</p>
-          {data.totalDuration != null && (
-            <p className="text-sm">Tiempo total: {data.totalDuration} min</p>
-          )}
+  const TaskCard: React.FC<{ task: UserSummaryItem }> = ({ task }) => (
+    <div
+      className="p-3 bg-white dark:bg-gray-800 rounded-lg shadow-sm border dark:border-gray-700 cursor-pointer hover:border-blue-500 hover:shadow-md transition-all group"
+      onClick={() => navigate(`/ot/editar/${task.id}`)}
+    >
+      <div className="flex justify-between items-start">
+        <div>
+          <p className="font-bold text-blue-600 dark:text-blue-400">
+            {task.custom_id}
+          </p>
+          <p className="text-sm font-semibold">{task.product}</p>
+          <p className="text-xs text-gray-500 dark:text-gray-400">
+            {task.client_name}
+          </p>
         </div>
-      );
-    }
-    return null;
-  };
+        <div className="text-right flex items-center gap-2">
+          <div>
+            <p className="text-xs font-medium capitalize">{task.activity}</p>
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              {formatDate(task.ot_date)}
+            </p>
+          </div>
+          <ChevronRight className="h-5 w-5 text-gray-400 group-hover:text-blue-500 transition-colors" />
+        </div>
+      </div>
+    </div>
+  );
 
   return (
     <div className="space-y-6">
@@ -329,121 +296,122 @@ const EmpleadoDashboard: React.FC = () => {
         <Smile className="h-12 w-12 mx-auto text-blue-500" />
         <h1 className="mt-2 text-3xl font-bold">¡Hola, {user?.name}!</h1>
         <p className="mt-1 text-gray-600 dark:text-gray-300">
-          Este es el resumen de tu actividad mensual.
+          Este es el resumen de tus tareas activas.
         </p>
       </div>
 
-      <Card>
-        <div className="flex flex-wrap justify-between items-center gap-4 mb-6">
-          <h2 className="text-xl font-semibold flex items-center gap-2">
-            <BarChart3 /> Línea de Tiempo de Trabajos
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <Card className="lg:col-span-1">
+          <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+            <BarChart3 /> Tareas por Estado
           </h2>
-          <div className="flex gap-2">
-            <select
-              value={date.month}
-              onChange={(e) =>
-                setDate((d) => ({ ...d, month: Number(e.target.value) }))
-              }
-              className="p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
-            >
-              {Array.from({ length: 12 }, (_, i) => (
-                <option key={i + 1} value={i + 1}>
-                  {new Date(0, i).toLocaleString("es-AR", { month: "long" })}
-                </option>
-              ))}
-            </select>
-            <select
-              value={date.year}
-              onChange={(e) =>
-                setDate((d) => ({ ...d, year: Number(e.target.value) }))
-              }
-              className="p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
-            >
-              {Array.from({ length: 5 }, (_, i) => (
-                <option key={i} value={new Date().getFullYear() - i}>
-                  {new Date().getFullYear() - i}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        <div
-          style={{
-            width: "100%",
-            height: Math.max(300, chartData.length * 50),
-          }}
-        >
-          {isLoading && (
-            <p className="text-center text-gray-500">Cargando gráfico...</p>
-          )}
-          {error && (
-            <p className="text-center text-red-500">
-              Error al cargar los datos del gráfico.
-            </p>
-          )}
-          {!isLoading &&
-            !error &&
-            (chartData.length > 0 ? (
-              <ResponsiveContainer>
+          <div className="h-60">
+            {isLoading && <Loader className="animate-spin" />}
+            {error && <AlertCircle className="text-red-500" />}
+            {summaryData && (
+              <ResponsiveContainer width="100%" height="100%">
                 <BarChart
                   data={chartData}
                   layout="vertical"
-                  margin={{ top: 5, right: 20, left: 120, bottom: 5 }}
+                  barSize={25}
+                  onClick={handleBarClick}
                 >
                   <CartesianGrid
-                    strokeDasharray="3 3"
                     stroke="currentColor"
-                    strokeOpacity={0.2}
+                    strokeOpacity={0.1}
+                    horizontal={false}
                   />
-                  <XAxis
-                    type="number"
-                    domain={[1, daysInMonth]}
-                    ticks={Array.from({ length: daysInMonth }, (_, i) => i + 1)}
-                    allowDecimals={false}
-                    tick={{ fill: "currentColor", fontSize: 12 }}
-                  />
+                  <XAxis type="number" hide />
                   <YAxis
                     dataKey="name"
                     type="category"
-                    width={140}
-                    tick={{ fontSize: 12, fill: "currentColor" }}
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{ fill: "currentColor", fontSize: 14 }}
+                    width={90}
                   />
                   <Tooltip
-                    content={<CustomTooltip />}
                     cursor={{ fill: "rgba(200, 200, 200, 0.1)" }}
+                    contentStyle={{
+                      backgroundColor: "rgba(30,41,59,0.9)",
+                      border: "none",
+                      borderRadius: "0.5rem",
+                    }}
                   />
-                  <Bar dataKey="startPadding" stackId="a" fill="transparent" />
-                  <Bar dataKey="duration" stackId="a" name="Días de trabajo">
+                  <Bar dataKey="Tareas" cursor="pointer">
                     <LabelList
-                      dataKey="duration"
-                      position="insideRight"
-                      fill="#fff"
-                      fontSize={10}
-                      formatter={(value: number) => `${value}d`}
+                      dataKey="Tareas"
+                      position="right"
+                      offset={10}
+                      fill="currentColor"
+                      fontSize={14}
+                      fontWeight="bold"
                     />
+                    {chartData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.fill} />
+                    ))}
                   </Bar>
-                  {isCurrentMonth && (
-                    <ReferenceLine
-                      x={today.getDate()}
-                      stroke="#f87171"
-                      strokeWidth={2}
-                      label={{ value: "Hoy", position: "top", fill: "#f87171" }}
-                    />
-                  )}
                 </BarChart>
               </ResponsiveContainer>
-            ) : (
-              <div className="h-full flex items-center justify-center text-center text-gray-500">
-                <div>
-                  <Calendar className="mx-auto h-12 w-12 text-gray-400" />
-                  <p className="mt-2 font-semibold">Sin datos para mostrar</p>
-                  <p className="text-sm">
-                    No hay trabajos iniciados para el mes seleccionado.
-                  </p>
-                </div>
-              </div>
-            ))}
+            )}
+          </div>
+        </Card>
+
+        <div className="lg:col-span-2 space-y-6">
+          <Card ref={inProgressRef}>
+            <h2 className="text-xl font-semibold mb-4 text-blue-600 dark:text-blue-400">
+              En Progreso ({inProgress.length})
+            </h2>
+            <div className="space-y-3 max-h-60 overflow-y-auto pr-2">
+              {inProgress.length > 0 ? (
+                inProgress.map((task) => (
+                  <TaskCard key={`${task.id}-${task.activity}`} task={task} />
+                ))
+              ) : (
+                <p className="text-sm text-gray-500">
+                  Ninguna tarea en progreso.
+                </p>
+              )}
+            </div>
+          </Card>
+        </div>
+      </div>
+
+      <Card>
+        <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+          <ListTodo /> Lista de Tareas
+        </h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div ref={pendingRef}>
+            <h3 className="font-semibold text-yellow-600 dark:text-yellow-400 mb-3">
+              Pendientes ({pending.length})
+            </h3>
+            <div className="space-y-3 max-h-96 overflow-y-auto pr-2">
+              {pending.length > 0 ? (
+                pending.map((task) => (
+                  <TaskCard key={`${task.id}-${task.activity}`} task={task} />
+                ))
+              ) : (
+                <p className="text-sm text-gray-500">¡Sin pendientes!</p>
+              )}
+            </div>
+          </div>
+          <div ref={completedRef}>
+            <h3 className="font-semibold text-green-600 dark:text-green-400 mb-3">
+              Finalizadas ({completed.length})
+            </h3>
+            <div className="space-y-3 max-h-96 overflow-y-auto pr-2">
+              {completed.length > 0 ? (
+                completed.map((task) => (
+                  <TaskCard key={`${task.id}-${task.activity}`} task={task} />
+                ))
+              ) : (
+                <p className="text-sm text-gray-500">
+                  No hay tareas finalizadas recientemente.
+                </p>
+              )}
+            </div>
+          </div>
         </div>
       </Card>
     </div>
@@ -452,7 +420,7 @@ const EmpleadoDashboard: React.FC = () => {
 
 // --- Componente Principal del Dashboard ---
 const Dashboard: React.FC = () => {
-  const { canViewAdminContent } = useAuth(); // CORREGIDO
+  const { canViewAdminContent } = useAuth();
   return canViewAdminContent() ? (
     <AdminDirectorDashboard />
   ) : (

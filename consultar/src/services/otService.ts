@@ -48,6 +48,17 @@ export interface OTFilters {
   [key: string]: any;
 }
 
+// Interfaz para el nuevo resumen de empleado
+export interface UserSummaryItem {
+  id: number;
+  custom_id: string;
+  product: string;
+  client_name: string;
+  ot_date: string;
+  activity: string;
+  status: "pendiente" | "en_progreso" | "finalizada";
+}
+
 class OTService {
   // Modificamos la función para que acepte filtros
   async getAllOTs(
@@ -106,6 +117,11 @@ class OTService {
 
   async stopActivity(activityId: number): Promise<void> {
     await axiosInstance.put(`/ots/activities/${activityId}/stop`);
+  }
+
+  async getUserSummary(userId: number): Promise<UserSummaryItem[]> {
+    const response = await axiosInstance.get(`/ots/user-summary/${userId}`);
+    return response.data;
   }
 }
 

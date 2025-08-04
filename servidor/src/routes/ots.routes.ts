@@ -255,8 +255,7 @@ router.get("/:id", (req: Request, res: Response) => {
       .get(req.params.id);
 
     if (ot) {
-      // ***** LÍNEA CORREGIDA *****
-      // Adjuntar datos completos del cliente, verificando que exista primero
+      // Adjuntar datos completos del cliente
       const client = db
         .prepare("SELECT * FROM clients WHERE id = ?")
         .get(ot.client_id);
@@ -289,7 +288,6 @@ router.get("/:id", (req: Request, res: Response) => {
       res.status(404).json({ error: "OT no encontrada." });
     }
   } catch (error) {
-    console.error("Error en GET /api/ots/:id:", error);
     res.status(500).json({ error: "Error al obtener la OT." });
   }
 });
@@ -493,6 +491,48 @@ router.put("/activities/:activityId/stop", (req: Request, res: Response) => {
       return res.status(400).json({ error: error.message });
     }
     res.status(500).json({ error: "Error al finalizar la actividad." });
+  }
+});
+
+// [GET] /api/ots/user-summary/:userId
+router.get("/user-summary/:userId", (req: Request, res: Response) => {
+  try {
+    const { userId } = req.params;
+
+    const summary = db
+      .prepare(
+        `
+        SELECT
+            ot.id,
+            ot.custom_id,
+            ot.product,
+            c.name as client_name,
+            ot.date as ot_date,
+            wa.activity,
+            wa.status
+        FROM work_order_activities wa
+        JOIN work_order_activity_assignments waa ON wa.id = waa.activity_id
+        JOIN work_orders ot ON wa.work_order_id = ot.id
+        JOIN clients c ON ot.client_id = c.id
+        WHERE
+            waa.user_id = ?
+            AND ot.status NOT IN ('facturada', 'cierre')
+            AND ot.authorized = 1
+        ORDER BY
+            CASE wa.status
+                WHEN 'en_progreso' THEN 1
+                WHEN 'pendiente' THEN 2
+                WHEN 'finalizada' THEN 3
+            END,
+            ot.date DESC
+    `
+      )
+      .all(userId);
+
+    res.status(200).json(summary);
+  } catch (error) {
+    console.error("Error fetching user summary data:", error);
+    res.status(500).json({ error: "Error al obtener el resumen del usuario." });
   }
 });
 
