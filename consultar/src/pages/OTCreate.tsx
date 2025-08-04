@@ -133,7 +133,7 @@ const OTCreate: React.FC = () => {
         ...data,
         client_id: Number(data.client_id),
         created_by: user.id,
-        collaborator_observations: null, // FIX: Explicitly add null for this field
+        collaborator_observations: "", // FIX: Changed null to empty string
       };
       const newOt = await otService.createOT(dataToSubmit);
       navigate(`/ot/editar/${newOt.id}`);

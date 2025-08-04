@@ -66,13 +66,13 @@ router.get("/", (req: Request, res: Response) => {
 
   try {
     let query = `
-      SELECT 
+      SELECT
         ot.id, ot.custom_id, ot.product, ot.status, ot.authorized,
         c.name as client_name,
-        (SELECT GROUP_CONCAT(DISTINCT u.name) 
-         FROM work_order_activities wa 
+        (SELECT GROUP_CONCAT(DISTINCT u.name)
+         FROM work_order_activities wa
          JOIN work_order_activity_assignments waa ON wa.id = waa.activity_id
-         JOIN users u ON waa.user_id = u.id 
+         JOIN users u ON waa.user_id = u.id
          WHERE wa.work_order_id = ot.id) as assigned_to_name
       FROM work_orders ot
       LEFT JOIN clients c ON ot.client_id = c.id
@@ -175,7 +175,7 @@ router.post("/", (req: Request, res: Response) => {
   }
   const insertOTStmt = db.prepare(
     `INSERT INTO work_orders (
-      custom_id, date, type, client_id, product, brand, model, 
+      custom_id, date, type, client_id, product, brand, model,
       seal_number, observations, certificate_expiry, collaborator_observations, created_by, status,
       quotation_amount, quotation_details, disposition, contract_type
      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
@@ -187,34 +187,34 @@ router.post("/", (req: Request, res: Response) => {
     "INSERT INTO work_order_activity_assignments (activity_id, user_id) VALUES (?, ?)"
   );
 
-  const createTransaction = db.transaction(() => {
+  const createTransaction = db.transaction((data) => {
     const final_custom_id = generateCustomId(
-      otData.date,
-      otData.type,
-      otData.client_id
+      data.otData.date,
+      data.otData.type,
+      data.otData.client_id
     );
 
     const info = insertOTStmt.run(
       final_custom_id,
-      otData.date,
-      otData.type,
-      otData.client_id,
-      otData.product,
-      otData.brand,
-      otData.model,
-      otData.seal_number,
-      otData.observations,
-      otData.certificate_expiry,
-      otData.collaborator_observations,
-      created_by,
+      data.otData.date,
+      data.otData.type,
+      data.otData.client_id,
+      data.otData.product,
+      data.otData.brand,
+      data.otData.model,
+      data.otData.seal_number,
+      data.otData.observations,
+      data.otData.certificate_expiry,
+      data.otData.collaborator_observations,
+      data.created_by,
       "pendiente",
-      otData.quotation_amount,
-      otData.quotation_details,
-      otData.disposition,
-      otData.contract_type
+      data.otData.quotation_amount,
+      data.otData.quotation_details,
+      data.otData.disposition,
+      data.otData.contract_type
     );
     const otId = info.lastInsertRowid;
-    for (const act of activities) {
+    for (const act of data.activities) {
       if (act.activity) {
         const activityInfo = insertActivityStmt.run(
           otId,
@@ -239,7 +239,7 @@ router.post("/", (req: Request, res: Response) => {
     return { id: otId };
   });
   try {
-    const result = createTransaction();
+    const result = createTransaction({ otData, activities, created_by });
     res.status(201).json(result);
   } catch (error: any) {
     console.error("Error al crear OT:", error);
@@ -274,7 +274,7 @@ router.get("/:id", (req: Request, res: Response) => {
 
       const activities = db
         .prepare(
-          `SELECT wa.id, wa.activity, wa.norma, wa.precio_sin_iva, wa.status, wa.started_at, wa.completed_at, 
+          `SELECT wa.id, wa.activity, wa.norma, wa.precio_sin_iva, wa.status, wa.started_at, wa.completed_at,
            json_group_array(json_object('id', u.id, 'name', u.name)) as assigned_users
            FROM work_order_activities wa
            LEFT JOIN work_order_activity_assignments waa ON wa.id = waa.activity_id
