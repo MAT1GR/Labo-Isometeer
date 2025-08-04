@@ -35,7 +35,14 @@ class AuthService {
   }
 
   async deleteUser(userId: number): Promise<void> {
-    await axiosInstance.delete(`/users/${userId}`);
+    try {
+      await axiosInstance.delete(`/users/${userId}`);
+    } catch (error: any) {
+      if (error.response && error.response.data && error.response.data.error) {
+        throw new Error(error.response.data.error);
+      }
+      throw new Error("Error al eliminar el usuario.");
+    }
   }
 
   async changePassword(

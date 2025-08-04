@@ -46,13 +46,17 @@ const MultiUserSelect: React.FC<MultiUserSelectProps> = ({
     <Popover className="relative w-full">
       {({ open, close }) => (
         <>
+          {/* ***** CAMBIO: Popover.Button ahora es un div para evitar anidamiento incorrecto ***** */}
           <Popover.Button
+            as="div"
+            role="button"
+            tabIndex={0}
             disabled={disabled}
             className={cn(
-              "w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-left",
+              "w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-left cursor-pointer",
               "focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500",
               "dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100",
-              "disabled:bg-gray-100 dark:disabled:bg-gray-800"
+              "disabled:bg-gray-100 dark:disabled:bg-gray-800 disabled:cursor-not-allowed"
             )}
           >
             <div className="flex items-center justify-between">
@@ -70,7 +74,7 @@ const MultiUserSelect: React.FC<MultiUserSelectProps> = ({
                         <button
                           type="button"
                           onClick={(e) => {
-                            e.stopPropagation();
+                            e.stopPropagation(); // Evita que el popover se cierre
                             handleSelect(user.id);
                           }}
                           className="text-blue-500 hover:text-blue-700"

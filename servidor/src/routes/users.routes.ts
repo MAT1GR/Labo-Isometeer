@@ -45,31 +45,34 @@ router.post("/", (req: Request, res: Response) => {
 
 // [DELETE] /api/users/:id
 router.delete("/:id", (req: Request, res: Response) => {
-  try {
-    const { id } = req.params;
-    if (id === "1")
-      return res
-        .status(403)
-        .json({ error: "No se puede eliminar al administrador principal." });
+  const { id } = req.params;
+  if (id === "1") {
+    return res
+      .status(403)
+      .json({ error: "No se puede eliminar al administrador principal." });
+  }
 
-    // Verificar si el usuario tiene OTs asignadas
-    const otsAsignadas = db
-      .prepare(
-        "SELECT COUNT(*) as count FROM work_order_activity_assignments WHERE user_id = ?"
-      )
-      .get(id) as { count: number };
+  const deleteUserTransaction = db.transaction(() => {
+    // Reasigna las OTs creadas por este usuario al administrador principal (ID 1)
+    // para evitar errores de clave foránea sin perder datos.
+    db.prepare(
+      "UPDATE work_orders SET created_by = 1 WHERE created_by = ?"
+    ).run(id);
 
-    if (otsAsignadas.count > 0) {
-      return res.status(400).json({
-        error: "No se puede eliminar este usuario porque tiene OTs asignadas.",
-      });
-    }
-
+    // Ahora, elimina el usuario. La configuración ON DELETE CASCADE en
+    // la tabla de asignaciones se encargará de las tareas asignadas.
     const info = db.prepare("DELETE FROM users WHERE id = ?").run(id);
-    if (info.changes === 0)
+    return info;
+  });
+
+  try {
+    const info = deleteUserTransaction();
+    if (info.changes === 0) {
       return res.status(404).json({ error: "Usuario no encontrado." });
+    }
     res.status(200).json({ message: "Usuario eliminado con éxito." });
   } catch (error: any) {
+    console.error("Error al eliminar usuario:", error);
     res.status(500).json({ error: "Error interno del servidor." });
   }
 });

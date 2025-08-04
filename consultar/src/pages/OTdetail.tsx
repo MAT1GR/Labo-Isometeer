@@ -21,11 +21,16 @@ import {
   Clock,
   CalendarCheck,
   Lock,
+  Users as UsersIcon,
+  FileText, // Icono para reporte interno
 } from "lucide-react";
 import { mutate } from "swr";
-import { exportOtToPdfInternal } from "../services/pdfGenerator";
+import {
+  exportOtToPdfClient,
+  exportOtToPdfInternal,
+} from "../services/pdfGenerator";
 import { formatDateTime } from "../lib/utils";
-import MultiUserSelect from "../components/ui/MultiUserSelect"; // 1. IMPORTAMOS EL NUEVO COMPONENTE
+import MultiUserSelect from "../components/ui/MultiUserSelect";
 
 const activityOptions = [
   "Calibracion",
@@ -176,7 +181,13 @@ const OTDetail: React.FC = () => {
     await loadData();
   };
 
-  const handleExport = () => {
+  const handleExportClient = () => {
+    if (otData) {
+      exportOtToPdfClient(otData);
+    }
+  };
+
+  const handleExportInternal = () => {
     if (otData) {
       exportOtToPdfInternal(otData);
     }
@@ -200,19 +211,33 @@ const OTDetail: React.FC = () => {
       onSubmit={handleSubmit(onSubmit)}
       className="space-y-8 bg-gray-50 dark:bg-gray-900 p-6 rounded-lg"
     >
-      <div className="flex justify-between items-center">
+      <div className="flex justify-between items-center flex-wrap gap-4">
         <Button type="button" variant="ghost" onClick={() => navigate("/ot")}>
           <ArrowLeft className="mr-2 h-5 w-5" />
           Volver
         </Button>
-        <h1 className="text-2xl font-bold">
+        <h1 className="text-2xl font-bold text-center">
           Detalle de OT: {otData.custom_id || `#${otData.id}`}
         </h1>
-        <div className="flex gap-2">
-          <Button type="button" variant="secondary" onClick={handleExport}>
-            <Download className="mr-2 h-5 w-5" />
-            Exportar a PDF
+        <div className="flex gap-2 flex-wrap">
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={handleExportClient}
+          >
+            <UsersIcon className="mr-2 h-5 w-5" />
+            PDF Cliente
           </Button>
+          {canViewAdminContent() && (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleExportInternal}
+            >
+              <FileText className="mr-2 h-5 w-5" />
+              PDF Interno
+            </Button>
+          )}
           <Button
             type="submit"
             disabled={
@@ -220,7 +245,7 @@ const OTDetail: React.FC = () => {
             }
           >
             <Save className="mr-2 h-5 w-5" />
-            Guardar Cambios
+            Guardar
           </Button>
         </div>
       </div>
@@ -382,8 +407,8 @@ const OTDetail: React.FC = () => {
               <h2 className="text-lg font-semibold text-blue-700 dark:text-blue-400 col-span-full">
                 Información del Cliente
               </h2>
-              <Input label="Empresa" value={otData.client_name} readOnly />
-              <Input label="Nº Cliente" value={otData.client_id} readOnly />
+              <Input label="Empresa" value={otData.client?.name} readOnly />
+              <Input label="Nº Cliente" value={otData.client?.code} readOnly />
             </div>
           )}
 

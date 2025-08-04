@@ -255,7 +255,8 @@ router.get("/:id", (req: Request, res: Response) => {
       .get(req.params.id);
 
     if (ot) {
-      // Adjuntar datos completos del cliente
+      // ***** LÍNEA CORREGIDA *****
+      // Adjuntar datos completos del cliente, verificando que exista primero
       const client = db
         .prepare("SELECT * FROM clients WHERE id = ?")
         .get(ot.client_id);
@@ -288,6 +289,7 @@ router.get("/:id", (req: Request, res: Response) => {
       res.status(404).json({ error: "OT no encontrada." });
     }
   } catch (error) {
+    console.error("Error en GET /api/ots/:id:", error);
     res.status(500).json({ error: "Error al obtener la OT." });
   }
 });

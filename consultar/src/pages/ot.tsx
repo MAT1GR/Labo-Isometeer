@@ -292,4 +292,10 @@ const OT: React.FC = () => {
   );
 };
 
+export interface OT {
+  id: number;
+  name: string;
+  description: string;
+}
+
 export default OT;

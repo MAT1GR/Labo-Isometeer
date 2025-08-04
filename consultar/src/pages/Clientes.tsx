@@ -145,7 +145,7 @@ const Clientes: React.FC = () => {
                     {Array.isArray(client.contacts) &&
                     client.contacts.length > 0
                       ? client.contacts
-                          .map((contact: any, idx: number) =>
+                          .map((contact: any) =>
                             typeof contact === "string"
                               ? contact
                               : contact.name || contact.email || "Contacto"

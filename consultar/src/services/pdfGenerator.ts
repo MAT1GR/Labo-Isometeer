@@ -205,7 +205,10 @@ export const exportOtToPdfInternal = async (otData: WorkOrder) => {
     startY: 40,
     head: [["Datos del Cliente"]],
     body: [
-      ["Empresa", otData.client?.name || "N/A"],
+      [
+        "Empresa",
+        (otData.client?.name || otData.client_name || "N/A").toString(),
+      ],
       ["Nº Cliente", otData.client?.code || "N/A"],
     ],
     theme: "grid",
@@ -221,6 +224,8 @@ export const exportOtToPdfInternal = async (otData: WorkOrder) => {
       ["Producto", otData.product],
       ["Marca", otData.brand || "N/A"],
       ["Modelo", otData.model || "N/A"],
+      ["Nº de Lacre", otData.seal_number || "N/A"],
+      ["Vto. Certificado", formatDate(otData.certificate_expiry ?? null)],
     ],
     theme: "grid",
     headStyles: { fillColor: [37, 99, 235] },
@@ -242,6 +247,18 @@ export const exportOtToPdfInternal = async (otData: WorkOrder) => {
     ],
     theme: "grid",
     headStyles: { fillColor: [79, 70, 229] },
+  });
+
+  // --- OBSERVACIONES ---
+  autoTable(jspdfDoc, {
+    startY: (jspdfDoc as any).lastAutoTable.finalY + 10,
+    head: [["Observaciones"]],
+    body: [
+      ["Generales", otData.observations || "Sin observaciones."],
+      ["Colaborador", otData.collaborator_observations || "Sin observaciones."],
+    ],
+    theme: "grid",
+    headStyles: { fillColor: [217, 119, 6] },
   });
 
   // --- ACTIVIDADES CON ASIGNACIÓN ---
