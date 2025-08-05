@@ -105,17 +105,6 @@ const Login: React.FC = () => {
               {isLoading ? "Ingresando..." : "Ingresar"}
             </Button>
           </form>
-
-          <div className="mt-6 text-center">
-            <div className="text-xs text-gray-500 dark:text-gray-400 space-y-1">
-              <p>
-                <strong>Demo:</strong>
-              </p>
-              <p>Admin: admin@laboratorio.com / admin123</p>
-              <p>Director: director@laboratorio.com / admin123</p>
-              <p>Empleado: empleado@laboratorio.com / admin123</p>
-            </div>
-          </div>
         </div>
       </div>
     </div>

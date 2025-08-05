@@ -93,7 +93,7 @@ const appendContractToPdf = async (
 
 const addHeader = (doc: jsPDF, title: string, otData: WorkOrder) => {
   // Añadir el logo
-  doc.addImage(logo, "PNG", 14, 10, 30, 15); // x, y, width, height (ajustado para mejor proporción)
+  doc.addImage(logo, "PNG", 14, 8, 32, 24); // x, y, width, height (ajustado para mejor proporción)
 
   doc.setFontSize(18);
   doc.text("Laboratorio Consultar", 105, 15, { align: "center" });
@@ -185,7 +185,6 @@ export const exportOtPdfWorkOrder = async (otData: WorkOrder) => {
     startY: (jspdfDoc as any).lastAutoTable.finalY + 5,
     head: [["Datos del Producto", ""]],
     body: [
-      ["Tipo de OT", otData.type],
       ["Producto", otData.product],
       ["Marca", otData.brand || "N/A"],
       ["Modelo", otData.model || "N/A"],
@@ -197,23 +196,26 @@ export const exportOtPdfWorkOrder = async (otData: WorkOrder) => {
     columnStyles: { 0: { fontStyle: "bold" } },
   });
 
-  // --- SECCIÓN DE FECHA DE ENTREGA (MOVIDA) ---
+  // --- SECCIÓN DE ACTIVIDADES, ENTREGA Y TIPO DE OT ---
   const estimatedDate = calculateEstimatedDeliveryDate(
     otData.activities,
     otData.date
   );
   autoTable(jspdfDoc, {
-    startY: (jspdfDoc as any).lastAutoTable.finalY + 2,
-    head: [["Fecha Estimada de Entrega"]],
-    body: [[estimatedDate]],
+    startY: (jspdfDoc as any).lastAutoTable.finalY + 5,
+    head: [["Detalles del Servicio", ""]],
+    body: [
+      ["Tipo de OT", otData.type],
+      ["Fecha Estimada de Entrega", estimatedDate],
+    ],
     theme: "grid",
     headStyles: { fillColor: [79, 70, 229] },
+    columnStyles: { 0: { fontStyle: "bold" } },
   });
 
-  // --- SECCIÓN DE ACTIVIDADES CON PRECIO Y NORMA ---
   if (otData.activities && otData.activities.length > 0) {
     autoTable(jspdfDoc, {
-      startY: (jspdfDoc as any).lastAutoTable.finalY + 5,
+      startY: (jspdfDoc as any).lastAutoTable.finalY + 2,
       head: [["Actividad", "Norma de Referencia", "Precio (Sin IVA)"]],
       body: otData.activities.map((act) => [
         act.activity,
@@ -307,7 +309,6 @@ export const exportOtPdfRemito = async (otData: WorkOrder) => {
     startY: (jspdfDoc as any).lastAutoTable.finalY + 5,
     head: [["Datos del Producto", ""]],
     body: [
-      ["Tipo de OT", otData.type],
       ["Producto", otData.product],
       ["Marca", otData.brand || "N/A"],
       ["Modelo", otData.model || "N/A"],
@@ -319,23 +320,26 @@ export const exportOtPdfRemito = async (otData: WorkOrder) => {
     columnStyles: { 0: { fontStyle: "bold" } },
   });
 
-  // --- SECCIÓN DE FECHA DE ENTREGA (MOVIDA) ---
+  // --- SECCIÓN DE ACTIVIDADES, ENTREGA Y TIPO DE OT ---
   const estimatedDate = calculateEstimatedDeliveryDate(
     otData.activities,
     otData.date
   );
   autoTable(jspdfDoc, {
-    startY: (jspdfDoc as any).lastAutoTable.finalY + 2,
-    head: [["Fecha Estimada de Entrega"]],
-    body: [[estimatedDate]],
+    startY: (jspdfDoc as any).lastAutoTable.finalY + 5,
+    head: [["Detalles del Servicio", ""]],
+    body: [
+      ["Tipo de OT", otData.type],
+      ["Fecha Estimada de Entrega", estimatedDate],
+    ],
     theme: "grid",
     headStyles: { fillColor: [79, 70, 229] },
+    columnStyles: { 0: { fontStyle: "bold" } },
   });
 
-  // --- SECCIÓN DE ACTIVIDADES (SIN ASIGNACIÓN) ---
   if (otData.activities && otData.activities.length > 0) {
     autoTable(jspdfDoc, {
-      startY: (jspdfDoc as any).lastAutoTable.finalY + 5,
+      startY: (jspdfDoc as any).lastAutoTable.finalY + 2,
       head: [["Actividades a Realizar", "Norma"]],
       body: otData.activities.map((act) => [act.activity, act.norma || "N/A"]),
       theme: "striped",
@@ -460,4 +464,71 @@ export const exportOtToPdfInternal = async (otData: WorkOrder) => {
 
   const finalPdfBytes = await finalPdfDoc.save();
   savePdf(finalPdfBytes, `OT-Interna-${otData.custom_id || otData.id}.pdf`);
+};
+// --- PDF: ETIQUETA ---
+export const exportOtPdfEtiqueta = async (otData: WorkOrder) => {
+  const doc = new jsPDF({
+    orientation: "landscape",
+    unit: "mm",
+    format: [74.25, 105],
+  });
+
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+
+  // Dibuja el borde para recortar
+  doc.setDrawColor(0); // Color negro
+  doc.rect(1, 1, pageWidth - 2, pageHeight - 2);
+
+  const drawLabelContent = (startX: number) => {
+    const centerX = startX + pageWidth / 4; // Centro de cada etiqueta
+    let currentY = 15;
+
+    doc.setFontSize(14);
+    doc.setFont("helvetica", "bold");
+    doc.text(otData.custom_id || `#${otData.id}`, centerX, currentY, {
+      align: "center",
+    });
+    currentY += 10; // Más espacio
+
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+
+    const productText = otData.product || "N/A";
+    const productLines = doc.splitTextToSize(productText, pageWidth / 2 - 8);
+    doc.text(productLines, centerX, currentY, { align: "center" });
+    currentY += productLines.length * 4 + 6; // Más espacio
+
+    doc.text(`MARCA: ${otData.brand || "N/A"}`, centerX, currentY, {
+      align: "center",
+    });
+    currentY += 7; // Más espacio
+
+    doc.text(`MODELO: ${otData.model || "N/A"}`, centerX, currentY, {
+      align: "center",
+    });
+    currentY += 7; // Más espacio
+
+    const activities =
+      otData.activities?.map((a) => a.activity).join(", ") || "N/A";
+    const activityText = `ACTIVIDAD: ${activities}`;
+    const activityLines = doc.splitTextToSize(activityText, pageWidth / 2 - 8);
+    doc.text(activityLines, centerX, currentY, { align: "center" });
+  };
+
+  // Primera etiqueta (izquierda)
+  drawLabelContent(0);
+
+  // Línea divisoria
+  doc.setLineDashPattern([1, 1], 0);
+  doc.line(pageWidth / 2, 5, pageWidth / 2, pageHeight - 5);
+  doc.setLineDashPattern([], 0);
+
+  // Segunda etiqueta (derecha)
+  drawLabelContent(pageWidth / 2);
+
+  const pdfBytes = doc.output("arraybuffer");
+  const finalPdfDoc = await PDFDocument.load(pdfBytes);
+  const finalPdfBytes = await finalPdfDoc.save();
+  savePdf(finalPdfBytes, `Etiqueta-${otData.custom_id || otData.id}.pdf`);
 };

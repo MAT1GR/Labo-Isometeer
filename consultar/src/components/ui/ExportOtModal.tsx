@@ -8,6 +8,7 @@ import { WorkOrder } from "../../services/otService";
 import {
   exportOtPdfWorkOrder,
   exportOtPdfRemito,
+  exportOtPdfEtiqueta, // Importamos la nueva función
 } from "../../services/pdfGenerator";
 
 interface ExportOtModalProps {
@@ -30,6 +31,11 @@ const ExportOtModal: React.FC<ExportOtModalProps> = ({
 
   const handleExportRemito = () => {
     exportOtPdfRemito(otData);
+    onClose();
+  };
+
+  const handleExportEtiqueta = () => {
+    exportOtPdfEtiqueta(otData);
     onClose();
   };
 
@@ -141,9 +147,9 @@ const ExportOtModal: React.FC<ExportOtModalProps> = ({
                   <ExportOptionButton
                     icon={Tag}
                     title="Etiqueta"
-                    description="Próximamente disponible."
-                    disabled
-                    colorClass="text-gray-400"
+                    description="Genera 2 etiquetas duplicadas para imprimir."
+                    onClick={handleExportEtiqueta}
+                    colorClass="text-purple-500"
                   />
                 </div>
               </Dialog.Panel>
