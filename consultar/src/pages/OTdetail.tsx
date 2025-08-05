@@ -220,12 +220,7 @@ const OTDetail: React.FC = () => {
                 Exportar PDF
               </Button>
             )}
-            <Button
-              type="submit"
-              disabled={
-                isSubmitting || !isDirty || (isEmployee && isOtStartedOrLater)
-              }
-            >
+            <Button type="submit" disabled={isSubmitting || !isDirty}>
               <Save className="mr-2 h-5 w-5" />
               Guardar
             </Button>
@@ -387,9 +382,10 @@ const OTDetail: React.FC = () => {
                 readOnly
               />
             </div>
-
-            {!isEmployee && (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 border-b dark:border-gray-700 pb-6">
+          </fieldset>
+          <div className="border-b dark:border-gray-700 pb-6">
+            <fieldset disabled={!isFormEditable}>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <h2 className="text-lg font-semibold text-blue-700 dark:text-blue-400 col-span-full">
                   Información del Cliente
                 </h2>
@@ -400,8 +396,9 @@ const OTDetail: React.FC = () => {
                   readOnly
                 />
               </div>
-            )}
-
+            </fieldset>
+          </div>
+          <fieldset disabled={!isFormEditable}>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 border-b dark:border-gray-700 pb-6">
               <h2 className="text-lg font-semibold text-blue-700 dark:text-blue-400 col-span-full">
                 Producto
@@ -420,16 +417,6 @@ const OTDetail: React.FC = () => {
                 {...register("certificate_expiry")}
                 disabled={!isLacreEnabled}
               />
-              <div className="col-span-full">
-                <label className="text-sm font-medium dark:text-gray-300">
-                  Observaciones (Generales)
-                </label>
-                <textarea
-                  {...register("observations")}
-                  className="w-full mt-1 p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
-                  rows={3}
-                ></textarea>
-              </div>
             </div>
           </fieldset>
 
@@ -527,62 +514,37 @@ const OTDetail: React.FC = () => {
             </div>
           )}
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            <div className="col-span-full">
-              <h2 className="text-lg font-semibold text-blue-700 dark:text-blue-400 mb-4">
-                Observaciones del Colaborador
-              </h2>
+          <div className="col-span-full space-y-4">
+            <h2 className="text-lg font-semibold text-blue-700 dark:text-blue-400">
+              Observaciones
+            </h2>
+            <div>
+              <label className="text-sm font-medium dark:text-gray-300">
+                Observaciones Generales (visibles para el cliente)
+              </label>
+              <textarea
+                {...register("observations")}
+                disabled={!isFormEditable}
+                className="w-full mt-1 p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 disabled:bg-gray-100 dark:disabled:bg-gray-800"
+                rows={4}
+              ></textarea>
+            </div>
+            <div>
+              <label className="text-sm font-medium dark:text-gray-300">
+                Observaciones del Colaborador (uso interno)
+              </label>
               <textarea
                 {...register("collaborator_observations")}
-                disabled={isEmployee && isOtStartedOrLater}
-                className="w-full mt-1 p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
+                disabled={!isEmployee}
+                className="w-full mt-1 p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 disabled:bg-gray-100 dark:disabled:bg-gray-800"
                 rows={4}
                 placeholder={
                   isEmployee
                     ? "Añade tus observaciones aquí..."
-                    : "Visible para el empleado asignado..."
+                    : "Campo de uso exclusivo para el empleado asignado."
                 }
               ></textarea>
             </div>
-
-            {canViewAdminContent() && (
-              <div className="col-span-full">
-                <h2 className="text-lg font-semibold text-blue-700 dark:text-blue-400 mb-4">
-                  Administración
-                </h2>
-                <fieldset
-                  disabled={!isFormEditable}
-                  className="grid grid-cols-1 md:grid-cols-2 gap-6"
-                >
-                  <Input
-                    label="Cotización (Detalles)"
-                    {...register("quotation_details")}
-                  />
-                  <Input
-                    label="Cotización (Monto)"
-                    type="number"
-                    step="0.01"
-                    {...register("quotation_amount")}
-                  />
-                  <Input label="Disposición" {...register("disposition")} />
-                  <div>
-                    <label className="text-sm font-medium dark:text-gray-300">
-                      Estado Final
-                    </label>
-                    <select
-                      {...register("status")}
-                      className="w-full mt-1 p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
-                    >
-                      <option value="pendiente">Pendiente</option>
-                      <option value="en_progreso">En Progreso</option>
-                      <option value="finalizada">Finalizada</option>
-                      <option value="facturada">Facturada</option>
-                      <option value="cierre">Cierre</option>
-                    </select>
-                  </div>
-                </fieldset>
-              </div>
-            )}
           </div>
         </div>
       </form>

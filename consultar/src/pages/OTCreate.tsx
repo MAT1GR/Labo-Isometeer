@@ -36,7 +36,7 @@ const activityOptions = [
 ];
 
 const OTCreate: React.FC = () => {
-  const { user, canViewAdminContent } = useAuth();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const {
     register,
@@ -278,16 +278,6 @@ const OTCreate: React.FC = () => {
             {...register("certificate_expiry")}
             disabled={!isLacreEnabled}
           />
-          <div className="col-span-full">
-            <label className="text-sm font-medium dark:text-gray-300">
-              Observaciones
-            </label>
-            <textarea
-              {...register("observations")}
-              className="w-full mt-1 p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
-              rows={3}
-            ></textarea>
-          </div>
         </div>
 
         <div className="border-b dark:border-gray-700 pb-6">
@@ -381,26 +371,19 @@ const OTCreate: React.FC = () => {
           </div>
         </div>
 
-        {canViewAdminContent() && (
-          <div>
-            <h2 className="text-lg font-semibold text-blue-700 dark:text-blue-400 mb-4">
-              Administración
-            </h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <Input
-                label="Cotización (Detalles)"
-                {...register("quotation_details")}
-              />
-              <Input
-                label="Cotización (Monto)"
-                type="number"
-                step="0.01"
-                {...register("quotation_amount", { valueAsNumber: true })}
-              />
-              <Input label="Disposición" {...register("disposition")} />
-            </div>
-          </div>
-        )}
+        <div>
+          <h2 className="text-lg font-semibold text-blue-700 dark:text-blue-400 col-span-full mb-4">
+            Observaciones
+          </h2>
+          <label className="text-sm font-medium dark:text-gray-300">
+            Observaciones Generales (visibles para el cliente)
+          </label>
+          <textarea
+            {...register("observations")}
+            className="w-full mt-1 p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
+            rows={3}
+          ></textarea>
+        </div>
       </div>
     </form>
   );

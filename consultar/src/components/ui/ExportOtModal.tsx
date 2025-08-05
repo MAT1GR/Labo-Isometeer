@@ -33,6 +33,43 @@ const ExportOtModal: React.FC<ExportOtModalProps> = ({
     onClose();
   };
 
+  const ExportOptionButton = ({
+    icon: Icon,
+    title,
+    description,
+    onClick,
+    disabled = false,
+    colorClass,
+  }: {
+    icon: React.ElementType;
+    title: string;
+    description: string;
+    onClick?: () => void;
+    disabled?: boolean;
+    colorClass: string;
+  }) => (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className="w-full text-left p-4 rounded-lg border dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 hover:bg-gray-100 dark:hover:bg-gray-700/50 hover:border-blue-500 dark:hover:border-blue-400 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 flex items-center gap-4"
+    >
+      <div
+        className={`p-3 rounded-full bg-white dark:bg-gray-900 shadow-sm ${colorClass}`}
+      >
+        <Icon className="h-6 w-6" />
+      </div>
+      <div>
+        <p className="font-semibold text-gray-900 dark:text-gray-100">
+          {title}
+        </p>
+        <p className="text-sm text-gray-500 dark:text-gray-400">
+          {description}
+        </p>
+      </div>
+    </button>
+  );
+
   return (
     <Transition appear show={isOpen} as={Fragment}>
       <Dialog as="div" className="relative z-50" onClose={onClose}>
@@ -45,7 +82,7 @@ const ExportOtModal: React.FC<ExportOtModalProps> = ({
           leaveFrom="opacity-100"
           leaveTo="opacity-0"
         >
-          <div className="fixed inset-0 bg-black bg-opacity-60" />
+          <div className="fixed inset-0 bg-black/60" />
         </Transition.Child>
 
         <div className="fixed inset-0 overflow-y-auto">
@@ -60,72 +97,54 @@ const ExportOtModal: React.FC<ExportOtModalProps> = ({
               leaveTo="opacity-0 scale-95"
             >
               <Dialog.Panel className="w-full max-w-md transform overflow-hidden rounded-2xl bg-white dark:bg-gray-800 p-6 text-left align-middle shadow-xl transition-all">
-                <div className="flex justify-between items-start">
+                <div className="flex justify-between items-center">
                   <Dialog.Title
                     as="h3"
-                    className="text-lg font-semibold leading-6 text-gray-900 dark:text-gray-100"
+                    className="text-xl font-bold leading-6 text-gray-900 dark:text-gray-100"
                   >
                     Exportar Orden de Trabajo
                   </Dialog.Title>
-                  <button
+                  <Button
+                    variant="ghost"
+                    size="sm"
                     onClick={onClose}
-                    className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700"
+                    className="!p-1 h-auto rounded-full"
                   >
-                    <X className="h-5 w-5 text-gray-500" />
-                  </button>
+                    <X className="h-5 w-5" />
+                  </Button>
                 </div>
-                <div className="mt-4">
+                <div className="mt-2">
                   <p className="text-sm text-gray-500 dark:text-gray-400">
                     Seleccione el formato de PDF que desea generar para la OT{" "}
-                    <strong>{otData.custom_id || `#${otData.id}`}</strong>.
+                    <strong className="text-blue-600 dark:text-blue-400">
+                      {otData.custom_id || `#${otData.id}`}
+                    </strong>
+                    .
                   </p>
                 </div>
 
-                <div className="mt-6 space-y-3">
-                  <Button
-                    variant="outline"
-                    className="w-full justify-start text-left"
+                <div className="mt-6 space-y-4">
+                  <ExportOptionButton
+                    icon={FileText}
+                    title="Orden de Trabajo"
+                    description="Documento completo con detalles y precios."
                     onClick={handleExportWorkOrder}
-                  >
-                    <FileText className="mr-3 h-5 w-5 text-blue-500" />
-                    <div>
-                      <p className="font-semibold">Orden de Trabajo</p>
-                      <p className="text-xs text-gray-500 dark:text-gray-400">
-                        Documento completo con detalles y precios.
-                      </p>
-                    </div>
-                  </Button>
-                  <Button
-                    variant="outline"
-                    className="w-full justify-start text-left"
+                    colorClass="text-blue-500"
+                  />
+                  <ExportOptionButton
+                    icon={Receipt}
+                    title="Remito / Recibo"
+                    description="Versión para el cliente sin información de precios."
                     onClick={handleExportRemito}
-                  >
-                    <Receipt className="mr-3 h-5 w-5 text-green-500" />
-                    <div>
-                      <p className="font-semibold">Remito / Recibo</p>
-                      <p className="text-xs text-gray-500 dark:text-gray-400">
-                        Versión para el cliente sin información de precios.
-                      </p>
-                    </div>
-                  </Button>
-                  <Button
-                    variant="outline"
-                    className="w-full justify-start text-left"
+                    colorClass="text-green-500"
+                  />
+                  <ExportOptionButton
+                    icon={Tag}
+                    title="Etiqueta"
+                    description="Próximamente disponible."
                     disabled
-                  >
-                    <Tag className="mr-3 h-5 w-5 text-gray-400" />
-                    <div>
-                      <p className="font-semibold text-gray-400">Etiqueta</p>
-                      <p className="text-xs text-gray-500 dark:text-gray-400">
-                        Próximamente disponible.
-                      </p>
-                    </div>
-                  </Button>
-                </div>
-                <div className="mt-6 flex justify-end">
-                  <Button variant="secondary" onClick={onClose}>
-                    Cerrar
-                  </Button>
+                    colorClass="text-gray-400"
+                  />
                 </div>
               </Dialog.Panel>
             </Transition.Child>

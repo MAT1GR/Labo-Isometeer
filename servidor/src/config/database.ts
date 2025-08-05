@@ -21,6 +21,11 @@ db.exec(`
     name TEXT NOT NULL, 
     code TEXT UNIQUE NOT NULL, 
     address TEXT, 
+    location TEXT, -- NUEVO
+    province TEXT, -- NUEVO
+    cp TEXT,       -- NUEVO
+    email TEXT,    -- NUEVO
+    phone TEXT,    -- NUEVO
     fiscal_id_type TEXT, 
     fiscal_id TEXT
   );

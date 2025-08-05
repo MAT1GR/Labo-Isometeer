@@ -7,6 +7,7 @@ import { contractService } from "./contractService";
 import { formatDate, formatCurrency } from "../lib/utils";
 import { PDFDocument } from "pdf-lib";
 import axiosInstance from "../api/axiosInstance";
+import logo from "/logo.png";
 
 // Helper para construir la URL base para archivos estáticos
 const staticBaseUrl = axiosInstance.defaults.baseURL?.replace("/api", "") || "";
@@ -90,28 +91,67 @@ const appendContractToPdf = async (
   }
 };
 
+const addHeader = (doc: jsPDF, title: string, otData: WorkOrder) => {
+  // Añadir el logo
+  doc.addImage(logo, "PNG", 14, 10, 30, 15); // x, y, width, height (ajustado para mejor proporción)
+
+  doc.setFontSize(18);
+  doc.text("Laboratorio Consultar", 105, 15, { align: "center" });
+  doc.setFontSize(16);
+  doc.text(title, 105, 22, { align: "center" });
+  doc.setFontSize(12);
+  doc.text(`Fecha de Emisión: ${formatDate(otData.date)}`, 105, 30, {
+    align: "center",
+  });
+};
+
+const addFooterLegend = (doc: jsPDF, isRemito: boolean = false) => {
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const legendText = isRemito
+    ? "Los productos a ensayar/calibrar son desarrollos propietarios ajenos. Nuestra actividad técnica, es reservada y confidencial. Respetar en todo momento esa condición."
+    : "Las muestras estarán disponibles para su retiro durante los 2 MESES posteriores a la fecha de emision del reporte. Luego pasará a disposicion de rezago y YA NO PODRÁ ser reclamada.";
+
+  const textLines = doc.splitTextToSize(legendText, 180); // Ancho del texto
+  const textHeight = textLines.length * 5;
+  const rectY = pageHeight - 28;
+
+  doc.setFillColor(0, 0, 0); // Color de fondo negro
+  doc.rect(10, rectY, 190, textHeight + 6, "F"); // Dibuja el rectángulo relleno
+
+  doc.setFontSize(10); // Tamaño de fuente un poco más grande
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(255, 255, 255); // Color de texto blanco
+  doc.text(textLines, 105, rectY + 6, { align: "center" });
+
+  // Restaurar colores por defecto
+  doc.setTextColor(0, 0, 0);
+};
+
 // --- PDF: ORDEN DE TRABAJO (CLIENTE) ---
 export const exportOtPdfWorkOrder = async (otData: WorkOrder) => {
   const finalPdfDoc = await PDFDocument.create();
   const jspdfDoc = new jsPDF();
 
-  jspdfDoc.setFontSize(18);
-  jspdfDoc.text(
+  addHeader(
+    jspdfDoc,
     `Orden de Trabajo: ${otData.custom_id || `#${otData.id}`}`,
-    14,
-    22
+    otData
   );
-  jspdfDoc.setFontSize(12);
-  jspdfDoc.text(`Fecha de Emisión: ${formatDate(otData.date)}`, 14, 30);
 
   // --- SECCIÓN DATOS DEL CLIENTE ---
   autoTable(jspdfDoc, {
-    startY: 40,
-    head: [["Campo", "Información"]],
+    startY: 45,
+    head: [["Datos del Cliente", ""]],
     body: [
       ["Empresa", otData.client?.name || "N/A"],
-      ["Nº Cliente", otData.client?.code || "N/A"],
-      ["Dirección", otData.client?.address || "N/A"],
+      [
+        "Dirección",
+        `${otData.client?.address || ""}, ${otData.client?.location || ""}, ${
+          otData.client?.province || ""
+        } (CP: ${otData.client?.cp || "N/A"})`,
+      ],
+      ["Email", otData.client?.email || "N/A"],
+      ["Celular", otData.client?.phone || "N/A"],
       [
         "ID Fiscal",
         `${otData.client?.fiscal_id_type || ""} ${
@@ -121,12 +161,13 @@ export const exportOtPdfWorkOrder = async (otData: WorkOrder) => {
     ],
     theme: "grid",
     headStyles: { fillColor: [22, 163, 74] },
+    columnStyles: { 0: { fontStyle: "bold" } },
   });
 
   // --- SECCIÓN CONTACTOS DEL CLIENTE ---
   if (otData.client?.contacts && otData.client.contacts.length > 0) {
     autoTable(jspdfDoc, {
-      head: [["Tipo", "Nombre", "Email", "Teléfono"]],
+      head: [["Referente", "Nombre", "Email", "Teléfono"]],
       body: otData.client.contacts.map((c) => [
         c.type || "N/A",
         c.name,
@@ -134,31 +175,45 @@ export const exportOtPdfWorkOrder = async (otData: WorkOrder) => {
         c.phone || "N/A",
       ]),
       theme: "striped",
-      startY: (jspdfDoc as any).lastAutoTable.finalY + 2,
+      startY: (jspdfDoc as any).lastAutoTable.finalY + 5,
+      headStyles: { fillColor: [107, 114, 128] },
     });
   }
 
   // --- SECCIÓN DATOS DEL PRODUCTO ---
   autoTable(jspdfDoc, {
-    startY: (jspdfDoc as any).lastAutoTable.finalY + 10,
-    head: [["Campo", "Información"]],
+    startY: (jspdfDoc as any).lastAutoTable.finalY + 5,
+    head: [["Datos del Producto", ""]],
     body: [
       ["Tipo de OT", otData.type],
       ["Producto", otData.product],
       ["Marca", otData.brand || "N/A"],
       ["Modelo", otData.model || "N/A"],
-      ["Nº de Lacre", otData.seal_number || "N/A"],
+      ["Nº de Lacre/Toma de muestra", otData.seal_number || "N/A"],
       ["Vto. Certificado", formatDate(otData.certificate_expiry ?? null)],
-      ["Observaciones", otData.observations || "Sin observaciones."],
     ],
     theme: "grid",
     headStyles: { fillColor: [37, 99, 235] },
+    columnStyles: { 0: { fontStyle: "bold" } },
+  });
+
+  // --- SECCIÓN DE FECHA DE ENTREGA (MOVIDA) ---
+  const estimatedDate = calculateEstimatedDeliveryDate(
+    otData.activities,
+    otData.date
+  );
+  autoTable(jspdfDoc, {
+    startY: (jspdfDoc as any).lastAutoTable.finalY + 2,
+    head: [["Fecha Estimada de Entrega"]],
+    body: [[estimatedDate]],
+    theme: "grid",
+    headStyles: { fillColor: [79, 70, 229] },
   });
 
   // --- SECCIÓN DE ACTIVIDADES CON PRECIO Y NORMA ---
   if (otData.activities && otData.activities.length > 0) {
     autoTable(jspdfDoc, {
-      startY: (jspdfDoc as any).lastAutoTable.finalY + 10,
+      startY: (jspdfDoc as any).lastAutoTable.finalY + 5,
       head: [["Actividad", "Norma de Referencia", "Precio (Sin IVA)"]],
       body: otData.activities.map((act) => [
         act.activity,
@@ -170,23 +225,23 @@ export const exportOtPdfWorkOrder = async (otData: WorkOrder) => {
     });
   }
 
-  // --- SECCIÓN DE FECHA DE ENTREGA ---
-  const estimatedDate = calculateEstimatedDeliveryDate(
-    otData.activities,
-    otData.date
-  );
+  // --- SECCIÓN DE OBSERVACIONES (MOVIDA) ---
   autoTable(jspdfDoc, {
-    startY: (jspdfDoc as any).lastAutoTable.finalY + 10,
-    head: [["Fecha Estimada de Entrega"]],
-    body: [[estimatedDate]],
+    startY: (jspdfDoc as any).lastAutoTable.finalY + 2,
+    head: [["Observaciones"]],
+    body: [[otData.observations || "Sin observaciones."]],
     theme: "grid",
-    headStyles: { fillColor: [79, 70, 229] },
   });
+
+  addFooterLegend(jspdfDoc);
 
   const jspdfBytes = jspdfDoc.output("arraybuffer");
   const otPdfDoc = await PDFDocument.load(jspdfBytes);
-  const [otPage] = await finalPdfDoc.copyPages(otPdfDoc, [0]);
-  finalPdfDoc.addPage(otPage);
+  const copiedPages = await finalPdfDoc.copyPages(
+    otPdfDoc,
+    otPdfDoc.getPageIndices()
+  );
+  copiedPages.forEach((page) => finalPdfDoc.addPage(page));
 
   await appendContractToPdf(finalPdfDoc, otData.contract_type);
 
@@ -199,23 +254,26 @@ export const exportOtPdfRemito = async (otData: WorkOrder) => {
   const finalPdfDoc = await PDFDocument.create();
   const jspdfDoc = new jsPDF();
 
-  jspdfDoc.setFontSize(18);
-  jspdfDoc.text(
+  addHeader(
+    jspdfDoc,
     `Remito / Recibo: ${otData.custom_id || `#${otData.id}`}`,
-    14,
-    22
+    otData
   );
-  jspdfDoc.setFontSize(12);
-  jspdfDoc.text(`Fecha de Emisión: ${formatDate(otData.date)}`, 14, 30);
 
   // --- SECCIÓN DATOS DEL CLIENTE ---
   autoTable(jspdfDoc, {
-    startY: 40,
-    head: [["Campo", "Información"]],
+    startY: 45,
+    head: [["Datos del Cliente", ""]],
     body: [
       ["Empresa", otData.client?.name || "N/A"],
-      ["Nº Cliente", otData.client?.code || "N/A"],
-      ["Dirección", otData.client?.address || "N/A"],
+      [
+        "Dirección",
+        `${otData.client?.address || ""}, ${otData.client?.location || ""}, ${
+          otData.client?.province || ""
+        } (CP: ${otData.client?.cp || "N/A"})`,
+      ],
+      ["Email", otData.client?.email || "N/A"],
+      ["Celular", otData.client?.phone || "N/A"],
       [
         "ID Fiscal",
         `${otData.client?.fiscal_id_type || ""} ${
@@ -225,12 +283,13 @@ export const exportOtPdfRemito = async (otData: WorkOrder) => {
     ],
     theme: "grid",
     headStyles: { fillColor: [22, 163, 74] },
+    columnStyles: { 0: { fontStyle: "bold" } },
   });
 
   // --- SECCIÓN CONTACTOS DEL CLIENTE ---
   if (otData.client?.contacts && otData.client.contacts.length > 0) {
     autoTable(jspdfDoc, {
-      head: [["Tipo", "Nombre", "Email", "Teléfono"]],
+      head: [["Referente", "Nombre", "Email", "Teléfono"]],
       body: otData.client.contacts.map((c) => [
         c.type || "N/A",
         c.name,
@@ -238,34 +297,35 @@ export const exportOtPdfRemito = async (otData: WorkOrder) => {
         c.phone || "N/A",
       ]),
       theme: "striped",
-      startY: (jspdfDoc as any).lastAutoTable.finalY + 2,
+      startY: (jspdfDoc as any).lastAutoTable.finalY + 5,
+      headStyles: { fillColor: [107, 114, 128] },
     });
   }
 
   // --- SECCIÓN DATOS DEL PRODUCTO ---
   autoTable(jspdfDoc, {
-    startY: (jspdfDoc as any).lastAutoTable.finalY + 10,
-    head: [["Campo", "Información"]],
+    startY: (jspdfDoc as any).lastAutoTable.finalY + 5,
+    head: [["Datos del Producto", ""]],
     body: [
       ["Tipo de OT", otData.type],
       ["Producto", otData.product],
       ["Marca", otData.brand || "N/A"],
       ["Modelo", otData.model || "N/A"],
-      ["Nº de Lacre", otData.seal_number || "N/A"],
+      ["Nº de Lacre/Toma de muestra", otData.seal_number || "N/A"],
       ["Vto. Certificado", formatDate(otData.certificate_expiry ?? null)],
-      ["Observaciones", otData.observations || "Sin observaciones."],
     ],
     theme: "grid",
     headStyles: { fillColor: [37, 99, 235] },
+    columnStyles: { 0: { fontStyle: "bold" } },
   });
 
-  // --- SECCIÓN DE FECHA DE ENTREGA ---
+  // --- SECCIÓN DE FECHA DE ENTREGA (MOVIDA) ---
   const estimatedDate = calculateEstimatedDeliveryDate(
     otData.activities,
     otData.date
   );
   autoTable(jspdfDoc, {
-    startY: (jspdfDoc as any).lastAutoTable.finalY + 10,
+    startY: (jspdfDoc as any).lastAutoTable.finalY + 2,
     head: [["Fecha Estimada de Entrega"]],
     body: [[estimatedDate]],
     theme: "grid",
@@ -275,18 +335,31 @@ export const exportOtPdfRemito = async (otData: WorkOrder) => {
   // --- SECCIÓN DE ACTIVIDADES (SIN ASIGNACIÓN) ---
   if (otData.activities && otData.activities.length > 0) {
     autoTable(jspdfDoc, {
-      startY: (jspdfDoc as any).lastAutoTable.finalY + 10,
-      head: [["Actividades a Realizar"]],
-      body: otData.activities.map((act) => [act.activity]),
+      startY: (jspdfDoc as any).lastAutoTable.finalY + 5,
+      head: [["Actividades a Realizar", "Norma"]],
+      body: otData.activities.map((act) => [act.activity, act.norma || "N/A"]),
       theme: "striped",
       headStyles: { fillColor: [107, 114, 128] },
     });
   }
 
+  // --- SECCIÓN DE OBSERVACIONES (MOVIDA) ---
+  autoTable(jspdfDoc, {
+    startY: (jspdfDoc as any).lastAutoTable.finalY + 2,
+    head: [["Observaciones"]],
+    body: [[otData.observations || "Sin observaciones."]],
+    theme: "grid",
+  });
+
+  addFooterLegend(jspdfDoc, true); // true para indicar que es un remito
+
   const jspdfBytes = jspdfDoc.output("arraybuffer");
   const otPdfDoc = await PDFDocument.load(jspdfBytes);
-  const [otPage] = await finalPdfDoc.copyPages(otPdfDoc, [0]);
-  finalPdfDoc.addPage(otPage);
+  const copiedPages = await finalPdfDoc.copyPages(
+    otPdfDoc,
+    otPdfDoc.getPageIndices()
+  );
+  copiedPages.forEach((page) => finalPdfDoc.addPage(page));
 
   await appendContractToPdf(finalPdfDoc, otData.contract_type);
 
@@ -299,14 +372,15 @@ export const exportOtToPdfInternal = async (otData: WorkOrder) => {
   const finalPdfDoc = await PDFDocument.create();
   const jspdfDoc = new jsPDF();
 
-  jspdfDoc.setFontSize(18);
-  jspdfDoc.text(`OT Interna: ${otData.custom_id || `#${otData.id}`}`, 14, 22);
-  jspdfDoc.setFontSize(12);
-  jspdfDoc.text(`Fecha de Emisión: ${formatDate(otData.date)}`, 14, 30);
+  addHeader(
+    jspdfDoc,
+    `OT Interna: ${otData.custom_id || `#${otData.id}`}`,
+    otData
+  );
 
   // --- DATOS DEL CLIENTE ---
   autoTable(jspdfDoc, {
-    startY: 40,
+    startY: 45,
     head: [["Campo", "Información"]],
     body: [
       ["Empresa", otData.client?.name || "N/A"],
@@ -318,14 +392,14 @@ export const exportOtToPdfInternal = async (otData: WorkOrder) => {
 
   // --- DATOS DEL PRODUCTO ---
   autoTable(jspdfDoc, {
-    startY: (jspdfDoc as any).lastAutoTable.finalY + 10,
+    startY: (jspdfDoc as any).lastAutoTable.finalY + 5,
     head: [["Campo", "Información"]],
     body: [
       ["Tipo de OT", otData.type],
       ["Producto", otData.product],
       ["Marca", otData.brand || "N/A"],
       ["Modelo", otData.model || "N/A"],
-      ["Nº de Lacre", otData.seal_number || "N/A"],
+      ["Nº de Lacre/Toma de muestra", otData.seal_number || "N/A"],
       ["Vto. Certificado", formatDate(otData.certificate_expiry ?? null)],
       ["Observaciones (Cliente)", otData.observations || "N/A"],
       [
@@ -343,7 +417,7 @@ export const exportOtToPdfInternal = async (otData: WorkOrder) => {
     otData.date
   );
   autoTable(jspdfDoc, {
-    startY: (jspdfDoc as any).lastAutoTable.finalY + 10,
+    startY: (jspdfDoc as any).lastAutoTable.finalY + 5,
     head: [["Campo", "Información"]],
     body: [
       ["Cotización", otData.quotation_details || "N/A"],
@@ -360,7 +434,7 @@ export const exportOtToPdfInternal = async (otData: WorkOrder) => {
   // --- ACTIVIDADES CON ASIGNACIÓN ---
   if (otData.activities && otData.activities.length > 0) {
     autoTable(jspdfDoc, {
-      startY: (jspdfDoc as any).lastAutoTable.finalY + 10,
+      startY: (jspdfDoc as any).lastAutoTable.finalY + 5,
       head: [["Actividad", "Asignado a", "Estado"]],
       body: otData.activities.map((act) => [
         act.activity,
@@ -372,10 +446,15 @@ export const exportOtToPdfInternal = async (otData: WorkOrder) => {
     });
   }
 
+  addFooterLegend(jspdfDoc);
+
   const jspdfBytes = jspdfDoc.output("arraybuffer");
   const otPdfDoc = await PDFDocument.load(jspdfBytes);
-  const [otPage] = await finalPdfDoc.copyPages(otPdfDoc, [0]);
-  finalPdfDoc.addPage(otPage);
+  const copiedPages = await finalPdfDoc.copyPages(
+    otPdfDoc,
+    otPdfDoc.getPageIndices()
+  );
+  copiedPages.forEach((page) => finalPdfDoc.addPage(page));
 
   await appendContractToPdf(finalPdfDoc, otData.contract_type);
 

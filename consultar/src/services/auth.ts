@@ -34,6 +34,15 @@ class AuthService {
     return response.data;
   }
 
+  async bulkCreateUsers(
+    users: Partial<User>[]
+  ): Promise<{ imported: number; duplicates: number }> {
+    const response = await axiosInstance.post("/users/bulk-import", {
+      users,
+    });
+    return response.data;
+  }
+
   async deleteUser(userId: number): Promise<void> {
     try {
       await axiosInstance.delete(`/users/${userId}`);

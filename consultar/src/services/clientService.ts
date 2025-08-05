@@ -16,6 +16,11 @@ export interface Client {
   name: string;
   code: string;
   address?: string;
+  location?: string;
+  province?: string;
+  cp?: string;
+  email?: string;
+  phone?: string;
   fiscal_id_type?: string;
   fiscal_id?: string;
   contacts: Contact[];

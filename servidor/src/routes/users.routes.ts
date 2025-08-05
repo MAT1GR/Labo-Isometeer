@@ -43,6 +43,50 @@ router.post("/", (req: Request, res: Response) => {
   }
 });
 
+// [POST] /api/users/bulk-import
+router.post("/bulk-import", (req: Request, res: Response) => {
+  const { users } = req.body;
+  if (!Array.isArray(users)) {
+    return res
+      .status(400)
+      .json({ error: "Se esperaba un arreglo de usuarios." });
+  }
+
+  const insertStmt = db.prepare(
+    "INSERT OR IGNORE INTO users (name, email, password, role) VALUES (?, ?, ?, ?)"
+  );
+
+  const importTransaction = db.transaction((userList) => {
+    let importedCount = 0;
+    for (const user of userList) {
+      if (user.name && user.email && user.password && user.role) {
+        const hashedPassword = bcrypt.hashSync(user.password.toString(), 10);
+        const info = insertStmt.run(
+          user.name,
+          user.email,
+          hashedPassword,
+          user.role
+        );
+        if (info.changes > 0) {
+          importedCount++;
+        }
+      }
+    }
+    return { imported: importedCount, total: userList.length };
+  });
+
+  try {
+    const result = importTransaction(users);
+    res.status(201).json({
+      imported: result.imported,
+      duplicates: result.total - result.imported,
+    });
+  } catch (error) {
+    console.error("Error en la importación masiva de usuarios:", error);
+    res.status(500).json({ error: "Error al importar los usuarios." });
+  }
+});
+
 // [DELETE] /api/users/:id
 router.delete("/:id", (req: Request, res: Response) => {
   const { id } = req.params;

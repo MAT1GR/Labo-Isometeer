@@ -65,14 +65,37 @@ const ClienteDetail: React.FC = () => {
         </div>
       </div>
       <div className="bg-white dark:bg-gray-800 dark:border dark:border-gray-700 p-6 rounded-lg shadow-sm space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           <Input
-            label="Nº Cliente *"
+            label="ID / Nº Cliente *"
             {...register("code", { required: true })}
+            className="lg:col-span-1"
           />
-          <Input label="Empresa *" {...register("name", { required: true })} />
-          <Input label="Dirección" {...register("address")} />
-          <div className="flex items-end gap-4 col-span-2">
+          <Input
+            label="Nombre / Empresa *"
+            {...register("name", { required: true })}
+            className="lg:col-span-2"
+          />
+          <Input
+            label="Dirección"
+            {...register("address")}
+            className="lg:col-span-3"
+          />
+          <Input label="Localidad" {...register("location")} />
+          <Input label="Provincia" {...register("province")} />
+          <Input label="Código Postal (CP)" {...register("cp")} />
+          <Input
+            label="Email Principal"
+            type="email"
+            {...register("email")}
+            className="lg:col-span-2"
+          />
+          <Input
+            label="Número de Celular Principal"
+            {...register("phone")}
+            className="lg:col-span-1"
+          />
+          <div className="flex items-end gap-4 col-span-full">
             <div className="flex-1">
               <label className="text-sm font-medium dark:text-gray-300">
                 Tipo ID Fiscal
@@ -96,13 +119,13 @@ const ClienteDetail: React.FC = () => {
         <div className="border-t dark:border-gray-700 pt-6">
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-lg font-semibold text-blue-700 dark:text-blue-400">
-              Contactos
+              Contactos Adicionales (Referentes)
             </h2>
             <Button
               type="button"
               size="sm"
               onClick={() =>
-                append({ type: "", name: "", email: "", phone: "" })
+                append({ type: "Referente", name: "", email: "", phone: "" })
               }
             >
               <PlusCircle className="h-4 w-4 mr-2" />
@@ -120,7 +143,7 @@ const ClienteDetail: React.FC = () => {
                   {...register(`contacts.${index}.type`)}
                 />
                 <Input
-                  placeholder="Contacto"
+                  placeholder="Nombre del Referente"
                   {...register(`contacts.${index}.name`)}
                 />
                 <Input

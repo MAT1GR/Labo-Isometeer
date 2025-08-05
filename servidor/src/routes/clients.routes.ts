@@ -29,6 +29,11 @@ router.post("/", (req: Request, res: Response) => {
     name,
     code,
     address,
+    location,
+    province,
+    cp,
+    email,
+    phone,
     fiscal_id_type,
     fiscal_id,
     contacts = [],
@@ -39,7 +44,7 @@ router.post("/", (req: Request, res: Response) => {
       .json({ error: "El Nº Cliente y la Empresa son requeridos." });
 
   const clientInsertStmt = db.prepare(
-    "INSERT INTO clients (name, code, address, fiscal_id_type, fiscal_id) VALUES (?, ?, ?, ?, ?)"
+    "INSERT INTO clients (name, code, address, location, province, cp, email, phone, fiscal_id_type, fiscal_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
   );
   const contactInsertStmt = db.prepare(
     "INSERT INTO contacts (client_id, type, name, email, phone) VALUES (?, ?, ?, ?, ?)"
@@ -50,6 +55,11 @@ router.post("/", (req: Request, res: Response) => {
       clientData.name,
       clientData.code,
       clientData.address,
+      clientData.location,
+      clientData.province,
+      clientData.cp,
+      clientData.email,
+      clientData.phone,
       clientData.fiscal_id_type,
       clientData.fiscal_id
     );
@@ -73,6 +83,11 @@ router.post("/", (req: Request, res: Response) => {
       name,
       code,
       address,
+      location,
+      province,
+      cp,
+      email,
+      phone,
       fiscal_id_type,
       fiscal_id,
       contacts,
@@ -111,12 +126,17 @@ router.put("/:id", (req: Request, res: Response) => {
     name,
     code,
     address,
+    location,
+    province,
+    cp,
+    email,
+    phone,
     fiscal_id_type,
     fiscal_id,
     contacts = [],
   } = req.body;
   const updateStmt = db.prepare(
-    "UPDATE clients SET name=?, code=?, address=?, fiscal_id_type=?, fiscal_id=? WHERE id = ?"
+    "UPDATE clients SET name=?, code=?, address=?, location=?, province=?, cp=?, email=?, phone=?, fiscal_id_type=?, fiscal_id=? WHERE id = ?"
   );
   const deleteContactsStmt = db.prepare(
     "DELETE FROM contacts WHERE client_id = ?"
@@ -126,7 +146,19 @@ router.put("/:id", (req: Request, res: Response) => {
   );
 
   const updateTransaction = db.transaction(() => {
-    updateStmt.run(name, code, address, fiscal_id_type, fiscal_id, id);
+    updateStmt.run(
+      name,
+      code,
+      address,
+      location,
+      province,
+      cp,
+      email,
+      phone,
+      fiscal_id_type,
+      fiscal_id,
+      id
+    );
     deleteContactsStmt.run(id);
     for (const contact of contacts) {
       if (contact.type || contact.name || contact.email || contact.phone) {

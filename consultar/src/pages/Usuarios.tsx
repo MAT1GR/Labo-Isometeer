@@ -1,6 +1,6 @@
 // RUTA: /cliente/src/pages/Usuarios.tsx
 
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -8,11 +8,12 @@ import { authService, User } from "../services/auth";
 import Card from "../components/ui/Card";
 import Input from "../components/ui/Input";
 import Button from "../components/ui/Button";
-import { PlusCircle, Users, Trash2, BarChart2 } from "lucide-react";
+import { PlusCircle, Users, Trash2, BarChart2, Upload } from "lucide-react";
 import useSWR, { mutate } from "swr";
 import { fetcher } from "../api/axiosInstance";
 import { useNavigate } from "react-router-dom";
 import ConfirmationModal from "../components/ui/ConfirmationModal"; // Importamos el modal
+import * as XLSX from "xlsx";
 
 const userSchema = z.object({
   name: z.string().min(3, "El nombre es requerido"),
@@ -27,6 +28,7 @@ const Usuarios: React.FC = () => {
   const { data: users, error, isLoading } = useSWR<User[]>("/users", fetcher);
   const navigate = useNavigate();
   const [formError, setFormError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Estado para el modal de confirmación
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -75,6 +77,46 @@ const Usuarios: React.FC = () => {
     }
   };
 
+  const handleFileImport = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      try {
+        const data = new Uint8Array(e.target?.result as ArrayBuffer);
+        const workbook = XLSX.read(data, { type: "array" });
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        const json = XLSX.utils.sheet_to_json(worksheet) as any[];
+
+        const usersToImport = json.map((row) => ({
+          name: row["nombre"] || row["Nombre"],
+          email: row["email"] || row["Email"],
+          password:
+            row["password"] ||
+            row["Password"] ||
+            row["contraseña"] ||
+            row["Contraseña"],
+          role: row["rol"] || row["Rol"],
+        }));
+
+        if (usersToImport.length > 0) {
+          const response = await authService.bulkCreateUsers(usersToImport);
+          alert(
+            `Importación completada: ${response.imported} usuarios nuevos, ${response.duplicates} duplicados ignorados.`
+          );
+          mutate("/users");
+        }
+      } catch (error) {
+        alert(
+          "Hubo un error al procesar el archivo. Asegúrate que las columnas son: nombre, email, password, role."
+        );
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  };
+
   if (error) return <div>Error al cargar los usuarios.</div>;
   if (isLoading) return <div>Cargando...</div>;
 
@@ -90,10 +132,25 @@ const Usuarios: React.FC = () => {
       <div className="space-y-6">
         <div className="flex justify-between items-center">
           <h1 className="text-3xl font-bold">Gestión de Usuarios</h1>
-          <Button onClick={() => navigate("/usuarios/grafico")}>
-            <BarChart2 className="mr-2 h-4 w-4" />
-            Ver Gráfico de Puntos
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              variant="secondary"
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <Upload className="mr-2 h-4 w-4" /> Importar Usuarios
+            </Button>
+            <Button onClick={() => navigate("/usuarios/grafico")}>
+              <BarChart2 className="mr-2 h-4 w-4" />
+              Ver Gráfico de Puntos
+            </Button>
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handleFileImport}
+              className="hidden"
+              accept=".xlsx, .xls"
+            />
+          </div>
         </div>
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2">
