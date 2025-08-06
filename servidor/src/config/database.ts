@@ -20,12 +20,13 @@ db.exec(`
     id INTEGER PRIMARY KEY AUTOINCREMENT, 
     name TEXT NOT NULL, 
     code TEXT UNIQUE NOT NULL, 
+    client_number TEXT,
     address TEXT, 
-    location TEXT, -- NUEVO
-    province TEXT, -- NUEVO
-    cp TEXT,       -- NUEVO
-    email TEXT,    -- NUEVO
-    phone TEXT,    -- NUEVO
+    location TEXT,
+    province TEXT,
+    cp TEXT,
+    email TEXT,
+    phone TEXT,
     fiscal_id_type TEXT, 
     fiscal_id TEXT
   );
@@ -46,6 +47,7 @@ db.exec(`
     date TEXT NOT NULL, 
     type TEXT NOT NULL, 
     client_id INTEGER NOT NULL,
+    contact_id INTEGER, -- NUEVO CAMPO PARA EL REFERENTE
     product TEXT NOT NULL, 
     brand TEXT,
     model TEXT,
@@ -63,7 +65,8 @@ db.exec(`
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP, 
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE,
-    FOREIGN KEY (created_by) REFERENCES users(id)
+    FOREIGN KEY (created_by) REFERENCES users(id),
+    FOREIGN KEY (contact_id) REFERENCES contacts(id) ON DELETE SET NULL
   );
   
   CREATE TABLE IF NOT EXISTS work_order_activities (

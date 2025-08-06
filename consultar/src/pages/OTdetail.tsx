@@ -144,7 +144,11 @@ const OTDetail: React.FC = () => {
 
   const onSubmit = async (data: WorkOrder) => {
     try {
-      const dataToSubmit = { ...data, role: user?.role };
+      const dataToSubmit = {
+        ...data,
+        role: user?.role,
+        contact_id: data.contact_id ? Number(data.contact_id) : undefined,
+      };
       await otService.updateOT(Number(id), dataToSubmit);
       mutate(["/ots", user]);
       navigate("/ot");
@@ -382,23 +386,32 @@ const OTDetail: React.FC = () => {
                 readOnly
               />
             </div>
-          </fieldset>
-          <div className="border-b dark:border-gray-700 pb-6">
-            <fieldset disabled={!isFormEditable}>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <h2 className="text-lg font-semibold text-blue-700 dark:text-blue-400 col-span-full">
-                  Información del Cliente
-                </h2>
-                <Input label="Empresa" value={otData.client?.name} readOnly />
-                <Input
-                  label="Nº Cliente"
-                  value={otData.client?.code}
-                  readOnly
-                />
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 border-b dark:border-gray-700 pb-6">
+              <h2 className="text-lg font-semibold text-blue-700 dark:text-blue-400 col-span-full">
+                Información del Cliente
+              </h2>
+              <Input label="Empresa" value={otData.client?.name} readOnly />
+              <Input label="Nº Cliente" value={otData.client?.code} readOnly />
+              <div className="col-span-full">
+                <label className="text-sm font-medium dark:text-gray-300">
+                  Referente
+                </label>
+                <select
+                  {...register("contact_id")}
+                  disabled={!isFormEditable}
+                  className="w-full mt-1 p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
+                >
+                  <option value="">Seleccionar referente...</option>
+                  {otData.client?.contacts?.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name} ({c.type})
+                    </option>
+                  ))}
+                </select>
               </div>
-            </fieldset>
-          </div>
-          <fieldset disabled={!isFormEditable}>
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 border-b dark:border-gray-700 pb-6">
               <h2 className="text-lg font-semibold text-blue-700 dark:text-blue-400 col-span-full">
                 Producto

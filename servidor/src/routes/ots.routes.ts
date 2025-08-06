@@ -175,10 +175,10 @@ router.post("/", (req: Request, res: Response) => {
   }
   const insertOTStmt = db.prepare(
     `INSERT INTO work_orders (
-      custom_id, date, type, client_id, product, brand, model,
+      custom_id, date, type, client_id, contact_id, product, brand, model,
       seal_number, observations, certificate_expiry, collaborator_observations, created_by, status,
       quotation_amount, quotation_details, disposition, contract_type
-     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   );
   const insertActivityStmt = db.prepare(
     "INSERT INTO work_order_activities (work_order_id, activity, norma, precio_sin_iva) VALUES (?, ?, ?, ?)"
@@ -199,6 +199,7 @@ router.post("/", (req: Request, res: Response) => {
       data.otData.date,
       data.otData.type,
       data.otData.client_id,
+      data.otData.contact_id,
       data.otData.product,
       data.otData.brand,
       data.otData.model,
@@ -313,7 +314,7 @@ router.put("/:id", (req: Request, res: Response) => {
     return res.status(200).json({ message: "Observaciones guardadas." });
   }
   const updateStmt = db.prepare(
-    `UPDATE work_orders SET date=?, type=?, product=?, brand=?, model=?, seal_number=?, observations=?, certificate_expiry=?, status=?, quotation_amount=?, quotation_details=?, disposition=?, contract_type=?, collaborator_observations=?, updated_at=CURRENT_TIMESTAMP WHERE id=?`
+    `UPDATE work_orders SET date=?, type=?, product=?, brand=?, model=?, seal_number=?, observations=?, certificate_expiry=?, status=?, quotation_amount=?, quotation_details=?, disposition=?, contract_type=?, collaborator_observations=?, contact_id=?, updated_at=CURRENT_TIMESTAMP WHERE id=?`
   );
   const deleteActivitiesStmt = db.prepare(
     "DELETE FROM work_order_activities WHERE work_order_id = ?"
@@ -341,6 +342,7 @@ router.put("/:id", (req: Request, res: Response) => {
       otData.disposition,
       otData.contract_type,
       otData.collaborator_observations,
+      otData.contact_id,
       id
     );
     deleteActivitiesStmt.run(id); // Esto eliminará en cascada las asignaciones

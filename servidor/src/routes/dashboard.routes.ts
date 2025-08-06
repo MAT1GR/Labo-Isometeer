@@ -1,45 +1,159 @@
 // RUTA: /servidor/src/routes/dashboard.routes.ts
 
-import { Router, Request, Response } from 'express';
-import db from '../config/database';
+import { Router, Request, Response } from "express";
+import db from "../config/database";
 
 const router = Router();
 
 // [GET] /api/dashboard/stats
-router.get('/stats', (req: Request, res: Response) => {
-    try {
-        const getCount = (table: string, whereClause: string = '1 = 1') => (db.prepare(`SELECT COUNT(*) as count FROM ${table} WHERE ${whereClause}`).get() as { count: number }).count;
-        
-        const statsData = {
-            stats: {
-                totalOT: getCount('work_orders'),
-                totalClients: getCount('clients'),
-                pendingOT: getCount('work_orders', "status = 'pendiente' OR status = 'autorizada'"),
-                inProgressOT: getCount('work_orders', "status = 'en_progreso' OR status = 'pausada'"),
-                completedOT: getCount('work_orders', "status = 'finalizada'"),
-                billedOT: getCount('work_orders', "status = 'facturada'"),
-                totalRevenue: 2450000, // Dato simulado
-                paidInvoices: 89,       // Dato simulado
-                unpaidInvoices: 23,     // Dato simulado
-                overdueInvoices: 8,     // Dato simulado
-            },
-            recentOrders: db.prepare(`
+router.get("/stats", (req: Request, res: Response) => {
+  try {
+    const { period = "week" } = req.query;
+
+    // Usa un alias consistente para la tabla de órdenes de trabajo
+    let dateFilterClause = "";
+
+    switch (period) {
+      case "year":
+        dateFilterClause = ` WHERE strftime('%Y', wo.date) = strftime('%Y', 'now')`;
+        break;
+      case "month":
+        dateFilterClause = ` WHERE strftime('%Y-%m', wo.date) = strftime('%Y-%m', 'now')`;
+        break;
+      case "week":
+      default:
+        dateFilterClause = ` WHERE wo.date >= date('now', '-6 days')`;
+        break;
+    }
+
+    const getCount = (table: string, customWhere: string = "1 = 1") => {
+      // Reemplaza el alias 'wo' por el nombre de la tabla para que la consulta sea correcta
+      const finalWhere =
+        dateFilterClause.replace(/wo\./g, "") + ` AND ${customWhere}`;
+      const query = `SELECT COUNT(*) as count FROM ${table} AS wo ${finalWhere}`;
+      return (db.prepare(query).get() as { count: number }).count;
+    };
+
+    const getTotalClients = () =>
+      (
+        db.prepare(`SELECT COUNT(*) as count FROM clients`).get() as {
+          count: number;
+        }
+      ).count;
+
+    const getTotalRevenue = () => {
+      const result = db
+        .prepare(
+          `
+                SELECT SUM(wa.precio_sin_iva) as total 
+                FROM work_order_activities wa
+                JOIN work_orders wo ON wa.work_order_id = wo.id
+                ${dateFilterClause}
+             `
+        )
+        .get() as { total: number | null };
+      return result.total || 0;
+    };
+
+    const getChartData = () => {
+      let groupByClause = "";
+      let chartDataKey = "period";
+
+      switch (period) {
+        case "year":
+          groupByClause = "strftime('%Y-%m', wo.date)";
+          break;
+        case "month":
+          groupByClause = "strftime('%Y-%m-%d', wo.date)";
+          break;
+        case "week":
+        default:
+          groupByClause = "strftime('%Y-%m-%d', wo.date)";
+          break;
+      }
+
+      const result = db
+        .prepare(
+          `
+                SELECT
+                    ${groupByClause} as ${chartDataKey},
+                    SUM(wa.precio_sin_iva) as revenue
+                FROM work_order_activities wa
+                JOIN work_orders wo ON wa.work_order_id = wo.id
+                ${dateFilterClause} AND wa.precio_sin_iva > 0
+                GROUP BY ${chartDataKey}
+                ORDER BY ${chartDataKey}
+            `
+        )
+        .all() as { [key: string]: string | number; revenue: number }[];
+
+      const monthNames = [
+        "Ene",
+        "Feb",
+        "Mar",
+        "Abr",
+        "May",
+        "Jun",
+        "Jul",
+        "Ago",
+        "Sep",
+        "Oct",
+        "Nov",
+        "Dic",
+      ];
+
+      return result.map((item) => {
+        let name = "";
+        const dateValue = item.period;
+        const dateObj = new Date(dateValue + "T12:00:00");
+        if (period === "year") {
+          name = monthNames[dateObj.getMonth()];
+        } else {
+          name = `${dateObj.getDate()}/${dateObj.getMonth() + 1}`;
+        }
+        return {
+          name: name,
+          revenue: item.revenue,
+        };
+      });
+    };
+
+    const statsData = {
+      stats: {
+        totalOT: getCount("work_orders"),
+        totalClients: getTotalClients(),
+        pendingOT: getCount(
+          "work_orders",
+          "status IN ('pendiente', 'autorizada')"
+        ),
+        inProgressOT: getCount(
+          "work_orders",
+          "status IN ('en_progreso', 'pausada')"
+        ),
+        completedOT: getCount("work_orders", "status = 'finalizada'"),
+        billedOT: getCount("work_orders", "status = 'facturada'"),
+        totalRevenue: getTotalRevenue(),
+        paidInvoices: getCount("work_orders", "status = 'cierre'"),
+        unpaidInvoices: getCount("work_orders", "status = 'facturada'"),
+        overdueInvoices: 0,
+      },
+      recentOrders: db
+        .prepare(
+          `
                 SELECT ot.id, ot.product, ot.status, ot.date, c.name as client_name 
                 FROM work_orders ot 
                 JOIN clients c ON ot.client_id = c.id 
                 ORDER BY ot.created_at DESC LIMIT 5
-            `).all(),
-            monthlyRevenue: [
-                { month: 'Ene', revenue: 180000 }, { month: 'Feb', revenue: 220000 },
-                { month: 'Mar', revenue: 195000 }, { month: 'Abr', revenue: 280000 },
-                { month: 'May', revenue: 245000 }, { month: 'Jun', revenue: 310000 },
-            ]
-        };
-        res.status(200).json(statsData);
-    } catch (error) {
-        console.error("Error en /dashboard/stats:", error);
-        res.status(500).json({ error: 'Error al obtener las estadísticas.' });
-    }
+            `
+        )
+        .all(),
+      monthlyRevenue: getChartData(),
+    };
+    res.status(200).json(statsData);
+  } catch (error) {
+    console.error("Error en /dashboard/stats:", error);
+    res.status(500).json({ error: "Error al obtener las estadísticas." });
+  }
 });
 
 export default router;

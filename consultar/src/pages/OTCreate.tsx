@@ -4,7 +4,7 @@ import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useForm, useWatch, useFieldArray, Controller } from "react-hook-form";
 import { otService, WorkOrder } from "../services/otService";
-import { clientService, Client } from "../services/clientService";
+import { clientService, Client, Contact } from "../services/clientService";
 import { authService, User } from "../services/auth";
 import { useAuth } from "../contexts/AuthContext";
 import Input from "../components/ui/Input";
@@ -61,6 +61,7 @@ const OTCreate: React.FC = () => {
   });
 
   const [clients, setClients] = useState<Client[]>([]);
+  const [contacts, setContacts] = useState<Contact[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [idPreview, setIdPreview] = useState("Completar campos...");
   const [isIdLoading, setIsIdLoading] = useState(false);
@@ -71,6 +72,8 @@ const OTCreate: React.FC = () => {
     name: ["date", "type", "client_id"],
   });
   const otType = watchedIdFields[1];
+  const selectedClientId = watchedIdFields[2];
+
   const isLacreEnabled =
     otType === "Ensayo SE" ||
     otType === "Ensayo EE" ||
@@ -104,6 +107,21 @@ const OTCreate: React.FC = () => {
   }, []);
 
   useEffect(() => {
+    const fetchContacts = async () => {
+      if (selectedClientId) {
+        const client = await clientService.getClientById(
+          Number(selectedClientId)
+        );
+        setContacts(client.contacts);
+        setValue("contact_id", undefined); // Resetea el referente al cambiar de cliente
+      } else {
+        setContacts([]);
+      }
+    };
+    fetchContacts();
+  }, [selectedClientId, setValue]);
+
+  useEffect(() => {
     const [date, type, clientId] = watchedIdFields;
 
     if (date && type && clientId) {
@@ -132,8 +150,9 @@ const OTCreate: React.FC = () => {
       const dataToSubmit = {
         ...data,
         client_id: Number(data.client_id),
+        contact_id: data.contact_id ? Number(data.contact_id) : undefined,
         created_by: user.id,
-        collaborator_observations: "", // FIX: Changed null to empty string
+        collaborator_observations: "",
       };
       const newOt = await otService.createOT(dataToSubmit);
       navigate(`/ot/editar/${newOt.id}`);
@@ -252,6 +271,27 @@ const OTCreate: React.FC = () => {
               {clients.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.name} ({c.code})
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="text-sm font-medium dark:text-gray-300">
+              Referente
+            </label>
+            <select
+              {...register("contact_id")}
+              className="w-full mt-1 p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
+              disabled={!selectedClientId || contacts.length === 0}
+            >
+              <option value="">
+                {contacts.length > 0
+                  ? "Seleccionar referente..."
+                  : "Sin referentes"}
+              </option>
+              {contacts.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name} ({c.type})
                 </option>
               ))}
             </select>

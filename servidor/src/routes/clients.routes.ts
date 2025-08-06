@@ -28,6 +28,7 @@ router.post("/", (req: Request, res: Response) => {
   const {
     name,
     code,
+    client_number,
     address,
     location,
     province,
@@ -41,10 +42,10 @@ router.post("/", (req: Request, res: Response) => {
   if (!code || !name)
     return res
       .status(400)
-      .json({ error: "El Nº Cliente y la Empresa son requeridos." });
+      .json({ error: "El Código de Cliente y la Empresa son requeridos." });
 
   const clientInsertStmt = db.prepare(
-    "INSERT INTO clients (name, code, address, location, province, cp, email, phone, fiscal_id_type, fiscal_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+    "INSERT INTO clients (name, code, client_number, address, location, province, cp, email, phone, fiscal_id_type, fiscal_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
   );
   const contactInsertStmt = db.prepare(
     "INSERT INTO contacts (client_id, type, name, email, phone) VALUES (?, ?, ?, ?, ?)"
@@ -54,6 +55,7 @@ router.post("/", (req: Request, res: Response) => {
     const info = clientInsertStmt.run(
       clientData.name,
       clientData.code,
+      clientData.client_number,
       clientData.address,
       clientData.location,
       clientData.province,
@@ -82,6 +84,7 @@ router.post("/", (req: Request, res: Response) => {
     const result = createTransaction({
       name,
       code,
+      client_number,
       address,
       location,
       province,
@@ -95,7 +98,7 @@ router.post("/", (req: Request, res: Response) => {
     res.status(201).json(result);
   } catch (error: any) {
     if (error.code === "SQLITE_CONSTRAINT_UNIQUE")
-      return res.status(409).json({ error: "El Nº Cliente ya existe." });
+      return res.status(409).json({ error: "El Código de Cliente ya existe." });
     res.status(500).json({ error: "Error al crear el cliente." });
   }
 });
@@ -125,6 +128,7 @@ router.put("/:id", (req: Request, res: Response) => {
   const {
     name,
     code,
+    client_number,
     address,
     location,
     province,
@@ -136,7 +140,7 @@ router.put("/:id", (req: Request, res: Response) => {
     contacts = [],
   } = req.body;
   const updateStmt = db.prepare(
-    "UPDATE clients SET name=?, code=?, address=?, location=?, province=?, cp=?, email=?, phone=?, fiscal_id_type=?, fiscal_id=? WHERE id = ?"
+    "UPDATE clients SET name=?, code=?, client_number=?, address=?, location=?, province=?, cp=?, email=?, phone=?, fiscal_id_type=?, fiscal_id=? WHERE id = ?"
   );
   const deleteContactsStmt = db.prepare(
     "DELETE FROM contacts WHERE client_id = ?"
@@ -149,6 +153,7 @@ router.put("/:id", (req: Request, res: Response) => {
     updateStmt.run(
       name,
       code,
+      client_number,
       address,
       location,
       province,

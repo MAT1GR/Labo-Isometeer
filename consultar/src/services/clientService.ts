@@ -15,6 +15,7 @@ export interface Client {
   id: number;
   name: string;
   code: string;
+  client_number?: string; // NUEVO CAMPO
   address?: string;
   location?: string;
   province?: string;

@@ -14,13 +14,14 @@ import {
   X,
   UserCircle,
   Bot,
-  FileSignature, // Importamos el nuevo ícono
+  FileSignature,
+  BarChart2, // NUEVO ÍCONO
 } from "lucide-react";
 import ThemeToggle from "./ui/ThemeToggle";
 import { cn } from "../lib/utils";
 
 const SidebarNavigation: React.FC = () => {
-  const { user, logout, canManageContracts } = useAuth(); // Añadimos canManageContracts
+  const { user, logout, canManageContracts, canViewAdminContent } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -44,23 +45,30 @@ const SidebarNavigation: React.FC = () => {
       roles: ["director", "administracion", "administrador"],
     },
     {
-      icon: FileText,
-      label: "Usuarios",
-      path: "/usuarios",
-      roles: ["administrador"],
+      icon: BarChart2,
+      label: "Estadísticas",
+      path: "/estadisticas",
+      show: canViewAdminContent,
+      roles: ["director", "administrador"],
     },
     {
-      icon: FileSignature, // Nuevo ícono para Contratos
+      icon: FileSignature,
       label: "Contratos",
       path: "/contratos",
-      show: canManageContracts, // Usamos la nueva función de permiso
-      roles: ["administrador"], // Solo para admin
+      show: canManageContracts,
+      roles: ["administrador"],
     },
     {
       icon: Bot,
       label: "Asistente IA",
       path: "/asistente",
       roles: ["empleado", "director", "administracion", "administrador"],
+    },
+    {
+      icon: FileText,
+      label: "Usuarios",
+      path: "/usuarios",
+      roles: ["administrador"],
     },
   ];
 

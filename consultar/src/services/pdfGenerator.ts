@@ -93,7 +93,7 @@ const appendContractToPdf = async (
 
 const addHeader = (doc: jsPDF, title: string, otData: WorkOrder) => {
   // Añadir el logo
-  doc.addImage(logo, "PNG", 14, 8, 32, 24); // x, y, width, height (ajustado para mejor proporción)
+  doc.addImage(logo, "PNG", 14, 8, 32, 24); // x, y, width, height (ajustado por el usuario)
 
   doc.setFontSize(18);
   doc.text("Laboratorio Consultar", 105, 15, { align: "center" });
@@ -138,12 +138,17 @@ export const exportOtPdfWorkOrder = async (otData: WorkOrder) => {
     otData
   );
 
+  const selectedContact = otData.client?.contacts.find(
+    (c) => c.id === otData.contact_id
+  );
+
   // --- SECCIÓN DATOS DEL CLIENTE ---
   autoTable(jspdfDoc, {
     startY: 45,
     head: [["Datos del Cliente", ""]],
     body: [
       ["Empresa", otData.client?.name || "N/A"],
+      ["Referente", selectedContact ? selectedContact.name : "N/A"],
       [
         "Dirección",
         `${otData.client?.address || ""}, ${otData.client?.location || ""}, ${
@@ -164,22 +169,6 @@ export const exportOtPdfWorkOrder = async (otData: WorkOrder) => {
     columnStyles: { 0: { fontStyle: "bold" } },
   });
 
-  // --- SECCIÓN CONTACTOS DEL CLIENTE ---
-  if (otData.client?.contacts && otData.client.contacts.length > 0) {
-    autoTable(jspdfDoc, {
-      head: [["Referente", "Nombre", "Email", "Teléfono"]],
-      body: otData.client.contacts.map((c) => [
-        c.type || "N/A",
-        c.name,
-        c.email || "N/A",
-        c.phone || "N/A",
-      ]),
-      theme: "striped",
-      startY: (jspdfDoc as any).lastAutoTable.finalY + 5,
-      headStyles: { fillColor: [107, 114, 128] },
-    });
-  }
-
   // --- SECCIÓN DATOS DEL PRODUCTO ---
   autoTable(jspdfDoc, {
     startY: (jspdfDoc as any).lastAutoTable.finalY + 5,
@@ -196,7 +185,7 @@ export const exportOtPdfWorkOrder = async (otData: WorkOrder) => {
     columnStyles: { 0: { fontStyle: "bold" } },
   });
 
-  // --- SECCIÓN DE ACTIVIDADES, ENTREGA Y TIPO DE OT ---
+  // --- SECCIÓN DE DETALLES DEL SERVICIO (SEPARADA) ---
   const estimatedDate = calculateEstimatedDeliveryDate(
     otData.activities,
     otData.date
@@ -213,9 +202,10 @@ export const exportOtPdfWorkOrder = async (otData: WorkOrder) => {
     columnStyles: { 0: { fontStyle: "bold" } },
   });
 
+  // --- SECCIÓN DE ACTIVIDADES (SEPARADA) ---
   if (otData.activities && otData.activities.length > 0) {
     autoTable(jspdfDoc, {
-      startY: (jspdfDoc as any).lastAutoTable.finalY + 2,
+      startY: (jspdfDoc as any).lastAutoTable.finalY + 5,
       head: [["Actividad", "Norma de Referencia", "Precio (Sin IVA)"]],
       body: otData.activities.map((act) => [
         act.activity,
@@ -227,7 +217,7 @@ export const exportOtPdfWorkOrder = async (otData: WorkOrder) => {
     });
   }
 
-  // --- SECCIÓN DE OBSERVACIONES (MOVIDA) ---
+  // --- SECCIÓN DE OBSERVACIONES ---
   autoTable(jspdfDoc, {
     startY: (jspdfDoc as any).lastAutoTable.finalY + 2,
     head: [["Observaciones"]],
@@ -262,12 +252,17 @@ export const exportOtPdfRemito = async (otData: WorkOrder) => {
     otData
   );
 
+  const selectedContact = otData.client?.contacts.find(
+    (c) => c.id === otData.contact_id
+  );
+
   // --- SECCIÓN DATOS DEL CLIENTE ---
   autoTable(jspdfDoc, {
     startY: 45,
     head: [["Datos del Cliente", ""]],
     body: [
       ["Empresa", otData.client?.name || "N/A"],
+      ["Referente", selectedContact ? selectedContact.name : "N/A"],
       [
         "Dirección",
         `${otData.client?.address || ""}, ${otData.client?.location || ""}, ${
@@ -288,22 +283,6 @@ export const exportOtPdfRemito = async (otData: WorkOrder) => {
     columnStyles: { 0: { fontStyle: "bold" } },
   });
 
-  // --- SECCIÓN CONTACTOS DEL CLIENTE ---
-  if (otData.client?.contacts && otData.client.contacts.length > 0) {
-    autoTable(jspdfDoc, {
-      head: [["Referente", "Nombre", "Email", "Teléfono"]],
-      body: otData.client.contacts.map((c) => [
-        c.type || "N/A",
-        c.name,
-        c.email || "N/A",
-        c.phone || "N/A",
-      ]),
-      theme: "striped",
-      startY: (jspdfDoc as any).lastAutoTable.finalY + 5,
-      headStyles: { fillColor: [107, 114, 128] },
-    });
-  }
-
   // --- SECCIÓN DATOS DEL PRODUCTO ---
   autoTable(jspdfDoc, {
     startY: (jspdfDoc as any).lastAutoTable.finalY + 5,
@@ -320,7 +299,7 @@ export const exportOtPdfRemito = async (otData: WorkOrder) => {
     columnStyles: { 0: { fontStyle: "bold" } },
   });
 
-  // --- SECCIÓN DE ACTIVIDADES, ENTREGA Y TIPO DE OT ---
+  // --- SECCIÓN DE DETALLES DEL SERVICIO (SEPARADA) ---
   const estimatedDate = calculateEstimatedDeliveryDate(
     otData.activities,
     otData.date
@@ -337,9 +316,10 @@ export const exportOtPdfRemito = async (otData: WorkOrder) => {
     columnStyles: { 0: { fontStyle: "bold" } },
   });
 
+  // --- SECCIÓN DE ACTIVIDADES (SEPARADA) ---
   if (otData.activities && otData.activities.length > 0) {
     autoTable(jspdfDoc, {
-      startY: (jspdfDoc as any).lastAutoTable.finalY + 2,
+      startY: (jspdfDoc as any).lastAutoTable.finalY + 5,
       head: [["Actividades a Realizar", "Norma"]],
       body: otData.activities.map((act) => [act.activity, act.norma || "N/A"]),
       theme: "striped",
@@ -465,6 +445,7 @@ export const exportOtToPdfInternal = async (otData: WorkOrder) => {
   const finalPdfBytes = await finalPdfDoc.save();
   savePdf(finalPdfBytes, `OT-Interna-${otData.custom_id || otData.id}.pdf`);
 };
+
 // --- PDF: ETIQUETA ---
 export const exportOtPdfEtiqueta = async (otData: WorkOrder) => {
   const doc = new jsPDF({
@@ -475,44 +456,45 @@ export const exportOtPdfEtiqueta = async (otData: WorkOrder) => {
 
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
+  const labelWidth = pageWidth / 2;
 
   // Dibuja el borde para recortar
   doc.setDrawColor(0); // Color negro
   doc.rect(1, 1, pageWidth - 2, pageHeight - 2);
 
   const drawLabelContent = (startX: number) => {
-    const centerX = startX + pageWidth / 4; // Centro de cada etiqueta
-    let currentY = 15;
+    const centerX = startX + labelWidth / 2;
+    let currentY = 12; // Posición Y inicial
 
-    doc.setFontSize(14);
+    doc.setFontSize(16);
     doc.setFont("helvetica", "bold");
     doc.text(otData.custom_id || `#${otData.id}`, centerX, currentY, {
       align: "center",
     });
-    currentY += 10; // Más espacio
+    currentY += 8;
 
     doc.setFontSize(10);
     doc.setFont("helvetica", "normal");
-
     const productText = otData.product || "N/A";
-    const productLines = doc.splitTextToSize(productText, pageWidth / 2 - 8);
+    const productLines = doc.splitTextToSize(productText, labelWidth - 8);
     doc.text(productLines, centerX, currentY, { align: "center" });
-    currentY += productLines.length * 4 + 6; // Más espacio
+    currentY += productLines.length * 4 + 5;
 
-    doc.text(`MARCA: ${otData.brand || "N/A"}`, centerX, currentY, {
-      align: "center",
-    });
-    currentY += 7; // Más espacio
+    doc.setFont("helvetica", "bold");
+    const brandText = `MARCA: ${otData.brand || "N/A"}`;
+    const brandLines = doc.splitTextToSize(brandText, labelWidth - 8);
+    doc.text(brandLines, centerX, currentY, { align: "center" });
+    currentY += brandLines.length * 4 + 4;
 
-    doc.text(`MODELO: ${otData.model || "N/A"}`, centerX, currentY, {
-      align: "center",
-    });
-    currentY += 7; // Más espacio
+    const modelText = `MODELO: ${otData.model || "N/A"}`;
+    const modelLines = doc.splitTextToSize(modelText, labelWidth - 8);
+    doc.text(modelLines, centerX, currentY, { align: "center" });
+    currentY += modelLines.length * 4 + 4;
 
     const activities =
       otData.activities?.map((a) => a.activity).join(", ") || "N/A";
     const activityText = `ACTIVIDAD: ${activities}`;
-    const activityLines = doc.splitTextToSize(activityText, pageWidth / 2 - 8);
+    const activityLines = doc.splitTextToSize(activityText, labelWidth - 8);
     doc.text(activityLines, centerX, currentY, { align: "center" });
   };
 
@@ -521,14 +503,109 @@ export const exportOtPdfEtiqueta = async (otData: WorkOrder) => {
 
   // Línea divisoria
   doc.setLineDashPattern([1, 1], 0);
-  doc.line(pageWidth / 2, 5, pageWidth / 2, pageHeight - 5);
+  doc.line(labelWidth, 5, labelWidth, pageHeight - 5);
   doc.setLineDashPattern([], 0);
 
   // Segunda etiqueta (derecha)
-  drawLabelContent(pageWidth / 2);
+  drawLabelContent(labelWidth);
 
   const pdfBytes = doc.output("arraybuffer");
   const finalPdfDoc = await PDFDocument.load(pdfBytes);
   const finalPdfBytes = await finalPdfDoc.save();
   savePdf(finalPdfBytes, `Etiqueta-${otData.custom_id || otData.id}.pdf`);
+};
+
+// --- PDF: ESTADÍSTICAS (NUEVA FUNCIÓN) ---
+export const exportStatisticsPdf = async (data: any) => {
+  const doc = new jsPDF();
+  const pageWidth = doc.internal.pageSize.getWidth();
+
+  // Título
+  doc.setFontSize(20);
+  doc.text("Reporte de Estadísticas", pageWidth / 2, 20, { align: "center" });
+
+  // Resumen General
+  doc.setFontSize(16);
+  doc.text("Resumen General y Financiero", 14, 40);
+  autoTable(doc, {
+    startY: 45,
+    head: [["Métrica", "Total"]],
+    body: [
+      ["Órdenes de Trabajo", data.summary.totalOTs],
+      ["Clientes", data.summary.totalClients],
+      ["Usuarios", data.summary.totalUsers],
+      ["Ingresos Totales", formatCurrency(data.summary.totalRevenue)],
+      [
+        "Ingreso Promedio por OT",
+        formatCurrency(data.summary.averageRevenuePerOT),
+      ],
+    ],
+    theme: "grid",
+  });
+
+  // Gráficos (se agregarán como tablas)
+  doc.setFontSize(16);
+  doc.text(
+    "Distribución de Órdenes de Trabajo",
+    14,
+    (doc as any).lastAutoTable.finalY + 15
+  );
+
+  autoTable(doc, {
+    startY: (doc as any).lastAutoTable.finalY + 20,
+    head: [["Estado de OT", "Cantidad"]],
+    body: data.otsByStatus.map((item: any) => [item.status, item.count]),
+    theme: "striped",
+    margin: { right: pageWidth / 2 + 5 },
+  });
+
+  autoTable(doc, {
+    startY:
+      (doc as any).lastAutoTable.finalY - (data.otsByStatus.length * 8 + 12), // Align tables
+    head: [["Tipo de OT", "Cantidad"]],
+    body: data.otsByType.map((item: any) => [item.type, item.count]),
+    theme: "striped",
+    margin: { left: pageWidth / 2 + 5 },
+  });
+
+  doc.addPage();
+  // Rankings
+  doc.setFontSize(16);
+  doc.text("Rankings y Tendencias", 14, 20);
+
+  autoTable(doc, {
+    startY: 25,
+    head: [["Top 10 Clientes por Nº de OTs", "Cantidad"]],
+    body: data.topClients.map((item: any) => [item.name, item.count]),
+    theme: "grid",
+  });
+
+  autoTable(doc, {
+    startY: (doc as any).lastAutoTable.finalY + 10,
+    head: [["Top 5 Usuarios por OTs Finalizadas", "Cantidad"]],
+    body: data.topUsersByCompletedOTs.map((item: any) => [
+      item.name,
+      item.count,
+    ]),
+    theme: "grid",
+  });
+
+  autoTable(doc, {
+    startY: (doc as any).lastAutoTable.finalY + 10,
+    head: [["Actividades Más Solicitadas", "Cantidad"]],
+    body: data.topActivities.map((item: any) => [item.activity, item.count]),
+    theme: "grid",
+  });
+
+  autoTable(doc, {
+    startY: (doc as any).lastAutoTable.finalY + 10,
+    head: [["Tendencia de Creación de OTs (Últimos 12 Meses)", "Cantidad"]],
+    body: data.otCreationTrend.map((item: any) => [item.month, item.count]),
+    theme: "grid",
+  });
+
+  const pdfBytes = doc.output("arraybuffer");
+  const finalPdfDoc = await PDFDocument.load(pdfBytes);
+  const finalPdfBytes = await finalPdfDoc.save();
+  savePdf(finalPdfBytes, `Reporte-Estadisticas.pdf`);
 };

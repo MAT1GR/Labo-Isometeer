@@ -67,14 +67,14 @@ const ClienteDetail: React.FC = () => {
       <div className="bg-white dark:bg-gray-800 dark:border dark:border-gray-700 p-6 rounded-lg shadow-sm space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           <Input
-            label="ID / Nº Cliente *"
+            label="Código de Cliente *"
             {...register("code", { required: true })}
-            className="lg:col-span-1"
           />
+          <Input label="N° Cliente" {...register("client_number")} />
           <Input
             label="Nombre / Empresa *"
             {...register("name", { required: true })}
-            className="lg:col-span-2"
+            className="lg:col-span-1"
           />
           <Input
             label="Dirección"

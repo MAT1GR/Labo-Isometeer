@@ -3,7 +3,7 @@
 import axios from "axios";
 
 // --- CAMBIO AQUÍ ---
-// Usamos el nombre de tu computadora en lugar de la IP.
+// Usamos 'localhost' que es más estándar y confiable para desarrollo local.
 const API_BASE_URL = "http://DESKTOP-HU53VB2:4000/api";
 
 const axiosInstance = axios.create({
