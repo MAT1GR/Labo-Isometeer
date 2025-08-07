@@ -438,28 +438,28 @@ export const exportOtToPdfInternal = async (otData: WorkOrder) => {
 };
 
 // --- PDF: ETIQUETA ---
+
 export const exportOtPdfEtiqueta = async (otData: WorkOrder) => {
   const doc = new jsPDF({
-    orientation: "landscape",
+    orientation: "portrait",
     unit: "mm",
-    format: [74.25, 105],
+    format: "a4",
   });
 
-  const pageWidth = doc.internal.pageSize.getWidth();
-  const pageHeight = doc.internal.pageSize.getHeight();
-  const labelWidth = pageWidth / 2;
+  const labelWidth = 50;
+  const labelHeight = 74.25;
 
-  const drawLabelContent = (startX: number) => {
-    const margin = 3;
+  const drawLabelContent = (startX: number, startY: number) => {
+    const margin = 1;
     const innerX = startX + margin;
     const innerWidth = labelWidth - margin * 2;
     const centerX = startX + labelWidth / 2;
-    let currentY = 12;
+    let currentY = startY + 15;
 
     // Borde de cada etiqueta individual más grueso
-    doc.setLineWidth(0.5);
+    doc.setLineWidth(1);
     doc.setDrawColor(0);
-    doc.rect(innerX, margin + 1, innerWidth, pageHeight - margin * 2 - 2);
+    doc.rect(startX, 6, labelWidth, 60);
 
     // Separar el ID del código de cliente
     const fullId = otData.custom_id || "";
@@ -480,9 +480,7 @@ export const exportOtPdfEtiqueta = async (otData: WorkOrder) => {
     // 2. Producto (en lugar de la línea)
     doc.setFontSize(10);
     doc.setFont("helvetica", "normal");
-    doc.text(otData.product || "N/A", centerX, currentY, {
-      align: "center",
-    });
+    doc.text(otData.product || "N/A", centerX, currentY, { align: "center" });
     currentY += 8;
 
     // 3. Detalles
@@ -513,10 +511,10 @@ export const exportOtPdfEtiqueta = async (otData: WorkOrder) => {
     doc.text(activityLines, detailStartX + 18, currentY);
   };
 
-  // Primera etiqueta (izquierda)
-  drawLabelContent(0);
-  // Segunda etiqueta (derecha)
-  drawLabelContent(labelWidth);
+  // Dibujar la primera etiqueta en la esquina superior izquierda
+  drawLabelContent(52.5, 0);
+  // Dibujar la segunda etiqueta al lado de la primera
+  drawLabelContent(105, 0);
 
   const pdfBytes = doc.output("arraybuffer");
   const finalPdfDoc = await PDFDocument.load(pdfBytes);
