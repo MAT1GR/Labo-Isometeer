@@ -24,7 +24,7 @@ import {
   Archive,
 } from "lucide-react";
 import { mutate } from "swr";
-import { formatDateTime } from "../lib/utils";
+import { formatDateTime, calculateEstimatedDeliveryDate } from "../lib/utils";
 import MultiUserSelect from "../components/ui/MultiUserSelect";
 import ExportOtModal from "../components/ui/ExportOtModal";
 
@@ -50,6 +50,7 @@ const OTDetail: React.FC = () => {
     control,
     reset,
     setValue,
+    getValues,
     formState: { isSubmitting, isDirty },
   } = useForm<WorkOrder>();
 
@@ -59,12 +60,14 @@ const OTDetail: React.FC = () => {
   });
 
   const [otData, setOtData] = useState<WorkOrder | null>(null);
+  const [dataForExport, setDataForExport] = useState<WorkOrder | null>(null);
   const [users, setUsers] = useState<User[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
 
   const watchedActivities = useWatch({ control, name: "activities" });
   const otType = useWatch({ control, name: "type" });
+  const otDate = useWatch({ control, name: "date" });
   const isLacreEnabled =
     otType === "Ensayo SE" ||
     otType === "Ensayo EE" ||
@@ -87,7 +90,7 @@ const OTDetail: React.FC = () => {
       "en_progreso",
       "finalizada",
       "facturada",
-      "cerrada", // Añadido el nuevo estado
+      "cerrada",
     ];
     return startedStatuses.includes(otData.status);
   }, [otData]);
@@ -126,6 +129,9 @@ const OTDetail: React.FC = () => {
           certificate_expiry: ot.certificate_expiry
             ? new Date(ot.certificate_expiry).toISOString().split("T")[0]
             : "",
+          estimated_delivery_date: ot.estimated_delivery_date
+            ? new Date(ot.estimated_delivery_date).toISOString().split("T")[0]
+            : "",
           activities: ot.activities?.map((act) => ({
             ...act,
             assigned_to: act.assigned_users?.map((u) => u.id) || [],
@@ -143,6 +149,22 @@ const OTDetail: React.FC = () => {
     loadData();
   }, [loadData]);
 
+  useEffect(() => {
+    const activities = watchedActivities as Activity[];
+    if (otDate && activities && isFormEditable) {
+      // Solo calcula la fecha si el campo está vacío, permitiendo la edición manual.
+      if (!getValues("estimated_delivery_date")) {
+        const estimatedDate = calculateEstimatedDeliveryDate(
+          activities,
+          otDate
+        );
+        setValue("estimated_delivery_date", estimatedDate, {
+          shouldDirty: true,
+        });
+      }
+    }
+  }, [watchedActivities, otDate, isFormEditable, setValue, getValues]);
+
   const onSubmit = async (data: WorkOrder) => {
     try {
       const dataToSubmit = {
@@ -156,6 +178,16 @@ const OTDetail: React.FC = () => {
     } catch (error: any) {
       alert(error.message || "Hubo un error al guardar los cambios.");
     }
+  };
+
+  const handleOpenExportModal = () => {
+    const currentFormData = getValues();
+    const exportData = {
+      ...otData,
+      ...currentFormData,
+    } as WorkOrder;
+    setDataForExport(exportData);
+    setIsExportModalOpen(true);
   };
 
   const handleAuthorize = async () => {
@@ -211,7 +243,7 @@ const OTDetail: React.FC = () => {
       <ExportOtModal
         isOpen={isExportModalOpen}
         onClose={() => setIsExportModalOpen(false)}
-        otData={otData}
+        otData={dataForExport}
       />
       <form
         onSubmit={handleSubmit(onSubmit)}
@@ -230,7 +262,7 @@ const OTDetail: React.FC = () => {
               <Button
                 type="button"
                 variant="secondary"
-                onClick={() => setIsExportModalOpen(true)}
+                onClick={handleOpenExportModal}
               >
                 <Download className="mr-2 h-5 w-5" />
                 Exportar PDF
@@ -437,7 +469,7 @@ const OTDetail: React.FC = () => {
               <h2 className="text-lg font-semibold text-blue-700 dark:text-blue-400 col-span-full">
                 Producto
               </h2>
-              <Input label="Nombre" {...register("product")} />
+              <Input label="Nombre *" {...register("product")} />
               <Input label="Marca" {...register("brand")} />
               <Input label="Modelo" {...register("model")} />
               <Input
@@ -450,6 +482,11 @@ const OTDetail: React.FC = () => {
                 type="date"
                 {...register("certificate_expiry")}
                 disabled={!isLacreEnabled}
+              />
+              <Input
+                label="Fecha de Entrega Estimada"
+                type="date"
+                {...register("estimated_delivery_date")}
               />
             </div>
           </fieldset>

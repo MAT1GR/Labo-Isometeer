@@ -44,6 +44,7 @@ export interface WorkOrder {
   created_at: string;
   updated_at?: string;
   assigned_to_name?: string;
+  estimated_delivery_date?: string; // NUEVO CAMPO
 }
 
 // Interfaz para los filtros

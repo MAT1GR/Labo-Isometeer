@@ -186,10 +186,7 @@ export const exportOtPdfWorkOrder = async (otData: WorkOrder) => {
   });
 
   // --- SECCIÓN DE DETALLES DEL SERVICIO (SEPARADA) ---
-  const estimatedDate = calculateEstimatedDeliveryDate(
-    otData.activities,
-    otData.date
-  );
+  const estimatedDate = formatDate(otData.estimated_delivery_date);
   autoTable(jspdfDoc, {
     startY: (jspdfDoc as any).lastAutoTable.finalY + 5,
     head: [["Detalles del Servicio", ""]],
@@ -300,10 +297,7 @@ export const exportOtPdfRemito = async (otData: WorkOrder) => {
   });
 
   // --- SECCIÓN DE DETALLES DEL SERVICIO (SEPARADA) ---
-  const estimatedDate = calculateEstimatedDeliveryDate(
-    otData.activities,
-    otData.date
-  );
+  const estimatedDate = formatDate(otData.estimated_delivery_date);
   autoTable(jspdfDoc, {
     startY: (jspdfDoc as any).lastAutoTable.finalY + 5,
     head: [["Detalles del Servicio", ""]],
@@ -396,10 +390,7 @@ export const exportOtToPdfInternal = async (otData: WorkOrder) => {
   });
 
   // --- ESTADÍSTICAS Y COTIZACIÓN ---
-  const estimatedDate = calculateEstimatedDeliveryDate(
-    otData.activities,
-    otData.date
-  );
+  const estimatedDate = formatDate(otData.estimated_delivery_date);
   autoTable(jspdfDoc, {
     startY: (jspdfDoc as any).lastAutoTable.finalY + 5,
     head: [["Campo", "Información"]],
@@ -458,54 +449,72 @@ export const exportOtPdfEtiqueta = async (otData: WorkOrder) => {
   const pageHeight = doc.internal.pageSize.getHeight();
   const labelWidth = pageWidth / 2;
 
-  // Dibuja el borde para recortar
-  doc.setDrawColor(0); // Color negro
-  doc.rect(1, 1, pageWidth - 2, pageHeight - 2);
-
   const drawLabelContent = (startX: number) => {
+    const margin = 3;
+    const innerX = startX + margin;
+    const innerWidth = labelWidth - margin * 2;
     const centerX = startX + labelWidth / 2;
-    let currentY = 12; // Posición Y inicial
+    let currentY = 12;
 
-    doc.setFontSize(16);
+    // Borde de cada etiqueta individual más grueso
+    doc.setLineWidth(0.5);
+    doc.setDrawColor(0);
+    doc.rect(innerX, margin + 1, innerWidth, pageHeight - margin * 2 - 2);
+
+    // Separar el ID del código de cliente
+    const fullId = otData.custom_id || "";
+    const lastSpaceIndex = fullId.lastIndexOf(" ");
+    const mainId =
+      lastSpaceIndex !== -1 ? fullId.substring(0, lastSpaceIndex) : fullId;
+    const clientCode =
+      lastSpaceIndex !== -1 ? fullId.substring(lastSpaceIndex + 1) : "";
+
+    // 1. ID Principal y Código de Cliente (ambos en negrita)
+    doc.setFontSize(22);
     doc.setFont("helvetica", "bold");
-    doc.text(otData.custom_id || `#${otData.id}`, centerX, currentY, {
+    doc.text(mainId, centerX, currentY, { align: "center" });
+    currentY += 8;
+    doc.text(clientCode, centerX, currentY, { align: "center" });
+    currentY += 10;
+
+    // 2. Producto (en lugar de la línea)
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    doc.text(otData.product || "N/A", centerX, currentY, {
       align: "center",
     });
     currentY += 8;
 
-    doc.setFontSize(10);
+    // 3. Detalles
+    const detailStartX = innerX + 4;
+    doc.setFontSize(11);
+
+    // Marca
     doc.setFont("helvetica", "normal");
-    const productText = otData.product || "N/A";
-    const productLines = doc.splitTextToSize(productText, labelWidth - 8);
-    doc.text(productLines, centerX, currentY, { align: "center" });
-    currentY += productLines.length * 4 + 5;
-
+    doc.text("Marca:", detailStartX, currentY);
     doc.setFont("helvetica", "bold");
-    const brandText = `MARCA: ${otData.brand || "N/A"}`;
-    const brandLines = doc.splitTextToSize(brandText, labelWidth - 8);
-    doc.text(brandLines, centerX, currentY, { align: "center" });
-    currentY += brandLines.length * 4 + 4;
+    doc.text(otData.brand || "N/A", detailStartX + 14, currentY);
+    currentY += 7;
 
-    const modelText = `MODELO: ${otData.model || "N/A"}`;
-    const modelLines = doc.splitTextToSize(modelText, labelWidth - 8);
-    doc.text(modelLines, centerX, currentY, { align: "center" });
-    currentY += modelLines.length * 4 + 4;
+    // Modelo
+    doc.setFont("helvetica", "normal");
+    doc.text("Modelo:", detailStartX, currentY);
+    doc.setFont("helvetica", "bold");
+    doc.text(otData.model || "N/A", detailStartX + 15, currentY);
+    currentY += 7;
 
+    // Actividad
     const activities =
       otData.activities?.map((a) => a.activity).join(", ") || "N/A";
-    const activityText = `ACTIVIDAD: ${activities}`;
-    const activityLines = doc.splitTextToSize(activityText, labelWidth - 8);
-    doc.text(activityLines, centerX, currentY, { align: "center" });
+    doc.setFont("helvetica", "normal");
+    doc.text("Actividad:", detailStartX, currentY);
+    doc.setFont("helvetica", "bold");
+    const activityLines = doc.splitTextToSize(activities, innerWidth - 22);
+    doc.text(activityLines, detailStartX + 18, currentY);
   };
 
   // Primera etiqueta (izquierda)
   drawLabelContent(0);
-
-  // Línea divisoria
-  doc.setLineDashPattern([1, 1], 0);
-  doc.line(labelWidth, 5, labelWidth, pageHeight - 5);
-  doc.setLineDashPattern([], 0);
-
   // Segunda etiqueta (derecha)
   drawLabelContent(labelWidth);
 

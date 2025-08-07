@@ -12,6 +12,7 @@ import Button from "../components/ui/Button";
 import { ArrowLeft, Save, PlusCircle, Trash2, Loader } from "lucide-react";
 import axiosInstance from "../api/axiosInstance";
 import MultiUserSelect from "../components/ui/MultiUserSelect";
+import { calculateEstimatedDeliveryDate } from "../lib/utils";
 
 type OTCreateFormData = Omit<
   WorkOrder,
@@ -143,6 +144,16 @@ const OTCreate: React.FC = () => {
       setIdPreview("Completar campos...");
     }
   }, [watchedIdFields, setValue]);
+
+  // --- NUEVO EFECTO PARA CALCULAR FECHA DE ENTREGA ---
+  useEffect(() => {
+    const date = watchedIdFields[0];
+    const activities = watchedActivities as { activity: string }[];
+    if (date && activities) {
+      const estimatedDate = calculateEstimatedDeliveryDate(activities, date);
+      setValue("estimated_delivery_date", estimatedDate);
+    }
+  }, [watchedActivities, watchedIdFields, setValue]);
 
   const onSubmit = async (data: any) => {
     if (!user) return;
@@ -317,6 +328,11 @@ const OTCreate: React.FC = () => {
             type="date"
             {...register("certificate_expiry")}
             disabled={!isLacreEnabled}
+          />
+          <Input
+            label="Fecha de Entrega Estimada"
+            type="date"
+            {...register("estimated_delivery_date")}
           />
         </div>
 
