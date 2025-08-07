@@ -24,7 +24,7 @@ export interface WorkOrder {
   date: string;
   type: string;
   client_id: number;
-  contact_id?: number; // NUEVO CAMPO
+  contact_id?: number;
   client?: Client;
   activities?: Activity[];
   product: string;
@@ -112,6 +112,11 @@ class OTService {
 
   async deauthorizeOT(id: number): Promise<void> {
     await axiosInstance.put(`/ots/${id}/deauthorize`);
+  }
+
+  async closeOT(id: number, userId: number): Promise<WorkOrder> {
+    const response = await axiosInstance.put(`/ots/${id}/close`, { userId });
+    return response.data;
   }
 
   async startActivity(activityId: number): Promise<void> {

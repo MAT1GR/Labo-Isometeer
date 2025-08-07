@@ -44,13 +44,7 @@ const SidebarNavigation: React.FC = () => {
       path: "/clientes",
       roles: ["director", "administracion", "administrador"],
     },
-    {
-      icon: BarChart2,
-      label: "Estadísticas",
-      path: "/estadisticas",
-      show: canViewAdminContent,
-      roles: ["director", "administrador"],
-    },
+
     {
       icon: FileSignature,
       label: "Contratos",
@@ -58,12 +52,7 @@ const SidebarNavigation: React.FC = () => {
       show: canManageContracts,
       roles: ["administrador"],
     },
-    {
-      icon: Bot,
-      label: "Asistente IA",
-      path: "/asistente",
-      roles: ["empleado", "director", "administracion", "administrador"],
-    },
+
     {
       icon: FileText,
       label: "Usuarios",

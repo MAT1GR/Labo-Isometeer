@@ -133,7 +133,7 @@ router.get("/stats", (req: Request, res: Response) => {
         completedOT: getCount("work_orders", "status = 'finalizada'"),
         billedOT: getCount("work_orders", "status = 'facturada'"),
         totalRevenue: getTotalRevenue(),
-        paidInvoices: getCount("work_orders", "status = 'cierre'"),
+        paidInvoices: getCount("work_orders", "status = 'cerrada'"),
         unpaidInvoices: getCount("work_orders", "status = 'facturada'"),
         overdueInvoices: 0,
       },

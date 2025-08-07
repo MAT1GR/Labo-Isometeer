@@ -147,21 +147,6 @@ router.get("/generate-id", (req: Request, res: Response) => {
   }
 });
 
-const getPointsForActivity = (activity: string): number => {
-  const pointsMap: { [key: string]: number } = {
-    Calibracion: 1,
-    Completo: 1,
-    Ampliado: 0.5,
-    Refurbished: 0.5,
-    Fabricacion: 1,
-    "Verificacion de identidad": 0.1,
-    Reducido: 0.2,
-    "Servicio tecnico": 0.2,
-    Capacitacion: 1,
-  };
-  return pointsMap[activity] || 0;
-};
-
 // [POST] /api/ots
 router.post("/", (req: Request, res: Response) => {
   const { activities = [], created_by, ...otData } = req.body;
@@ -227,12 +212,6 @@ router.post("/", (req: Request, res: Response) => {
         if (act.assigned_to && Array.isArray(act.assigned_to)) {
           for (const userId of act.assigned_to) {
             insertAssignmentStmt.run(activityId, userId);
-            const points = getPointsForActivity(act.activity);
-            if (points > 0) {
-              db.prepare(
-                "UPDATE users SET points = points + ? WHERE id = ?"
-              ).run(points, userId);
-            }
           }
         }
       }
@@ -426,6 +405,97 @@ router.put("/:id/deauthorize", (req, res) => {
   }
 });
 
+// --- RUTA DE CIERRE DE OT ---
+router.put("/:id/close", (req: Request, res: Response) => {
+  const { id } = req.params;
+  const { userId } = req.body;
+
+  if (!userId) {
+    return res.status(400).json({ error: "userId es requerido." });
+  }
+
+  const closer = db
+    .prepare("SELECT role FROM users WHERE id = ?")
+    .get(userId) as { role: string };
+  if (!closer || closer.role !== "director") {
+    return res
+      .status(403)
+      .json({ error: "Solo un director puede cerrar OTs." });
+  }
+
+  const ot = db
+    .prepare("SELECT * FROM work_orders WHERE id = ?")
+    .get(id) as any;
+  if (!ot) {
+    return res.status(404).json({ error: "OT no encontrada." });
+  }
+  if (ot.status !== "finalizada") {
+    return res.status(400).json({
+      error: "La OT debe estar en estado 'finalizada' para poder cerrarse.",
+    });
+  }
+
+  const getPointsForActivity = (activity: string): number => {
+    const pointsMap: { [key: string]: number } = {
+      Calibracion: 1,
+      Completo: 1,
+      Ampliado: 0.5,
+      Refurbished: 0.5,
+      Fabricacion: 1,
+      "Verificacion de identidad": 0.1,
+      Reducido: 0.2,
+      "Servicio tecnico": 0.2,
+      Capacitacion: 1,
+    };
+    return pointsMap[activity] || 0;
+  };
+
+  const closeTransaction = db.transaction(() => {
+    db.prepare(
+      "UPDATE work_orders SET status = 'cerrada', updated_at = CURRENT_TIMESTAMP WHERE id = ?"
+    ).run(id);
+
+    const activities = db
+      .prepare(
+        `
+            SELECT wa.activity, waa.user_id
+            FROM work_order_activities wa
+            JOIN work_order_activity_assignments waa ON wa.id = waa.activity_id
+            WHERE wa.work_order_id = ?
+        `
+      )
+      .all(id) as { activity: string; user_id: number }[];
+
+    const pointsToAward: { [key: number]: number } = {};
+    for (const act of activities) {
+      const points = getPointsForActivity(act.activity);
+      if (points > 0 && act.user_id) {
+        pointsToAward[act.user_id] = (pointsToAward[act.user_id] || 0) + points;
+      }
+    }
+
+    for (const userId in pointsToAward) {
+      db.prepare("UPDATE users SET points = points + ? WHERE id = ?").run(
+        pointsToAward[userId],
+        userId
+      );
+    }
+
+    const updatedOT = db
+      .prepare("SELECT * FROM work_orders WHERE id = ?")
+      .get(id);
+    return updatedOT;
+  });
+
+  try {
+    const updatedOT = closeTransaction();
+    res.status(200).json(updatedOT);
+  } catch (error) {
+    console.error("Error closing OT:", error);
+    res.status(500).json({ error: "Error al cerrar la OT." });
+  }
+});
+
 // [DELETE] /api/ots/:id
 router.delete("/:id", (req: Request, res: Response) => {
   try {
@@ -530,7 +600,7 @@ router.get("/user-summary/:userId", (req: Request, res: Response) => {
         JOIN clients c ON ot.client_id = c.id
         WHERE
             waa.user_id = ?
-            AND ot.status NOT IN ('facturada', 'cierre')
+            AND ot.status NOT IN ('facturada', 'cierre', 'cerrada')
             AND ot.authorized = 1
         ORDER BY
             CASE wa.status

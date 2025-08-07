@@ -21,6 +21,7 @@ import {
   Clock,
   CalendarCheck,
   Lock,
+  Archive,
 } from "lucide-react";
 import { mutate } from "swr";
 import { formatDateTime } from "../lib/utils";
@@ -86,7 +87,7 @@ const OTDetail: React.FC = () => {
       "en_progreso",
       "finalizada",
       "facturada",
-      "cierre",
+      "cerrada", // Añadido el nuevo estado
     ];
     return startedStatuses.includes(otData.status);
   }, [otData]);
@@ -171,6 +172,17 @@ const OTDetail: React.FC = () => {
     mutate(["/ots", user]);
   };
 
+  const handleCloseOT = async () => {
+    if (!id || !user) return;
+    try {
+      await otService.closeOT(Number(id), user.id);
+      await loadData();
+      mutate(["/ots", user]);
+    } catch (error: any) {
+      alert(error.response?.data?.error || "Hubo un error al cerrar la OT.");
+    }
+  };
+
   const handleStartActivity = async (activityId: number) => {
     await otService.startActivity(activityId);
     await loadData();
@@ -252,6 +264,15 @@ const OTDetail: React.FC = () => {
                 <XSquare className="mr-2 h-5 w-5" /> Desautorizar OT
               </Button>
             )}
+          {user?.role === "director" && otData.status === "finalizada" && (
+            <Button
+              type="button"
+              onClick={handleCloseOT}
+              className="bg-purple-600 hover:bg-purple-700"
+            >
+              <Archive className="mr-2 h-5 w-5" /> Cerrar OT
+            </Button>
+          )}
         </div>
 
         {isEmployee && myActivities.length > 0 && (

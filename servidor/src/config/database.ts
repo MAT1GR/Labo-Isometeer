@@ -47,13 +47,14 @@ db.exec(`
     date TEXT NOT NULL, 
     type TEXT NOT NULL, 
     client_id INTEGER NOT NULL,
-    contact_id INTEGER, -- NUEVO CAMPO PARA EL REFERENTE
+    contact_id INTEGER, 
     product TEXT NOT NULL, 
     brand TEXT,
     model TEXT,
     seal_number TEXT,
     observations TEXT,
     certificate_expiry TEXT,
+    estimated_delivery_date TEXT, -- NUEVO CAMPO
     collaborator_observations TEXT,
     status TEXT NOT NULL DEFAULT 'pendiente',
     created_by INTEGER NOT NULL, 

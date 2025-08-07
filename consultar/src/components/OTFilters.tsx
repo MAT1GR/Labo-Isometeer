@@ -105,7 +105,7 @@ const OTFilters: React.FC<OTFiltersProps> = ({
             <option value="en_progreso">En Progreso</option>
             <option value="finalizada">Finalizada</option>
             <option value="facturada">Facturada</option>
-            <option value="cierre">Cierre</option>
+            <option value="cerrada">Cerrada</option>
           </select>
         </div>
         <div className="space-y-2">

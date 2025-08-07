@@ -105,9 +105,9 @@ const OT: React.FC = () => {
       case "finalizada":
         return "bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300";
       case "facturada":
+        return "bg-indigo-100 text-indigo-800 dark:bg-indigo-900/50 dark:text-indigo-300";
+      case "cerrada":
         return "bg-purple-100 text-purple-800 dark:bg-purple-900/50 dark:text-purple-300";
-      case "cierre":
-        return "bg-gray-200 text-gray-800 dark:bg-gray-600 dark:text-gray-100";
       default:
         return "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200";
     }

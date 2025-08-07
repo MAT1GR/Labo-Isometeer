@@ -19,10 +19,8 @@ import ClienteDetail from "./pages/ClienteDetail";
 import OT from "./pages/ot";
 import OTCreate from "./pages/OTCreate";
 import OTDetail from "./pages/OTdetail";
-import Asistente from "./pages/Asistente";
 import Perfil from "./pages/Perfil";
 import Contratos from "./pages/Contratos";
-import Estadisticas from "./pages/Estadisticas"; // NUEVA PÁGINA
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({
   children,
@@ -78,10 +76,10 @@ function App() {
             <Route path="clientes/editar/:id" element={<ClienteDetail />} />
             <Route path="usuarios" element={<Usuarios />} />
             <Route path="usuarios/grafico" element={<UserChart />} />
-            <Route path="asistente" element={<Asistente />} />
+
             <Route path="perfil" element={<Perfil />} />
             <Route path="contratos" element={<Contratos />} />
-            <Route path="estadisticas" element={<Estadisticas />} />{" "}
+
             {/* NUEVA RUTA */}
           </Route>
         </Routes>
