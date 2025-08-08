@@ -52,9 +52,12 @@ class ClientService {
     await axiosInstance.delete(`/clients/${clientId}`);
   }
 
-  async bulkCreateClients(
-    clients: Partial<Client>[]
-  ): Promise<{ imported: number; duplicates: number }> {
+  // FUNCIÓN CORREGIDA
+  async bulkCreateClients(clients: Partial<Client>[]): Promise<{
+    importedClients: number;
+    importedContacts: number;
+    duplicates: number;
+  }> {
     const response = await axiosInstance.post("/clients/bulk-import", {
       clients,
     });

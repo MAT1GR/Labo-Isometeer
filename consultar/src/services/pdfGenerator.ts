@@ -457,7 +457,7 @@ export const exportOtPdfEtiqueta = async (otData: WorkOrder) => {
     let currentY = startY + 15;
 
     // Borde de cada etiqueta individual más grueso
-    doc.setLineWidth(1);
+    doc.setLineWidth(0.7);
     doc.setDrawColor(0);
     doc.rect(startX, 6, labelWidth, 60);
 
