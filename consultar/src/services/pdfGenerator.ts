@@ -514,7 +514,7 @@ export const exportOtPdfEtiqueta = async (otData: WorkOrder) => {
   // Dibujar la primera etiqueta en la esquina superior izquierda
   drawLabelContent(52.5, 0);
   // Dibujar la segunda etiqueta al lado de la primera
-  drawLabelContent(105, 0);
+  drawLabelContent(107.5, 0);
 
   const pdfBytes = doc.output("arraybuffer");
   const finalPdfDoc = await PDFDocument.load(pdfBytes);
