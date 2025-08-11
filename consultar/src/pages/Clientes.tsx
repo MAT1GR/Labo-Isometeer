@@ -1,15 +1,27 @@
 // RUTA: /cliente/src/pages/Clientes.tsx
 
-import React, { useRef, useState } from "react";
+import React, { useMemo, useRef, useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { clientService, Client } from "../services/clientService";
 import Card from "../components/ui/Card";
 import Button from "../components/ui/Button";
-import { PlusCircle, Users, Trash2, Upload, Edit } from "lucide-react";
+import {
+  PlusCircle,
+  Users,
+  Trash2,
+  Upload,
+  Edit,
+  Search,
+  ChevronLeft,
+  ChevronRight,
+} from "lucide-react";
 import useSWR, { mutate } from "swr";
 import { fetcher } from "../api/axiosInstance";
 import * as XLSX from "xlsx";
-import ConfirmationModal from "../components/ui/ConfirmationModal"; // Importamos el modal
+import ConfirmationModal from "../components/ui/ConfirmationModal";
+import Input from "../components/ui/Input";
+
+const CLIENTS_PER_PAGE = 50;
 
 const Clientes: React.FC = () => {
   const {
@@ -19,10 +31,44 @@ const Clientes: React.FC = () => {
   } = useSWR<Client[]>("/clients", fetcher);
   const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const topOfListRef = useRef<HTMLDivElement>(null);
 
-  // Estado para el modal de confirmación
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [clientToDelete, setClientToDelete] = useState<number | null>(null);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+
+  const filteredClients = useMemo(() => {
+    if (!clients) return [];
+    const lowercasedFilter = searchTerm.toLowerCase();
+    return clients.filter((client) => {
+      return (
+        client.name?.toLowerCase().includes(lowercasedFilter) ||
+        client.code?.toLowerCase().includes(lowercasedFilter) ||
+        client.client_number?.toLowerCase().includes(lowercasedFilter) ||
+        client.fiscal_id?.toLowerCase().includes(lowercasedFilter) ||
+        client.address?.toLowerCase().includes(lowercasedFilter) ||
+        client.location?.toLowerCase().includes(lowercasedFilter) ||
+        client.province?.toLowerCase().includes(lowercasedFilter)
+      );
+    });
+  }, [clients, searchTerm]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm]);
+
+  useEffect(() => {
+    if (topOfListRef.current) {
+      topOfListRef.current.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [currentPage]);
+
+  const totalPages = Math.ceil(filteredClients.length / CLIENTS_PER_PAGE);
+  const paginatedClients = useMemo(() => {
+    const startIndex = (currentPage - 1) * CLIENTS_PER_PAGE;
+    return filteredClients.slice(startIndex, startIndex + CLIENTS_PER_PAGE);
+  }, [filteredClients, currentPage]);
 
   const handleDeleteRequest = (clientId: number) => {
     setClientToDelete(clientId);
@@ -46,7 +92,6 @@ const Clientes: React.FC = () => {
     }
   };
 
-  // REEMPLAZAR ESTA FUNCIÓN
   const handleFileImport = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -166,7 +211,7 @@ const Clientes: React.FC = () => {
         title="Eliminar Cliente"
         message="¿Estás seguro de que quieres eliminar este cliente? Se eliminarán también todas sus Órdenes de Trabajo asociadas. Esta acción no se puede deshacer."
       />
-      <div className="space-y-6">
+      <div className="space-y-6" ref={topOfListRef}>
         <div className="flex justify-between items-center">
           <h1 className="text-3xl font-bold">Gestión de Clientes</h1>
           <div className="flex gap-2">
@@ -188,6 +233,16 @@ const Clientes: React.FC = () => {
             />
           </div>
         </div>
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+          <Input
+            type="text"
+            placeholder="Buscar por nombre, código, nº de cliente, CUIT, dirección..."
+            className="pl-10 w-full"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </div>
         <Card>
           <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
             <thead className="bg-gray-50 dark:bg-gray-700">
@@ -201,32 +256,17 @@ const Clientes: React.FC = () => {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">
                   Empresa
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">
-                  Contacto Principal
-                </th>
                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">
                   Acciones
                 </th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200 dark:bg-gray-800 dark:divide-gray-700">
-              {clients?.map((client) => (
+              {paginatedClients?.map((client) => (
                 <tr key={client.id}>
                   <td className="px-6 py-4">{client.code}</td>
                   <td className="px-6 py-4">{client.client_number || "N/A"}</td>
                   <td className="px-6 py-4 font-medium">{client.name}</td>
-                  <td className="px-6 py-4">
-                    {Array.isArray(client.contacts) &&
-                    client.contacts.length > 0
-                      ? client.contacts
-                          .map((contact: any) =>
-                            typeof contact === "string"
-                              ? contact
-                              : contact.name || contact.email || "Contacto"
-                          )
-                          .join(", ")
-                      : "N/A"}
-                  </td>
                   <td className="px-6 py-4 text-right space-x-2">
                     <Button
                       size="sm"
@@ -248,6 +288,33 @@ const Clientes: React.FC = () => {
             </tbody>
           </table>
         </Card>
+        {totalPages > 1 && (
+          <div className="flex justify-center items-center gap-4 mt-6">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+              disabled={currentPage === 1}
+            >
+              <ChevronLeft className="h-4 w-4 mr-1" />
+              Anterior
+            </Button>
+            <span className="text-sm text-gray-600 dark:text-gray-400">
+              Página {currentPage} de {totalPages}
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() =>
+                setCurrentPage((prev) => Math.min(prev + 1, totalPages))
+              }
+              disabled={currentPage === totalPages}
+            >
+              Siguiente
+              <ChevronRight className="h-4 w-4 ml-1" />
+            </Button>
+          </div>
+        )}
       </div>
     </>
   );
