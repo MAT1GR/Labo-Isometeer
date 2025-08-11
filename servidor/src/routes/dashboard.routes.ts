@@ -10,7 +10,6 @@ router.get("/stats", (req: Request, res: Response) => {
   try {
     const { period = "week" } = req.query;
 
-    // Usa un alias consistente para la tabla de órdenes de trabajo
     let dateFilterClause = "";
 
     switch (period) {
@@ -27,7 +26,6 @@ router.get("/stats", (req: Request, res: Response) => {
     }
 
     const getCount = (table: string, customWhere: string = "1 = 1") => {
-      // Reemplaza el alias 'wo' por el nombre de la tabla para que la consulta sea correcta
       const finalWhere =
         dateFilterClause.replace(/wo\./g, "") + ` AND ${customWhere}`;
       const query = `SELECT COUNT(*) as count FROM ${table} AS wo ${finalWhere}`;
@@ -40,6 +38,13 @@ router.get("/stats", (req: Request, res: Response) => {
           count: number;
         }
       ).count;
+
+    const getTotalPoints = () =>
+      (
+        db.prepare(`SELECT SUM(points) as total FROM users`).get() as {
+          total: number;
+        }
+      ).total || 0;
 
     const getTotalRevenue = () => {
       const result = db
@@ -134,7 +139,7 @@ router.get("/stats", (req: Request, res: Response) => {
         billedOT: getCount("work_orders", "status = 'facturada'"),
         totalRevenue: getTotalRevenue(),
         paidInvoices: getCount("work_orders", "status = 'cerrada'"),
-        unpaidInvoices: getCount("work_orders", "status = 'facturada'"),
+        totalPoints: getTotalPoints(),
         overdueInvoices: 0,
       },
       recentOrders: db

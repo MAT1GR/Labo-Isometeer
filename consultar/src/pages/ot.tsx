@@ -1,6 +1,6 @@
 // RUTA: /cliente/src/pages/OT.tsx
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { otService, WorkOrder, OTFilters } from "../services/otService";
 import { clientService, Client } from "../services/clientService";
@@ -16,15 +16,20 @@ import {
   CheckSquare,
   XSquare,
   Filter,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import useSWR, { mutate } from "swr";
 import ConfirmationModal from "../components/ui/ConfirmationModal";
 import OTFiltersComponent from "../components/OTFilters"; // Importamos el nuevo componente
 
+const OTS_PER_PAGE = 50;
+
 const OT: React.FC = () => {
   const { user, canCreateContent, canViewAdminContent, canAuthorizeOT } =
     useAuth();
   const navigate = useNavigate();
+  const topOfListRef = useRef<HTMLDivElement>(null);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [otToDelete, setOtToDelete] = useState<number | null>(null);
@@ -32,6 +37,7 @@ const OT: React.FC = () => {
   // Estados para los filtros
   const [filters, setFilters] = useState<OTFilters>({});
   const [showFilters, setShowFilters] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
 
   // Fetching de datos para los selectores del filtro
   const { data: clients } = useSWR<Client[]>(
@@ -48,6 +54,23 @@ const OT: React.FC = () => {
   } = useSWR(user ? ["/ots", user, filters] : null, () =>
     otService.getAllOTs(user, filters)
   );
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filters]);
+
+  useEffect(() => {
+    if (topOfListRef.current) {
+      topOfListRef.current.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [currentPage]);
+
+  const totalPages = ots ? Math.ceil(ots.length / OTS_PER_PAGE) : 0;
+  const paginatedOts = useMemo(() => {
+    if (!ots) return [];
+    const startIndex = (currentPage - 1) * OTS_PER_PAGE;
+    return ots.slice(startIndex, startIndex + OTS_PER_PAGE);
+  }, [ots, currentPage]);
 
   const handleDeleteRequest = (otId: number) => {
     setOtToDelete(otId);
@@ -124,7 +147,7 @@ const OT: React.FC = () => {
         title="Eliminar Orden de Trabajo"
         message="¿Estás seguro de que quieres eliminar esta OT? Esta acción no se puede deshacer."
       />
-      <div className="space-y-6">
+      <div className="space-y-6" ref={topOfListRef}>
         <div className="flex justify-between items-center">
           <h1 className="text-3xl font-bold">
             {canViewAdminContent()
@@ -167,7 +190,7 @@ const OT: React.FC = () => {
         <Card>
           {isLoading ? (
             <div>Cargando...</div>
-          ) : ots && ots.length > 0 ? (
+          ) : paginatedOts && paginatedOts.length > 0 ? (
             <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
               <thead className="bg-gray-50 dark:bg-gray-700">
                 <tr>
@@ -197,7 +220,7 @@ const OT: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200 dark:bg-gray-800 dark:divide-gray-700">
-                {ots.map((ot) => (
+                {paginatedOts.map((ot) => (
                   <tr
                     key={ot.id}
                     className={`${
@@ -287,6 +310,33 @@ const OT: React.FC = () => {
             </div>
           )}
         </Card>
+        {totalPages > 1 && (
+          <div className="flex justify-center items-center gap-4 mt-6">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+              disabled={currentPage === 1}
+            >
+              <ChevronLeft className="h-4 w-4 mr-1" />
+              Anterior
+            </Button>
+            <span className="text-sm text-gray-600 dark:text-gray-400">
+              Página {currentPage} de {totalPages}
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() =>
+                setCurrentPage((prev) => Math.min(prev + 1, totalPages))
+              }
+              disabled={currentPage === totalPages}
+            >
+              Siguiente
+              <ChevronRight className="h-4 w-4 ml-1" />
+            </Button>
+          </div>
+        )}
       </div>
     </>
   );

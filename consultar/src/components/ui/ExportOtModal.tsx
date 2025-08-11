@@ -42,14 +42,12 @@ const ExportOtModal: React.FC<ExportOtModalProps> = ({
   const ExportOptionButton = ({
     icon: Icon,
     title,
-    description,
     onClick,
     disabled = false,
     colorClass,
   }: {
     icon: React.ElementType;
     title: string;
-    description: string;
     onClick?: () => void;
     disabled?: boolean;
     colorClass: string;
@@ -68,9 +66,6 @@ const ExportOtModal: React.FC<ExportOtModalProps> = ({
       <div>
         <p className="font-semibold text-gray-900 dark:text-gray-100">
           {title}
-        </p>
-        <p className="text-sm text-gray-500 dark:text-gray-400">
-          {description}
         </p>
       </div>
     </button>
@@ -133,21 +128,18 @@ const ExportOtModal: React.FC<ExportOtModalProps> = ({
                   <ExportOptionButton
                     icon={FileText}
                     title="Orden de Trabajo"
-                    description="Documento completo con detalles y precios."
                     onClick={handleExportWorkOrder}
                     colorClass="text-blue-500"
                   />
                   <ExportOptionButton
                     icon={Receipt}
                     title="Remito / Recibo"
-                    description="Versión para el cliente sin información de precios."
                     onClick={handleExportRemito}
                     colorClass="text-green-500"
                   />
                   <ExportOptionButton
                     icon={Tag}
                     title="Etiqueta"
-                    description="Genera 2 etiquetas duplicadas para imprimir."
                     onClick={handleExportEtiqueta}
                     colorClass="text-purple-500"
                   />

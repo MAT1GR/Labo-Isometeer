@@ -276,105 +276,89 @@ const OTDetail: React.FC = () => {
           </div>
         </div>
 
-        <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm flex flex-wrap justify-center items-center gap-4">
-          {canAuthorizeOT() && !otData.authorized && (
-            <Button
-              type="button"
-              onClick={handleAuthorize}
-              className="bg-green-600 hover:bg-green-700"
-            >
-              <CheckSquare className="mr-2 h-5 w-5" /> Autorizar OT
-            </Button>
-          )}
-          {canAuthorizeOT() &&
-            otData.authorized &&
-            otData.status === "pendiente" && (
-              <Button
-                type="button"
-                onClick={handleDeauthorize}
-                variant="danger"
-              >
-                <XSquare className="mr-2 h-5 w-5" /> Desautorizar OT
-              </Button>
-            )}
-          {user?.role === "director" && otData.status === "finalizada" && (
-            <Button
-              type="button"
-              onClick={handleCloseOT}
-              className="bg-purple-600 hover:bg-purple-700"
-            >
-              <Archive className="mr-2 h-5 w-5" /> Cerrar OT
-            </Button>
-          )}
-        </div>
-
         {isEmployee && myActivities.length > 0 && (
           <Card>
-            <h2 className="text-lg font-semibold text-blue-800 dark:text-blue-300 mb-4">
-              Mis Tareas en esta OT
+            <h2 className="text-xl font-semibold text-blue-800 dark:text-blue-300 mb-4 flex items-center gap-2">
+              <ClipboardList size={20} /> Mis Tareas en esta OT
             </h2>
             <div className="space-y-4">
-              {myActivities.map((activity) => (
-                <div
-                  key={activity.id}
-                  className="bg-gray-100 dark:bg-gray-800 p-4 rounded-lg flex flex-col md:flex-row md:items-center justify-between gap-4"
-                >
-                  <div className="flex-1">
-                    <p className="font-bold">{activity.activity}</p>
-                    <div className="grid grid-cols-2 gap-4 text-xs mt-2 text-gray-600 dark:text-gray-400">
-                      <div className="flex items-center gap-2">
-                        <Clock className="h-4 w-4" />
-                        <span>
-                          Inicio: {formatDateTime(activity.started_at) || "N/A"}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <CalendarCheck className="h-4 w-4" />
-                        <span>
-                          Fin: {formatDateTime(activity.completed_at) || "N/A"}
-                        </span>
+              {myActivities.map((activity) => {
+                const statusColor =
+                  activity.status === "finalizada"
+                    ? "border-green-500"
+                    : activity.status === "en_progreso"
+                    ? "border-blue-500"
+                    : "border-yellow-500";
+                return (
+                  <div
+                    key={activity.id}
+                    className={`bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm border-l-4 ${statusColor} flex flex-col md:flex-row md:items-center justify-between gap-4`}
+                  >
+                    <div className="flex-1">
+                      <p className="font-bold text-lg text-gray-800 dark:text-gray-100">
+                        {activity.activity}
+                      </p>
+                      <div className="flex items-center gap-6 text-xs mt-2 text-gray-500 dark:text-gray-400">
+                        <div className="flex items-center gap-2">
+                          <Clock className="h-4 w-4" />
+                          <span>
+                            Inicio:{" "}
+                            <strong>
+                              {formatDateTime(activity.started_at) || "N/A"}
+                            </strong>
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <CalendarCheck className="h-4 w-4" />
+                          <span>
+                            Fin:{" "}
+                            <strong>
+                              {formatDateTime(activity.completed_at) || "N/A"}
+                            </strong>
+                          </span>
+                        </div>
                       </div>
                     </div>
+                    <div className="flex items-center gap-4">
+                      <span
+                        className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                          activity.status === "finalizada"
+                            ? "bg-green-100 text-green-800"
+                            : activity.status === "en_progreso"
+                            ? "bg-blue-100 text-blue-800"
+                            : "bg-yellow-100 text-yellow-800"
+                        }`}
+                      >
+                        {activity.status.replace("_", " ")}
+                      </span>
+                      {otData.authorized && (
+                        <>
+                          {activity.status === "pendiente" && (
+                            <Button
+                              type="button"
+                              size="sm"
+                              onClick={() => handleStartActivity(activity.id)}
+                              className="bg-green-600 hover:bg-green-700"
+                            >
+                              <Play className="h-4 w-4 mr-1" /> Iniciar
+                            </Button>
+                          )}
+                          {activity.status === "en_progreso" && (
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="danger"
+                              onClick={() => handleStopActivity(activity.id)}
+                            >
+                              <StopCircle className="h-4 w-4 mr-1" /> Finalizar
+                            </Button>
+                          )}
+                        </>
+                      )}
+                    </div>
                   </div>
-                  <div className="flex items-center gap-4">
-                    <span
-                      className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                        activity.status === "finalizada"
-                          ? "bg-green-100 text-green-800"
-                          : activity.status === "en_progreso"
-                          ? "bg-blue-100 text-blue-800"
-                          : "bg-yellow-100 text-yellow-800"
-                      }`}
-                    >
-                      {activity.status.replace("_", " ")}
-                    </span>
-                    {otData.authorized && (
-                      <>
-                        {activity.status === "pendiente" && (
-                          <Button
-                            type="button"
-                            size="sm"
-                            onClick={() => handleStartActivity(activity.id)}
-                            className="bg-green-600 hover:bg-green-700"
-                          >
-                            <Play className="h-4 w-4" />
-                          </Button>
-                        )}
-                        {activity.status === "en_progreso" && (
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="danger"
-                            onClick={() => handleStopActivity(activity.id)}
-                          >
-                            <StopCircle className="h-4 w-4" />
-                          </Button>
-                        )}
-                      </>
-                    )}
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </Card>
         )}

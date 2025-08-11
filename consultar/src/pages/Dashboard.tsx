@@ -19,6 +19,7 @@ import {
   ChevronRight,
   Activity,
   CheckCircle2,
+  Award,
 } from "lucide-react";
 import {
   BarChart,
@@ -48,7 +49,7 @@ interface DashboardStats {
   totalClients: number;
   totalRevenue: number;
   paidInvoices: number;
-  unpaidInvoices: number;
+  totalPoints: number;
   overdueInvoices: number;
   pendingOT: number;
   inProgressOT: number;
@@ -97,6 +98,7 @@ const AdminDirectorDashboard: React.FC = () => {
       { name: "Pendientes", value: stats.pendingOT, fill: "#f59e0b" },
       { name: "En Progreso", value: stats.inProgressOT, fill: "#3b82f6" },
       { name: "Finalizadas", value: stats.completedOT, fill: "#22c55e" },
+      { name: "Facturadas", value: stats.billedOT, fill: "#4f46e5" },
       { name: "Cerradas", value: stats.paidInvoices, fill: "#8b5cf6" },
     ].filter((item) => item.value > 0);
   }, [stats]);
@@ -200,12 +202,10 @@ const AdminDirectorDashboard: React.FC = () => {
             </Card>
             <Card>
               <div className="flex justify-between items-center">
-                <p className="text-sm font-medium">
-                  Facturas Pendientes ({periodTitle})
-                </p>
-                <Clock className="h-6 w-6 text-red-500" />
+                <p className="text-sm font-medium">Puntos Acumulados</p>
+                <Award className="h-6 w-6 text-yellow-500" />
               </div>
-              <p className="text-3xl font-bold">{stats?.unpaidInvoices}</p>
+              <p className="text-3xl font-bold">{stats?.totalPoints}</p>
             </Card>
           </div>
 

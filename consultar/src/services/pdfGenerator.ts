@@ -461,20 +461,18 @@ export const exportOtPdfEtiqueta = async (otData: WorkOrder) => {
     doc.setDrawColor(0);
     doc.rect(startX, 6, labelWidth, 60);
 
-    // Separar el ID del código de cliente
+    // --- CAMBIO AQUÍ: Separar números y letras del ID ---
     const fullId = otData.custom_id || "";
-    const lastSpaceIndex = fullId.lastIndexOf(" ");
-    const mainId =
-      lastSpaceIndex !== -1 ? fullId.substring(0, lastSpaceIndex) : fullId;
-    const clientCode =
-      lastSpaceIndex !== -1 ? fullId.substring(lastSpaceIndex + 1) : "";
+    const parts = fullId.split(" ");
+    const numericId = parts[0] || ""; // La parte numérica
+    const letterId = parts.slice(1).join(" "); // El resto (letras y código de cliente)
 
     // 1. ID Principal y Código de Cliente (ambos en negrita)
     doc.setFontSize(22);
     doc.setFont("helvetica", "bold");
-    doc.text(mainId, centerX, currentY, { align: "center" });
+    doc.text(numericId, centerX, currentY, { align: "center" });
     currentY += 8;
-    doc.text(clientCode, centerX, currentY, { align: "center" });
+    doc.text(letterId, centerX, currentY, { align: "center" });
     currentY += 10;
 
     // 2. Producto (en lugar de la línea)
