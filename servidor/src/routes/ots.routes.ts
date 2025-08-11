@@ -438,18 +438,10 @@ router.put("/:id/close", (req: Request, res: Response) => {
   }
 
   const getPointsForActivity = (activity: string): number => {
-    const pointsMap: { [key: string]: number } = {
-      Calibracion: 1,
-      Completo: 1,
-      Ampliado: 0.5,
-      Refurbished: 0.5,
-      Fabricacion: 1,
-      "Verificacion de identidad": 0.1,
-      Reducido: 0.2,
-      "Servicio tecnico": 0.2,
-      Capacitacion: 1,
-    };
-    return pointsMap[activity] || 0;
+    const row = db
+      .prepare("SELECT points FROM activity_points WHERE activity = ?")
+      .get(activity) as { points: number } | undefined;
+    return row ? row.points : 0;
   };
 
   const closeTransaction = db.transaction(() => {

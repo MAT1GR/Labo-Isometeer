@@ -54,7 +54,7 @@ db.exec(`
     seal_number TEXT,
     observations TEXT,
     certificate_expiry TEXT,
-    estimated_delivery_date TEXT, -- NUEVO CAMPO
+    estimated_delivery_date TEXT,
     collaborator_observations TEXT,
     status TEXT NOT NULL DEFAULT 'pendiente',
     created_by INTEGER NOT NULL, 
@@ -96,8 +96,15 @@ db.exec(`
     content TEXT,
     pdf_path TEXT 
   );
+  
+  CREATE TABLE IF NOT EXISTS activity_points (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    activity TEXT UNIQUE NOT NULL,
+    points REAL NOT NULL
+  );
 `);
 
+// Seed contracts if they don't exist
 // Seed contracts if they don't exist
 const seedContracts = () => {
   const contracts = [
@@ -124,7 +131,27 @@ const seedContracts = () => {
   contracts.forEach((c) => stmt.run(c.name, c.content));
 };
 
+const seedActivityPoints = () => {
+  const points = [
+    { activity: "Calibracion", points: 1 },
+    { activity: "Completo", points: 1 },
+    { activity: "Ampliado", points: 0.5 },
+    { activity: "Refurbished", points: 0.5 },
+    { activity: "Fabricacion", points: 1 },
+    { activity: "Verificacion de identidad", points: 0.1 },
+    { activity: "Reducido", points: 0.2 },
+    { activity: "Servicio tecnico", points: 0.2 },
+    { activity: "Capacitacion", points: 1 },
+    { activity: "Emision", points: 0 },
+  ];
+  const stmt = db.prepare(
+    "INSERT OR IGNORE INTO activity_points (activity, points) VALUES (?, ?)"
+  );
+  points.forEach((p) => stmt.run(p.activity, p.points));
+};
+
 seedContracts();
+seedActivityPoints();
 
 const adminEmail = "admin@laboratorio.com";
 const adminCheckStmt = db.prepare("SELECT id FROM users WHERE email = ?");

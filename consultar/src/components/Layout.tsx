@@ -13,15 +13,16 @@ import {
   Menu,
   X,
   UserCircle,
-  Bot,
+  Settings,
   FileSignature,
-  BarChart2, // NUEVO ÍCONO
+  Award,
+  Image,
 } from "lucide-react";
 import ThemeToggle from "./ui/ThemeToggle";
 import { cn } from "../lib/utils";
 
 const SidebarNavigation: React.FC = () => {
-  const { user, logout, canManageContracts, canViewAdminContent } = useAuth();
+  const { user, logout, canManageAdminPanel } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -44,15 +45,6 @@ const SidebarNavigation: React.FC = () => {
       path: "/clientes",
       roles: ["director", "administracion", "administrador"],
     },
-
-    {
-      icon: FileSignature,
-      label: "Contratos",
-      path: "/contratos",
-      show: canManageContracts,
-      roles: ["administrador"],
-    },
-
     {
       icon: FileText,
       label: "Usuarios",
@@ -61,9 +53,26 @@ const SidebarNavigation: React.FC = () => {
     },
   ];
 
-  const filteredMenuItems = menuItems.filter(
-    (item) =>
-      item.roles.includes(user?.role || "") && (item.show ? item.show() : true)
+  const adminMenuItems = [
+    {
+      icon: FileSignature,
+      label: "Contratos",
+      path: "/admin/contratos",
+    },
+    {
+      icon: Award,
+      label: "Puntajes de OT",
+      path: "/admin/puntajes",
+    },
+    {
+      icon: Image,
+      label: "Cambiar Favicon",
+      path: "/admin/favicon",
+    },
+  ];
+
+  const filteredMenuItems = menuItems.filter((item) =>
+    item.roles.includes(user?.role || "")
   );
 
   const handleLogout = () => {
@@ -71,7 +80,10 @@ const SidebarNavigation: React.FC = () => {
     navigate("/login");
   };
 
-  const isActivePath = (path: string) => location.pathname === path;
+  const isActivePath = (path: string) =>
+    location.pathname.startsWith(path) && path !== "/";
+
+  const isHomeActive = location.pathname === "/";
 
   return (
     <div className="flex grow flex-col gap-y-5 overflow-y-auto bg-white dark:bg-gray-800 px-6 pb-4 shadow-sm border-r border-gray-200 dark:border-gray-700">
@@ -107,7 +119,11 @@ const SidebarNavigation: React.FC = () => {
                     onClick={() => navigate(item.path)}
                     className={cn(
                       "group flex w-full gap-x-3 rounded-md p-3 text-left text-base font-medium leading-6 transition-colors",
-                      isActivePath(item.path)
+                      (
+                        item.path === "/"
+                          ? isHomeActive
+                          : isActivePath(item.path)
+                      )
                         ? "bg-blue-50 text-blue-700 dark:bg-blue-900/50 dark:text-white"
                         : "text-gray-700 hover:bg-gray-100 hover:text-blue-700 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-white"
                     )}
@@ -119,6 +135,33 @@ const SidebarNavigation: React.FC = () => {
               ))}
             </ul>
           </li>
+
+          {canManageAdminPanel() && (
+            <li>
+              <div className="text-xs font-semibold leading-6 text-gray-400">
+                Panel de Administrador
+              </div>
+              <ul className="-mx-2 mt-2 space-y-1">
+                {adminMenuItems.map((item) => (
+                  <li key={item.path}>
+                    <button
+                      onClick={() => navigate(item.path)}
+                      className={cn(
+                        "group flex w-full gap-x-3 rounded-md p-3 text-left text-base font-medium leading-6 transition-colors",
+                        isActivePath(item.path)
+                          ? "bg-blue-50 text-blue-700 dark:bg-blue-900/50 dark:text-white"
+                          : "text-gray-700 hover:bg-gray-100 hover:text-blue-700 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-white"
+                      )}
+                    >
+                      <item.icon className="h-6 w-6 shrink-0" />
+                      {item.label}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </li>
+          )}
+
           <li className="mt-auto -mx-2 space-y-1">
             <button
               onClick={() => navigate("/perfil")}
@@ -145,7 +188,6 @@ const SidebarNavigation: React.FC = () => {
     </div>
   );
 };
-
 const Layout: React.FC = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 

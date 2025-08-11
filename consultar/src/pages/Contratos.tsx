@@ -77,8 +77,8 @@ const Contratos: React.FC = () => {
       />
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {contracts?.map((contract) => (
-          <Card key={contract.id} className="flex flex-col justify-between">
-            <div>
+          <Card key={contract.id} className="flex flex-col">
+            <div className="flex-grow">
               <h2 className="text-xl font-semibold flex items-center gap-2 mb-4">
                 <FileSignature /> {contract.name}
               </h2>

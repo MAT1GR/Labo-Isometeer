@@ -13,6 +13,7 @@ import { ArrowLeft, Save, PlusCircle, Trash2, Loader } from "lucide-react";
 import axiosInstance from "../api/axiosInstance";
 import MultiUserSelect from "../components/ui/MultiUserSelect";
 import { calculateEstimatedDeliveryDate } from "../lib/utils";
+import ClienteSelect from "../components/ui/ClienteSelect";
 
 type OTCreateFormData = Omit<
   WorkOrder,
@@ -267,25 +268,18 @@ const OTCreate: React.FC = () => {
           <h2 className="text-lg font-semibold text-blue-700 dark:text-blue-400 col-span-full">
             Información del Cliente
           </h2>
-          <div>
-            <label className="text-sm font-medium dark:text-gray-300">
-              Empresa (Nº Cliente) *
-            </label>
-            <select
-              {...register("client_id", {
-                required: true,
-                valueAsNumber: true,
-              })}
-              className="w-full mt-1 p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
-            >
-              <option value="">Seleccionar cliente...</option>
-              {clients.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name} ({c.code})
-                </option>
-              ))}
-            </select>
-          </div>
+          <Controller
+            control={control}
+            name="client_id"
+            rules={{ required: true }}
+            render={({ field }) => (
+              <ClienteSelect
+                clients={clients}
+                selectedClientId={field.value as number | undefined}
+                onChange={field.onChange}
+              />
+            )}
+          />
           <div>
             <label className="text-sm font-medium dark:text-gray-300">
               Referente
