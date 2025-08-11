@@ -48,7 +48,7 @@ router.get("/stats", (req: Request, res: Response) => {
                 SELECT SUM(wa.precio_sin_iva) as total 
                 FROM work_order_activities wa
                 JOIN work_orders wo ON wa.work_order_id = wo.id
-                ${dateFilterClause}
+                ${dateFilterClause} AND wo.status = 'cerrada'
              `
         )
         .get() as { total: number | null };
@@ -80,7 +80,7 @@ router.get("/stats", (req: Request, res: Response) => {
                     SUM(wa.precio_sin_iva) as revenue
                 FROM work_order_activities wa
                 JOIN work_orders wo ON wa.work_order_id = wo.id
-                ${dateFilterClause} AND wa.precio_sin_iva > 0
+                ${dateFilterClause} AND wa.precio_sin_iva > 0 AND wo.status = 'cerrada'
                 GROUP BY ${chartDataKey}
                 ORDER BY ${chartDataKey}
             `

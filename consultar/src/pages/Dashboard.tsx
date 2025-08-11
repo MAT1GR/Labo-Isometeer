@@ -34,6 +34,7 @@ import {
   Cell,
   AreaChart,
   Area,
+  Legend,
 } from "recharts";
 import { otService, UserSummaryItem } from "../services/otService";
 import useSWR from "swr";
@@ -96,6 +97,7 @@ const AdminDirectorDashboard: React.FC = () => {
       { name: "Pendientes", value: stats.pendingOT, fill: "#f59e0b" },
       { name: "En Progreso", value: stats.inProgressOT, fill: "#3b82f6" },
       { name: "Finalizadas", value: stats.completedOT, fill: "#22c55e" },
+      { name: "Cerradas", value: stats.paidInvoices, fill: "#8b5cf6" },
     ].filter((item) => item.value > 0);
   }, [stats]);
 
@@ -131,6 +133,33 @@ const AdminDirectorDashboard: React.FC = () => {
       : period === "month"
       ? "este mes"
       : "este año";
+
+  const RADIAN = Math.PI / 180;
+  const renderCustomizedLabel = ({
+    cx,
+    cy,
+    midAngle,
+    innerRadius,
+    outerRadius,
+    percent,
+  }: any) => {
+    const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
+    const x = cx + radius * Math.cos(-midAngle * RADIAN);
+    const y = cy + radius * Math.sin(-midAngle * RADIAN);
+
+    return (
+      <text
+        x={x}
+        y={y}
+        fill="white"
+        textAnchor="middle"
+        dominantBaseline="central"
+        className="text-xs font-bold"
+      >
+        {`${(percent * 100).toFixed(0)}%`}
+      </text>
+    );
+  };
 
   return (
     <div className="space-y-6">
@@ -262,9 +291,8 @@ const AdminDirectorDashboard: React.FC = () => {
                       innerRadius={60}
                       outerRadius={80}
                       paddingAngle={5}
-                      label={({ name, percent }) =>
-                        `${name} ${(percent * 100).toFixed(0)}%`
-                      }
+                      labelLine={false}
+                      label={renderCustomizedLabel}
                     >
                       {otStatusData.map((entry, index) => (
                         <Cell key={`cell-${index}`} fill={entry.fill} />
@@ -278,6 +306,7 @@ const AdminDirectorDashboard: React.FC = () => {
                       }}
                       itemStyle={{ color: "#cbd5e1" }}
                     />
+                    <Legend iconType="circle" iconSize={10} />
                   </PieChart>
                 </ResponsiveContainer>
               </div>

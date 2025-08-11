@@ -9,11 +9,22 @@ import { authService, User } from "../services/auth";
 import { useAuth } from "../contexts/AuthContext";
 import Input from "../components/ui/Input";
 import Button from "../components/ui/Button";
-import { ArrowLeft, Save, PlusCircle, Trash2, Loader } from "lucide-react";
+import {
+  ArrowLeft,
+  Save,
+  PlusCircle,
+  Trash2,
+  Loader,
+  UserSquare,
+  Package,
+  ClipboardList,
+  BookText,
+} from "lucide-react";
 import axiosInstance from "../api/axiosInstance";
 import MultiUserSelect from "../components/ui/MultiUserSelect";
 import { calculateEstimatedDeliveryDate } from "../lib/utils";
 import ClienteSelect from "../components/ui/ClienteSelect";
+import Card from "../components/ui/Card";
 
 type OTCreateFormData = Omit<
   WorkOrder,
@@ -81,7 +92,6 @@ const OTCreate: React.FC = () => {
     otType === "Ensayo EE" ||
     otType === "Otros Servicios";
 
-  // Logic to set default contract based on OT type
   useEffect(() => {
     if (otType === "Calibracion") {
       setValue("contract_type", "Contrato de Calibración");
@@ -115,7 +125,7 @@ const OTCreate: React.FC = () => {
           Number(selectedClientId)
         );
         setContacts(client.contacts);
-        setValue("contact_id", undefined); // Resetea el referente al cambiar de cliente
+        setValue("contact_id", undefined);
       } else {
         setContacts([]);
       }
@@ -146,7 +156,6 @@ const OTCreate: React.FC = () => {
     }
   }, [watchedIdFields, setValue]);
 
-  // --- NUEVO EFECTO PARA CALCULAR FECHA DE ENTREGA ---
   useEffect(() => {
     const date = watchedIdFields[0];
     const activities = watchedActivities as { activity: string }[];
@@ -191,12 +200,9 @@ const OTCreate: React.FC = () => {
   ];
 
   return (
-    <form
-      onSubmit={handleSubmit(onSubmit)}
-      className="space-y-8 bg-gray-50 dark:bg-gray-900 p-6 rounded-lg"
-    >
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
       <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold">Crear Nueva Orden de Trabajo</h1>
+        <h1 className="text-3xl font-bold">Crear Nueva Orden de Trabajo</h1>
         <div className="flex gap-4">
           <Button
             type="button"
@@ -216,124 +222,131 @@ const OTCreate: React.FC = () => {
         </div>
       </div>
 
-      <div className="bg-white dark:bg-gray-800 dark:border dark:border-gray-700 p-6 rounded-lg shadow-sm space-y-8">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 border-b dark:border-gray-700 pb-6">
-          <Input
-            label="Fecha *"
-            type="date"
-            {...register("date", { required: true })}
-          />
-          <div>
-            <label className="text-sm font-medium dark:text-gray-300">
-              Tipo de OT *
-            </label>
-            <select
-              {...register("type", { required: true })}
-              className="w-full mt-1 p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
-            >
-              <option value="">Seleccionar tipo...</option>
-              {otTypes.map((t) => (
-                <option key={t.value} value={t.value}>
-                  {t.label}
+      <div className="space-y-6">
+        <Card>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+            <Input
+              label="Fecha *"
+              type="date"
+              {...register("date", { required: true })}
+            />
+            <div>
+              <label className="text-sm font-medium dark:text-gray-300">
+                Tipo de OT *
+              </label>
+              <select
+                {...register("type", { required: true })}
+                className="w-full mt-1 p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
+              >
+                <option value="">Seleccionar tipo...</option>
+                {otTypes.map((t) => (
+                  <option key={t.value} value={t.value}>
+                    {t.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="text-sm font-medium dark:text-gray-300">
+                Contrato
+              </label>
+              <select
+                {...register("contract_type")}
+                className="w-full mt-1 p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
+              >
+                <option value="Contrato de Producción">
+                  Contrato de Producción
                 </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="text-sm font-medium dark:text-gray-300">
-              Contrato
-            </label>
-            <select
-              {...register("contract_type")}
-              className="w-full mt-1 p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
-            >
-              <option value="Contrato de Producción">
-                Contrato de Producción
-              </option>
-              <option value="Contrato de Calibración">
-                Contrato de Calibración
-              </option>
-              <option value="Contrato de Ensayo">Contrato de Ensayo</option>
-            </select>
-          </div>
-          <div className="relative">
-            <Input label="ID de OT" value={idPreview} disabled readOnly />
-            {isIdLoading && (
-              <Loader className="absolute right-3 top-9 h-5 w-5 animate-spin text-gray-400" />
-            )}
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 border-b dark:border-gray-700 pb-6">
-          <h2 className="text-lg font-semibold text-blue-700 dark:text-blue-400 col-span-full">
-            Información del Cliente
-          </h2>
-          <Controller
-            control={control}
-            name="client_id"
-            rules={{ required: true }}
-            render={({ field }) => (
-              <ClienteSelect
-                clients={clients}
-                selectedClientId={field.value as number | undefined}
-                onChange={field.onChange}
-              />
-            )}
-          />
-          <div>
-            <label className="text-sm font-medium dark:text-gray-300">
-              Referente
-            </label>
-            <select
-              {...register("contact_id")}
-              className="w-full mt-1 p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
-              disabled={!selectedClientId || contacts.length === 0}
-            >
-              <option value="">
-                {contacts.length > 0
-                  ? "Seleccionar referente..."
-                  : "Sin referentes"}
-              </option>
-              {contacts.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name} ({c.type})
+                <option value="Contrato de Calibración">
+                  Contrato de Calibración
                 </option>
-              ))}
-            </select>
+                <option value="Contrato de Ensayo">Contrato de Ensayo</option>
+              </select>
+            </div>
+            <div className="relative">
+              <Input label="ID de OT" value={idPreview} disabled readOnly />
+              {isIdLoading && (
+                <Loader className="absolute right-3 top-9 h-5 w-5 animate-spin text-gray-400" />
+              )}
+            </div>
           </div>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 border-b dark:border-gray-700 pb-6">
-          <h2 className="text-lg font-semibold text-blue-700 dark:text-blue-400 col-span-full">
-            Producto
-          </h2>
-          <Input
-            label="Nombre *"
-            {...register("product", { required: true })}
-          />
-          <Input label="Marca" {...register("brand")} />
-          <Input label="Modelo" {...register("model")} />
-          <Input
-            label="Nº de Lacre"
-            {...register("seal_number")}
-            disabled={!isLacreEnabled}
-          />
-          <Input
-            label="Vto. del Certificado"
-            type="date"
-            {...register("certificate_expiry")}
-            disabled={!isLacreEnabled}
-          />
-          <Input
-            label="Fecha de Entrega Estimada"
-            type="date"
-            {...register("estimated_delivery_date")}
-          />
-        </div>
+        </Card>
 
-        <div className="border-b dark:border-gray-700 pb-6">
+        <Card>
+          <h2 className="text-lg font-semibold text-blue-700 dark:text-blue-400 col-span-full mb-4 flex items-center gap-2">
+            <UserSquare size={20} /> Información del Cliente
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <Controller
+              control={control}
+              name="client_id"
+              rules={{ required: true }}
+              render={({ field }) => (
+                <ClienteSelect
+                  clients={clients}
+                  selectedClientId={field.value as number | undefined}
+                  onChange={field.onChange}
+                />
+              )}
+            />
+            <div>
+              <label className="text-sm font-medium dark:text-gray-300">
+                Referente
+              </label>
+              <select
+                {...register("contact_id")}
+                className="w-full mt-1 p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
+                disabled={!selectedClientId || contacts.length === 0}
+              >
+                <option value="">
+                  {contacts.length > 0
+                    ? "Seleccionar referente..."
+                    : "Sin referentes"}
+                </option>
+                {contacts.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name} ({c.type})
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+        </Card>
+
+        <Card>
+          <h2 className="text-lg font-semibold text-blue-700 dark:text-blue-400 col-span-full mb-4 flex items-center gap-2">
+            <Package size={20} /> Producto
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <Input
+              label="Nombre *"
+              {...register("product", { required: true })}
+            />
+            <Input label="Marca" {...register("brand")} />
+            <Input label="Modelo" {...register("model")} />
+            <Input
+              label="Nº de Lacre"
+              {...register("seal_number")}
+              disabled={!isLacreEnabled}
+            />
+            <Input
+              label="Vto. del Certificado"
+              type="date"
+              {...register("certificate_expiry")}
+              disabled={!isLacreEnabled}
+            />
+            <Input
+              label="Fecha de Entrega Estimada"
+              type="date"
+              {...register("estimated_delivery_date")}
+            />
+          </div>
+        </Card>
+
+        <Card>
           <div className="flex justify-between items-center mb-4">
-            <h2 className="text-lg font-semibold text-blue-700 dark:text-blue-400">
-              Actividades y Asignaciones
+            <h2 className="text-lg font-semibold text-blue-700 dark:text-blue-400 flex items-center gap-2">
+              <ClipboardList size={20} /> Actividades y Asignaciones
             </h2>
             <Button
               type="button"
@@ -365,7 +378,7 @@ const OTCreate: React.FC = () => {
                       {...register(`activities.${index}.activity`)}
                       className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
                     >
-                      <option value="">Seleccionar actividad...</option>
+                      <option value="">Seleccionar...</option>
                       {getAvailableActivities(index).map((opt) => (
                         <option key={opt} value={opt}>
                           {opt}
@@ -419,11 +432,11 @@ const OTCreate: React.FC = () => {
               </div>
             ))}
           </div>
-        </div>
+        </Card>
 
-        <div>
-          <h2 className="text-lg font-semibold text-blue-700 dark:text-blue-400 col-span-full mb-4">
-            Observaciones
+        <Card>
+          <h2 className="text-lg font-semibold text-blue-700 dark:text-blue-400 col-span-full mb-4 flex items-center gap-2">
+            <BookText size={20} /> Observaciones
           </h2>
           <label className="text-sm font-medium dark:text-gray-300">
             Observaciones Generales (visibles para el cliente)
@@ -433,7 +446,7 @@ const OTCreate: React.FC = () => {
             className="w-full mt-1 p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
             rows={3}
           ></textarea>
-        </div>
+        </Card>
       </div>
     </form>
   );

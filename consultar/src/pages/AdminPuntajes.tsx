@@ -71,16 +71,6 @@ const AdminPuntajes: React.FC = () => {
               Valores de Puntos por Actividad
             </h2>
           </div>
-          <div className="mb-6 p-4 bg-blue-50 dark:bg-blue-900/20 border-l-4 border-blue-500 rounded-r-lg">
-            <div className="flex items-start gap-3">
-              <Info className="h-5 w-5 text-blue-600 mt-1 flex-shrink-0" />
-              <p className="text-sm text-gray-700 dark:text-gray-300">
-                Estos valores determinan los puntos que se asignan a los
-                empleados al cerrar una Orden de Trabajo que contenga estas
-                actividades.
-              </p>
-            </div>
-          </div>
           <div className="space-y-2">
             {fields.map((field, index) => (
               <div

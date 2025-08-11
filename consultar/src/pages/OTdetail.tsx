@@ -22,11 +22,16 @@ import {
   CalendarCheck,
   Lock,
   Archive,
+  UserSquare,
+  Package,
+  ClipboardList,
+  BookText,
 } from "lucide-react";
 import { mutate } from "swr";
 import { formatDateTime, calculateEstimatedDeliveryDate } from "../lib/utils";
 import MultiUserSelect from "../components/ui/MultiUserSelect";
 import ExportOtModal from "../components/ui/ExportOtModal";
+import Card from "../components/ui/Card";
 
 const activityOptions = [
   "Calibracion",
@@ -152,7 +157,6 @@ const OTDetail: React.FC = () => {
   useEffect(() => {
     const activities = watchedActivities as Activity[];
     if (otDate && activities && isFormEditable) {
-      // Solo calcula la fecha si el campo está vacío, permitiendo la edición manual.
       if (!getValues("estimated_delivery_date")) {
         const estimatedDate = calculateEstimatedDeliveryDate(
           activities,
@@ -245,10 +249,7 @@ const OTDetail: React.FC = () => {
         onClose={() => setIsExportModalOpen(false)}
         otData={dataForExport}
       />
-      <form
-        onSubmit={handleSubmit(onSubmit)}
-        className="space-y-8 bg-gray-50 dark:bg-gray-900 p-6 rounded-lg"
-      >
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
         <div className="flex justify-between items-center flex-wrap gap-4">
           <Button type="button" variant="ghost" onClick={() => navigate("/ot")}>
             <ArrowLeft className="mr-2 h-5 w-5" />
@@ -308,7 +309,7 @@ const OTDetail: React.FC = () => {
         </div>
 
         {isEmployee && myActivities.length > 0 && (
-          <div className="bg-blue-50 dark:bg-blue-900/30 dark:border dark:border-blue-800/50 p-6 rounded-lg shadow-sm">
+          <Card>
             <h2 className="text-lg font-semibold text-blue-800 dark:text-blue-300 mb-4">
               Mis Tareas en esta OT
             </h2>
@@ -316,7 +317,7 @@ const OTDetail: React.FC = () => {
               {myActivities.map((activity) => (
                 <div
                   key={activity.id}
-                  className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4"
+                  className="bg-gray-100 dark:bg-gray-800 p-4 rounded-lg flex flex-col md:flex-row md:items-center justify-between gap-4"
                 >
                   <div className="flex-1">
                     <p className="font-bold">{activity.activity}</p>
@@ -375,7 +376,7 @@ const OTDetail: React.FC = () => {
                 </div>
               ))}
             </div>
-          </div>
+          </Card>
         )}
 
         {canViewAdminContent() && isOtStartedOrLater && (
@@ -394,108 +395,121 @@ const OTDetail: React.FC = () => {
           </div>
         )}
 
-        <div className="bg-white dark:bg-gray-800 dark:border dark:border-gray-700 p-6 rounded-lg shadow-sm space-y-8">
-          <fieldset disabled={!isFormEditable}>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6 border-b dark:border-gray-700 pb-6">
-              <h2 className="text-lg font-semibold text-blue-700 dark:text-blue-400 col-span-full">
-                OT Seleccionada
-              </h2>
-              <Input label="Fecha" type="date" {...register("date")} />
-              <div>
-                <label className="text-sm font-medium dark:text-gray-300">
-                  Tipo de OT
-                </label>
-                <select
-                  {...register("type")}
-                  className="w-full mt-1 p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
-                >
-                  <option value="Produccion">Producción</option>
-                  <option value="Calibracion">Calibración</option>
-                  <option value="Ensayo SE">Ensayo SE</option>
-                  <option value="Ensayo EE">Ensayo EE</option>
-                  <option value="Otros Servicios">Otros Servicios</option>
-                </select>
-              </div>
-              <div>
-                <label className="text-sm font-medium dark:text-gray-300">
-                  Contrato
-                </label>
-                <select
-                  {...register("contract_type")}
-                  className="w-full mt-1 p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
-                >
-                  <option value="Contrato de Producción">
-                    Contrato de Producción
-                  </option>
-                  <option value="Contrato de Calibración">
-                    Contrato de Calibración
-                  </option>
-                  <option value="Contrato de Ensayo">Contrato de Ensayo</option>
-                </select>
-              </div>
-              <Input
-                label="ID de OT"
-                value={otData.custom_id || `Interno #${id}`}
-                readOnly
-              />
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 border-b dark:border-gray-700 pb-6">
-              <h2 className="text-lg font-semibold text-blue-700 dark:text-blue-400 col-span-full">
-                Información del Cliente
-              </h2>
-              <Input label="Empresa" value={otData.client?.name} readOnly />
-              <Input label="Nº Cliente" value={otData.client?.code} readOnly />
-              <div className="col-span-full">
-                <label className="text-sm font-medium dark:text-gray-300">
-                  Referente
-                </label>
-                <select
-                  {...register("contact_id")}
-                  disabled={!isFormEditable}
-                  className="w-full mt-1 p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
-                >
-                  <option value="">Seleccionar referente...</option>
-                  {otData.client?.contacts?.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name} ({c.type})
+        <div className="space-y-6">
+          <Card>
+            <fieldset disabled={!isFormEditable}>
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                <Input label="Fecha" type="date" {...register("date")} />
+                <div>
+                  <label className="text-sm font-medium dark:text-gray-300">
+                    Tipo de OT
+                  </label>
+                  <select
+                    {...register("type")}
+                    className="w-full mt-1 p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
+                  >
+                    <option value="Produccion">Producción</option>
+                    <option value="Calibracion">Calibración</option>
+                    <option value="Ensayo SE">Ensayo SE</option>
+                    <option value="Ensayo EE">Ensayo EE</option>
+                    <option value="Otros Servicios">Otros Servicios</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-sm font-medium dark:text-gray-300">
+                    Contrato
+                  </label>
+                  <select
+                    {...register("contract_type")}
+                    className="w-full mt-1 p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
+                  >
+                    <option value="Contrato de Producción">
+                      Contrato de Producción
                     </option>
-                  ))}
-                </select>
+                    <option value="Contrato de Calibración">
+                      Contrato de Calibración
+                    </option>
+                    <option value="Contrato de Ensayo">
+                      Contrato de Ensayo
+                    </option>
+                  </select>
+                </div>
+                <Input
+                  label="ID de OT"
+                  value={otData.custom_id || `Interno #${id}`}
+                  readOnly
+                />
               </div>
-            </div>
+            </fieldset>
+          </Card>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 border-b dark:border-gray-700 pb-6">
-              <h2 className="text-lg font-semibold text-blue-700 dark:text-blue-400 col-span-full">
-                Producto
+          <Card>
+            <fieldset disabled={!isFormEditable}>
+              <h2 className="text-lg font-semibold text-blue-700 dark:text-blue-400 col-span-full mb-4 flex items-center gap-2">
+                <UserSquare size={20} /> Información del Cliente
               </h2>
-              <Input label="Nombre *" {...register("product")} />
-              <Input label="Marca" {...register("brand")} />
-              <Input label="Modelo" {...register("model")} />
-              <Input
-                label="Nº de Lacre"
-                {...register("seal_number")}
-                disabled={!isLacreEnabled}
-              />
-              <Input
-                label="Vto. del Certificado"
-                type="date"
-                {...register("certificate_expiry")}
-                disabled={!isLacreEnabled}
-              />
-              <Input
-                label="Fecha de Entrega Estimada"
-                type="date"
-                {...register("estimated_delivery_date")}
-              />
-            </div>
-          </fieldset>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <Input label="Empresa" value={otData.client?.name} readOnly />
+                <Input
+                  label="Nº Cliente"
+                  value={otData.client?.code}
+                  readOnly
+                />
+                <div className="col-span-full">
+                  <label className="text-sm font-medium dark:text-gray-300">
+                    Referente
+                  </label>
+                  <select
+                    {...register("contact_id")}
+                    disabled={!isFormEditable}
+                    className="w-full mt-1 p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
+                  >
+                    <option value="">Seleccionar referente...</option>
+                    {otData.client?.contacts?.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name} ({c.type})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            </fieldset>
+          </Card>
+
+          <Card>
+            <fieldset disabled={!isFormEditable}>
+              <h2 className="text-lg font-semibold text-blue-700 dark:text-blue-400 col-span-full mb-4 flex items-center gap-2">
+                <Package size={20} /> Producto
+              </h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <Input label="Nombre *" {...register("product")} />
+                <Input label="Marca" {...register("brand")} />
+                <Input label="Modelo" {...register("model")} />
+                <Input
+                  label="Nº de Lacre"
+                  {...register("seal_number")}
+                  disabled={!isLacreEnabled}
+                />
+                <Input
+                  label="Vto. del Certificado"
+                  type="date"
+                  {...register("certificate_expiry")}
+                  disabled={!isLacreEnabled}
+                />
+                <Input
+                  label="Fecha de Entrega Estimada"
+                  type="date"
+                  {...register("estimated_delivery_date")}
+                />
+              </div>
+            </fieldset>
+          </Card>
 
           {!isEmployee && (
-            <div className="border-b dark:border-gray-700 pb-6">
+            <Card>
               <div className="flex justify-between items-center mb-4">
-                <h2 className="text-lg font-semibold text-blue-700 dark:text-blue-400">
-                  Actividades y Asignaciones
+                <h2 className="text-lg font-semibold text-blue-700 dark:text-blue-400 flex items-center gap-2">
+                  <ClipboardList size={20} /> Actividades y Asignaciones
                 </h2>
                 {isFormEditable && (
                   <Button
@@ -523,7 +537,7 @@ const OTDetail: React.FC = () => {
                           className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
                           disabled={!isFormEditable}
                         >
-                          <option value="">Seleccionar actividad...</option>
+                          <option value="">Seleccionar...</option>
                           {getAvailableActivities(index).map((opt) => (
                             <option key={opt} value={opt}>
                               {opt}
@@ -582,12 +596,12 @@ const OTDetail: React.FC = () => {
                   </div>
                 ))}
               </div>
-            </div>
+            </Card>
           )}
 
-          <div className="col-span-full space-y-4">
-            <h2 className="text-lg font-semibold text-blue-700 dark:text-blue-400">
-              Observaciones
+          <Card>
+            <h2 className="text-lg font-semibold text-blue-700 dark:text-blue-400 col-span-full mb-4 flex items-center gap-2">
+              <BookText size={20} /> Observaciones
             </h2>
             <div>
               <label className="text-sm font-medium dark:text-gray-300">
@@ -600,13 +614,13 @@ const OTDetail: React.FC = () => {
                 rows={4}
               ></textarea>
             </div>
-            <div>
+            <div className="mt-4">
               <label className="text-sm font-medium dark:text-gray-300">
                 Observaciones del Colaborador (uso interno)
               </label>
               <textarea
                 {...register("collaborator_observations")}
-                disabled={!isEmployee}
+                disabled={!canViewAdminContent()}
                 className="w-full mt-1 p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 disabled:bg-gray-100 dark:disabled:bg-gray-800"
                 rows={4}
                 placeholder={
@@ -616,7 +630,7 @@ const OTDetail: React.FC = () => {
                 }
               ></textarea>
             </div>
-          </div>
+          </Card>
         </div>
       </form>
     </>

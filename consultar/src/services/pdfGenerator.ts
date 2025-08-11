@@ -155,8 +155,8 @@ export const exportOtPdfWorkOrder = async (otData: WorkOrder) => {
           otData.client?.province || ""
         } (CP: ${otData.client?.cp || "N/A"})`,
       ],
-      ["Email", otData.client?.email || "N/A"],
-      ["Celular", otData.client?.phone || "N/A"],
+      ["Email", selectedContact?.email || otData.client?.email || "N/A"],
+      ["Celular", selectedContact?.phone || otData.client?.phone || "N/A"],
       [
         "ID Fiscal",
         `${otData.client?.fiscal_id_type || ""} ${
@@ -266,8 +266,8 @@ export const exportOtPdfRemito = async (otData: WorkOrder) => {
           otData.client?.province || ""
         } (CP: ${otData.client?.cp || "N/A"})`,
       ],
-      ["Email", otData.client?.email || "N/A"],
-      ["Celular", otData.client?.phone || "N/A"],
+      ["Email", selectedContact?.email || otData.client?.email || "N/A"],
+      ["Celular", selectedContact?.phone || otData.client?.phone || "N/A"],
       [
         "ID Fiscal",
         `${otData.client?.fiscal_id_type || ""} ${

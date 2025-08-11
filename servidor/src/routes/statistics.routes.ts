@@ -5,6 +5,80 @@ import db from "../config/database";
 
 const router = Router();
 
+// [GET] /api/statistics/user/:id
+router.get("/user/:id", (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const user = db
+      .prepare("SELECT id, name, email, role, points FROM users WHERE id = ?")
+      .get(id);
+
+    if (!user) {
+      return res.status(404).json({ error: "Usuario no encontrado." });
+    }
+
+    const completedActivities = db
+      .prepare(
+        `
+        SELECT
+            wo.id as ot_id,
+            wo.custom_id,
+            wo.product,
+            c.name as client_name,
+            wa.activity,
+            wa.completed_at
+        FROM work_order_activities wa
+        JOIN work_order_activity_assignments waa ON wa.id = waa.activity_id
+        JOIN work_orders wo ON wa.work_order_id = wo.id
+        JOIN clients c ON wo.client_id = c.id
+        WHERE waa.user_id = ? AND wa.status = 'finalizada'
+        ORDER BY wa.completed_at DESC
+    `
+      )
+      .all(id);
+
+    const activityCounts = db
+      .prepare(
+        `
+        SELECT activity, COUNT(*) as count
+        FROM work_order_activities wa
+        JOIN work_order_activity_assignments waa ON wa.id = waa.activity_id
+        WHERE waa.user_id = ? AND wa.status = 'finalizada'
+        GROUP BY activity
+    `
+      )
+      .all(id);
+
+    const totalOTsFinalizadas = db
+      .prepare(
+        `
+        SELECT COUNT(DISTINCT wo.id) as count
+        FROM work_orders wo
+        JOIN work_order_activities wa ON wo.id = wa.work_order_id
+        JOIN work_order_activity_assignments waa ON wa.id = waa.activity_id
+        WHERE waa.user_id = ? AND wo.status IN ('finalizada', 'cerrada')
+    `
+      )
+      .get(id) as { count: number };
+
+    res.status(200).json({
+      user,
+      stats: {
+        totalPoints: (user as any).points,
+        totalCompletedActivities: completedActivities.length,
+        totalOTsFinalizadas: totalOTsFinalizadas.count,
+      },
+      activityDistribution: activityCounts,
+      completedWorkOrders: completedActivities,
+    });
+  } catch (error) {
+    console.error("Error fetching user statistics:", error);
+    res
+      .status(500)
+      .json({ error: "Error al obtener las estadísticas del usuario." });
+  }
+});
+
 // [GET] /api/statistics/all
 router.get("/all", (req: Request, res: Response) => {
   try {
