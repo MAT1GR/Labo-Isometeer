@@ -265,7 +265,11 @@ const Clientes: React.FC = () => {
               {paginatedClients?.map((client) => (
                 <tr key={client.id}>
                   <td className="px-6 py-4">{client.code}</td>
-                  <td className="px-6 py-4">{client.client_number || "N/A"}</td>
+                  <td className="px-6 py-4">
+                    {client.client_number
+                      ? String(client.client_number).replace(/\.0$/, "")
+                      : "N/A"}
+                  </td>
                   <td className="px-6 py-4 font-medium">{client.name}</td>
                   <td className="px-6 py-4 text-right space-x-2">
                     <Button
