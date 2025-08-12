@@ -89,6 +89,19 @@ db.exec(`
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
     PRIMARY KEY (activity_id, user_id)
   );
+  
+  -- --- INICIO: NUEVA TABLA DE NOTIFICACIONES ---
+  CREATE TABLE IF NOT EXISTS notifications (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    message TEXT NOT NULL,
+    ot_id INTEGER,
+    is_read BOOLEAN NOT NULL DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (ot_id) REFERENCES work_orders(id) ON DELETE CASCADE
+  );
+  -- --- FIN: NUEVA TABLA DE NOTIFICACIONES ---
 
   CREATE TABLE IF NOT EXISTS contracts (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -104,7 +117,6 @@ db.exec(`
   );
 `);
 
-// Seed contracts if they don't exist
 // Seed contracts if they don't exist
 const seedContracts = () => {
   const contracts = [

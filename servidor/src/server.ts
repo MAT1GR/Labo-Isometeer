@@ -13,7 +13,8 @@ import otRoutes from "./routes/ots.routes";
 import dashboardRoutes from "./routes/dashboard.routes";
 import contractRoutes from "./routes/contracts.routes";
 import statisticsRoutes from "./routes/statistics.routes";
-import adminRoutes from "./routes/admin.routes"; // NUEVA RUTA
+import adminRoutes from "./routes/admin.routes";
+import notificationRoutes from "./routes/notifications.routes"; // --- NUEVA RUTA ---
 
 const app = express();
 const port = 4000;
@@ -40,7 +41,8 @@ app.use("/api/ots", otRoutes);
 app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/contracts", contractRoutes);
 app.use("/api/statistics", statisticsRoutes);
-app.use("/api/admin", adminRoutes); // NUEVA RUTA
+app.use("/api/admin", adminRoutes);
+app.use("/api/notifications", notificationRoutes); // --- NUEVA RUTA ---
 
 app.listen(port, () => {
   console.log(`🚀 Servidor corriendo en http://localhost:${port}`);

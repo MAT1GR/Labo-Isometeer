@@ -16,12 +16,16 @@ const ThemeToggle: React.FC = () => {
       title={
         theme === "light" ? "Cambiar a modo oscuro" : "Cambiar a modo claro"
       }
-      className="rounded-full w-10 h-10 p-0 dark:text-gray-300 dark:hover:bg-gray-700"
+      className="relative rounded-full p-1.5 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none"
     >
       {theme === "light" ? (
-        <Sun className="h-5 w-5" />
+        // === INICIO DEL CAMBIO ===
+        <Sun className="h-4 w-4" />
       ) : (
-        <Moon className="h-5 w-5" />
+        // === FIN DEL CAMBIO ===
+        // === INICIO DEL CAMBIO ===
+        <Moon className="h-4 w-4" />
+        // === FIN DEL CAMBIO ===
       )}
     </Button>
   );

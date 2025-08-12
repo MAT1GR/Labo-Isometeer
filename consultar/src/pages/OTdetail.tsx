@@ -25,7 +25,7 @@ import {
   UserSquare,
   Package,
   ClipboardList,
-  BookText,
+  BookText
 } from "lucide-react";
 import { mutate } from "swr";
 import { formatDateTime, calculateEstimatedDeliveryDate } from "../lib/utils";
@@ -207,7 +207,7 @@ const OTDetail: React.FC = () => {
     await loadData();
     mutate(["/ots", user]);
   };
-
+  
   const handleCloseOT = async () => {
     if (!id || !user) return;
     try {
@@ -249,7 +249,10 @@ const OTDetail: React.FC = () => {
         onClose={() => setIsExportModalOpen(false)}
         otData={dataForExport}
       />
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+      <form
+        onSubmit={handleSubmit(onSubmit)}
+        className="space-y-6"
+      >
         <div className="flex justify-between items-center flex-wrap gap-4">
           <Button type="button" variant="ghost" onClick={() => navigate("/ot")}>
             <ArrowLeft className="mr-2 h-5 w-5" />
@@ -275,90 +278,108 @@ const OTDetail: React.FC = () => {
             </Button>
           </div>
         </div>
+        
+        <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm flex flex-wrap justify-center items-center gap-4">
+          {canAuthorizeOT() && !otData.authorized && (
+            <Button
+              type="button"
+              onClick={handleAuthorize}
+              className="bg-green-600 hover:bg-green-700"
+            >
+              <CheckSquare className="mr-2 h-5 w-5" /> Autorizar OT
+            </Button>
+          )}
+          {canAuthorizeOT() &&
+            otData.authorized &&
+            otData.status === "pendiente" && (
+              <Button
+                type="button"
+                onClick={handleDeauthorize}
+                variant="danger"
+              >
+                <XSquare className="mr-2 h-5 w-5" /> Desautorizar OT
+              </Button>
+            )}
+          {user?.role === "director" && otData.status === "finalizada" && (
+            <Button
+              type="button"
+              onClick={handleCloseOT}
+              className="bg-purple-600 hover:bg-purple-700"
+            >
+              <Archive className="mr-2 h-5 w-5" /> Cerrar OT
+            </Button>
+          )}
+        </div>
 
         {isEmployee && myActivities.length > 0 && (
           <Card>
             <h2 className="text-xl font-semibold text-blue-800 dark:text-blue-300 mb-4 flex items-center gap-2">
-              <ClipboardList size={20} /> Mis Tareas en esta OT
+                <ClipboardList size={20} /> Mis Tareas en esta OT
             </h2>
             <div className="space-y-4">
               {myActivities.map((activity) => {
-                const statusColor =
-                  activity.status === "finalizada"
-                    ? "border-green-500"
-                    : activity.status === "en_progreso"
-                    ? "border-blue-500"
-                    : "border-yellow-500";
+                const statusColor = activity.status === 'finalizada' ? 'border-green-500' : activity.status === 'en_progreso' ? 'border-blue-500' : 'border-yellow-500';
                 return (
-                  <div
-                    key={activity.id}
-                    className={`bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm border-l-4 ${statusColor} flex flex-col md:flex-row md:items-center justify-between gap-4`}
-                  >
-                    <div className="flex-1">
-                      <p className="font-bold text-lg text-gray-800 dark:text-gray-100">
-                        {activity.activity}
-                      </p>
-                      <div className="flex items-center gap-6 text-xs mt-2 text-gray-500 dark:text-gray-400">
-                        <div className="flex items-center gap-2">
-                          <Clock className="h-4 w-4" />
-                          <span>
-                            Inicio:{" "}
-                            <strong>
-                              {formatDateTime(activity.started_at) || "N/A"}
-                            </strong>
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <CalendarCheck className="h-4 w-4" />
-                          <span>
-                            Fin:{" "}
-                            <strong>
-                              {formatDateTime(activity.completed_at) || "N/A"}
-                            </strong>
-                          </span>
-                        </div>
+                <div
+                  key={activity.id}
+                  className={`bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm border-l-4 ${statusColor} flex flex-col md:flex-row md:items-center justify-between gap-4`}
+                >
+                  <div className="flex-1">
+                    <p className="font-bold text-lg text-gray-800 dark:text-gray-100">{activity.activity}</p>
+                    <div className="flex items-center gap-6 text-xs mt-2 text-gray-500 dark:text-gray-400">
+                      <div className="flex items-center gap-2">
+                        <Clock className="h-4 w-4" />
+                        <span>
+                          Inicio: <strong>{formatDateTime(activity.started_at) || "N/A"}</strong>
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <CalendarCheck className="h-4 w-4" />
+                        <span>
+                          Fin: <strong>{formatDateTime(activity.completed_at) || "N/A"}</strong>
+                        </span>
                       </div>
                     </div>
-                    <div className="flex items-center gap-4">
-                      <span
-                        className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                          activity.status === "finalizada"
-                            ? "bg-green-100 text-green-800"
-                            : activity.status === "en_progreso"
-                            ? "bg-blue-100 text-blue-800"
-                            : "bg-yellow-100 text-yellow-800"
-                        }`}
-                      >
-                        {activity.status.replace("_", " ")}
-                      </span>
-                      {otData.authorized && (
-                        <>
-                          {activity.status === "pendiente" && (
-                            <Button
-                              type="button"
-                              size="sm"
-                              onClick={() => handleStartActivity(activity.id)}
-                              className="bg-green-600 hover:bg-green-700"
-                            >
-                              <Play className="h-4 w-4 mr-1" /> Iniciar
-                            </Button>
-                          )}
-                          {activity.status === "en_progreso" && (
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="danger"
-                              onClick={() => handleStopActivity(activity.id)}
-                            >
-                              <StopCircle className="h-4 w-4 mr-1" /> Finalizar
-                            </Button>
-                          )}
-                        </>
-                      )}
-                    </div>
                   </div>
-                );
-              })}
+                  <div className="flex items-center gap-4">
+                    <span
+                      className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                        activity.status === "finalizada"
+                          ? "bg-green-100 text-green-800"
+                          : activity.status === "en_progreso"
+                          ? "bg-blue-100 text-blue-800"
+                          : "bg-yellow-100 text-yellow-800"
+                      }`}
+                    >
+                      {activity.status.replace("_", " ")}
+                    </span>
+                    {otData.authorized && (
+                      <>
+                        {activity.status === "pendiente" && (
+                          <Button
+                            type="button"
+                            size="sm"
+                            onClick={() => handleStartActivity(activity.id)}
+                            className="bg-green-600 hover:bg-green-700"
+                          >
+                            <Play className="h-4 w-4 mr-1" /> Iniciar
+                          </Button>
+                        )}
+                        {activity.status === "en_progreso" && (
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="danger"
+                            onClick={() => handleStopActivity(activity.id)}
+                          >
+                            <StopCircle className="h-4 w-4 mr-1" /> Finalizar
+                          </Button>
+                        )}
+                      </>
+                    )}
+                  </div>
+                </div>
+              )})}
             </div>
           </Card>
         )}
@@ -380,241 +401,235 @@ const OTDetail: React.FC = () => {
         )}
 
         <div className="space-y-6">
-          <Card>
-            <fieldset disabled={!isFormEditable}>
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                <Input label="Fecha" type="date" {...register("date")} />
-                <div>
-                  <label className="text-sm font-medium dark:text-gray-300">
-                    Tipo de OT
-                  </label>
-                  <select
-                    {...register("type")}
-                    className="w-full mt-1 p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
-                  >
-                    <option value="Produccion">Producción</option>
-                    <option value="Calibracion">Calibración</option>
-                    <option value="Ensayo SE">Ensayo SE</option>
-                    <option value="Ensayo EE">Ensayo EE</option>
-                    <option value="Otros Servicios">Otros Servicios</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="text-sm font-medium dark:text-gray-300">
-                    Contrato
-                  </label>
-                  <select
-                    {...register("contract_type")}
-                    className="w-full mt-1 p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
-                  >
-                    <option value="Contrato de Producción">
-                      Contrato de Producción
-                    </option>
-                    <option value="Contrato de Calibración">
-                      Contrato de Calibración
-                    </option>
-                    <option value="Contrato de Ensayo">
-                      Contrato de Ensayo
-                    </option>
-                  </select>
-                </div>
-                <Input
-                  label="ID de OT"
-                  value={otData.custom_id || `Interno #${id}`}
-                  readOnly
-                />
-              </div>
-            </fieldset>
-          </Card>
-
-          <Card>
-            <fieldset disabled={!isFormEditable}>
-              <h2 className="text-lg font-semibold text-blue-700 dark:text-blue-400 col-span-full mb-4 flex items-center gap-2">
-                <UserSquare size={20} /> Información del Cliente
-              </h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <Input label="Empresa" value={otData.client?.name} readOnly />
-                <Input
-                  label="Nº Cliente"
-                  value={otData.client?.code}
-                  readOnly
-                />
-                <div className="col-span-full">
-                  <label className="text-sm font-medium dark:text-gray-300">
-                    Referente
-                  </label>
-                  <select
-                    {...register("contact_id")}
-                    disabled={!isFormEditable}
-                    className="w-full mt-1 p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
-                  >
-                    <option value="">Seleccionar referente...</option>
-                    {otData.client?.contacts?.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.name} ({c.type})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-            </fieldset>
-          </Card>
-
-          <Card>
-            <fieldset disabled={!isFormEditable}>
-              <h2 className="text-lg font-semibold text-blue-700 dark:text-blue-400 col-span-full mb-4 flex items-center gap-2">
-                <Package size={20} /> Producto
-              </h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <Input label="Nombre *" {...register("product")} />
-                <Input label="Marca" {...register("brand")} />
-                <Input label="Modelo" {...register("model")} />
-                <Input
-                  label="Nº de Lacre"
-                  {...register("seal_number")}
-                  disabled={!isLacreEnabled}
-                />
-                <Input
-                  label="Vto. del Certificado"
-                  type="date"
-                  {...register("certificate_expiry")}
-                  disabled={!isLacreEnabled}
-                />
-                <Input
-                  label="Fecha de Entrega Estimada"
-                  type="date"
-                  {...register("estimated_delivery_date")}
-                />
-              </div>
-            </fieldset>
-          </Card>
-
-          {!isEmployee && (
             <Card>
-              <div className="flex justify-between items-center mb-4">
-                <h2 className="text-lg font-semibold text-blue-700 dark:text-blue-400 flex items-center gap-2">
-                  <ClipboardList size={20} /> Actividades y Asignaciones
-                </h2>
-                {isFormEditable && (
-                  <Button
-                    type="button"
-                    size="sm"
-                    onClick={() => append({ activity: "", assigned_to: [] })}
-                  >
-                    <PlusCircle className="h-4 w-4 mr-2" /> Agregar Actividad
-                  </Button>
-                )}
-              </div>
-              <div className="space-y-4">
-                {fields.map((field, index) => (
-                  <div
-                    key={field.id}
-                    className="bg-gray-50 dark:bg-gray-700/50 p-4 rounded-md space-y-4"
-                  >
-                    <div className="grid grid-cols-1 md:grid-cols-[1fr,2fr,auto] gap-4 items-start">
-                      <div>
-                        <label className="text-sm font-medium mb-1 dark:text-gray-300">
-                          Actividad
+                <fieldset disabled={!isFormEditable}>
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                    <Input label="Fecha" type="date" {...register("date")} />
+                    <div>
+                        <label className="text-sm font-medium dark:text-gray-300">
+                        Tipo de OT
                         </label>
                         <select
-                          {...register(`activities.${index}.activity`)}
-                          className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
-                          disabled={!isFormEditable}
+                            {...register("type")}
+                            className="w-full mt-1 p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
                         >
-                          <option value="">Seleccionar...</option>
-                          {getAvailableActivities(index).map((opt) => (
-                            <option key={opt} value={opt}>
-                              {opt}
-                            </option>
-                          ))}
+                            <option value="Produccion">Producción</option>
+                            <option value="Calibracion">Calibración</option>
+                            <option value="Ensayo SE">Ensayo SE</option>
+                            <option value="Ensayo EE">Ensayo EE</option>
+                            <option value="Otros Servicios">Otros Servicios</option>
                         </select>
-                      </div>
-                      <div>
-                        <label className="text-sm font-medium mb-1 dark:text-gray-300">
-                          Asignar a
+                    </div>
+                    <div>
+                        <label className="text-sm font-medium dark:text-gray-300">
+                        Contrato
                         </label>
-                        <Controller
-                          control={control}
-                          name={`activities.${index}.assigned_to` as any}
-                          render={({ field }) => (
-                            <MultiUserSelect
-                              users={users}
-                              selectedUserIds={field.value || []}
-                              onChange={field.onChange}
-                              disabled={!isFormEditable}
-                            />
-                          )}
-                        />
-                      </div>
-                      {isFormEditable && (
-                        <div className="self-end">
-                          <Button
-                            type="button"
-                            variant="danger"
-                            size="sm"
-                            onClick={() => remove(index)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      )}
+                        <select
+                            {...register("contract_type")}
+                            className="w-full mt-1 p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
+                        >
+                            <option value="Contrato de Producción">
+                                Contrato de Producción
+                            </option>
+                            <option value="Contrato de Calibración">
+                                Contrato de Calibración
+                            </option>
+                            <option value="Contrato de Ensayo">Contrato de Ensayo</option>
+                        </select>
                     </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <Input
-                        label="Norma"
-                        {...register(`activities.${index}.norma`)}
-                        disabled={!isFormEditable}
-                        placeholder="Ej: IEC 60601"
-                      />
-                      <Input
-                        label="Precio (Sin IVA)"
-                        type="number"
-                        step="0.01"
-                        {...register(`activities.${index}.precio_sin_iva`, {
-                          valueAsNumber: true,
-                        })}
-                        disabled={!isFormEditable}
-                        placeholder="Ej: 15000"
-                      />
+                    <Input
+                        label="ID de OT"
+                        value={otData.custom_id || `Interno #${id}`}
+                        readOnly
+                    />
                     </div>
-                  </div>
-                ))}
-              </div>
+                </fieldset>
             </Card>
-          )}
 
-          <Card>
-            <h2 className="text-lg font-semibold text-blue-700 dark:text-blue-400 col-span-full mb-4 flex items-center gap-2">
-              <BookText size={20} /> Observaciones
-            </h2>
-            <div>
-              <label className="text-sm font-medium dark:text-gray-300">
-                Observaciones Generales (visibles para el cliente)
-              </label>
-              <textarea
-                {...register("observations")}
-                disabled={!isFormEditable}
-                className="w-full mt-1 p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 disabled:bg-gray-100 dark:disabled:bg-gray-800"
-                rows={4}
-              ></textarea>
-            </div>
-            <div className="mt-4">
-              <label className="text-sm font-medium dark:text-gray-300">
-                Observaciones del Colaborador (uso interno)
-              </label>
-              <textarea
-                {...register("collaborator_observations")}
-                disabled={!canViewAdminContent()}
-                className="w-full mt-1 p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 disabled:bg-gray-100 dark:disabled:bg-gray-800"
-                rows={4}
-                placeholder={
-                  isEmployee
-                    ? "Añade tus observaciones aquí..."
-                    : "Campo de uso exclusivo para el empleado asignado."
-                }
-              ></textarea>
-            </div>
-          </Card>
+            <Card>
+                <fieldset disabled={!isFormEditable}>
+                    <h2 className="text-lg font-semibold text-blue-700 dark:text-blue-400 col-span-full mb-4 flex items-center gap-2">
+                        <UserSquare size={20} /> Información del Cliente
+                    </h2>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <Input label="Empresa" value={otData.client?.name} readOnly />
+                        <Input label="Nº Cliente" value={otData.client?.code} readOnly />
+                        <div className="col-span-full">
+                            <label className="text-sm font-medium dark:text-gray-300">
+                            Referente
+                            </label>
+                            <select
+                            {...register("contact_id")}
+                            disabled={!isFormEditable}
+                            className="w-full mt-1 p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
+                            >
+                            <option value="">Seleccionar referente...</option>
+                            {otData.client?.contacts?.map((c) => (
+                                <option key={c.id} value={c.id}>
+                                {c.name} ({c.type})
+                                </option>
+                            ))}
+                            </select>
+                        </div>
+                    </div>
+                </fieldset>
+            </Card>
+
+            <Card>
+                <fieldset disabled={!isFormEditable}>
+                    <h2 className="text-lg font-semibold text-blue-700 dark:text-blue-400 col-span-full mb-4 flex items-center gap-2">
+                        <Package size={20} /> Producto
+                    </h2>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <Input label="Nombre *" {...register("product")} />
+                        <Input label="Marca" {...register("brand")} />
+                        <Input label="Modelo" {...register("model")} />
+                        <Input
+                            label="Nº de Lacre"
+                            {...register("seal_number")}
+                            disabled={!isLacreEnabled}
+                        />
+                        <Input
+                            label="Vto. del Certificado"
+                            type="date"
+                            {...register("certificate_expiry")}
+                            disabled={!isLacreEnabled}
+                        />
+                        <Input
+                            label="Fecha de Entrega Estimada"
+                            type="date"
+                            {...register("estimated_delivery_date")}
+                        />
+                    </div>
+                </fieldset>
+            </Card>
+            
+            {!isEmployee && (
+                <Card>
+                    <div className="flex justify-between items-center mb-4">
+                        <h2 className="text-lg font-semibold text-blue-700 dark:text-blue-400 flex items-center gap-2">
+                            <ClipboardList size={20} /> Actividades y Asignaciones
+                        </h2>
+                        {isFormEditable && (
+                        <Button
+                            type="button"
+                            size="sm"
+                            onClick={() => append({ activity: "", assigned_to: [] })}
+                        >
+                            <PlusCircle className="h-4 w-4 mr-2" /> Agregar Actividad
+                        </Button>
+                        )}
+                    </div>
+                    <div className="space-y-4">
+                        {fields.map((field, index) => (
+                        <div
+                            key={field.id}
+                            className="bg-gray-50 dark:bg-gray-700/50 p-4 rounded-md space-y-4"
+                        >
+                            <div className="grid grid-cols-1 md:grid-cols-[1fr,2fr,auto] gap-4 items-start">
+                            <div>
+                                <label className="text-sm font-medium mb-1 dark:text-gray-300">
+                                Actividad
+                                </label>
+                                <select
+                                {...register(`activities.${index}.activity`)}
+                                className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
+                                disabled={!isFormEditable}
+                                >
+                                <option value="">Seleccionar...</option>
+                                {getAvailableActivities(index).map((opt) => (
+                                    <option key={opt} value={opt}>
+                                    {opt}
+                                    </option>
+                                ))}
+                                </select>
+                            </div>
+                            <div>
+                                <label className="text-sm font-medium mb-1 dark:text-gray-300">
+                                Asignar a
+                                </label>
+                                <Controller
+                                control={control}
+                                name={`activities.${index}.assigned_to` as any}
+                                render={({ field }) => (
+                                    <MultiUserSelect
+                                    users={users}
+                                    selectedUserIds={field.value || []}
+                                    onChange={field.onChange}
+                                    disabled={!isFormEditable}
+                                    />
+                                )}
+                                />
+                            </div>
+                            {isFormEditable && (
+                                <div className="self-end">
+                                <Button
+                                    type="button"
+                                    variant="danger"
+                                    size="sm"
+                                    onClick={() => remove(index)}
+                                >
+                                    <Trash2 className="h-4 w-4" />
+                                </Button>
+                                </div>
+                            )}
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <Input
+                                label="Norma"
+                                {...register(`activities.${index}.norma`)}
+                                disabled={!isFormEditable}
+                                placeholder="Ej: IEC 60601"
+                            />
+                            <Input
+                                label="Precio (Sin IVA)"
+                                type="number"
+                                step="0.01"
+                                {...register(`activities.${index}.precio_sin_iva`, {
+                                valueAsNumber: true,
+                                })}
+                                disabled={!isFormEditable}
+                                placeholder="Ej: 15000"
+                            />
+                            </div>
+                        </div>
+                        ))}
+                    </div>
+                </Card>
+            )}
+
+            <Card>
+                <h2 className="text-lg font-semibold text-blue-700 dark:text-blue-400 col-span-full mb-4 flex items-center gap-2">
+                    <BookText size={20}/> Observaciones
+                </h2>
+                <div>
+                <label className="text-sm font-medium dark:text-gray-300">
+                    Observaciones Generales (visibles para el cliente)
+                </label>
+                <textarea
+                    {...register("observations")}
+                    disabled={!isFormEditable}
+                    className="w-full mt-1 p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 disabled:bg-gray-100 dark:disabled:bg-gray-800"
+                    rows={4}
+                ></textarea>
+                </div>
+                <div className="mt-4">
+                <label className="text-sm font-medium dark:text-gray-300">
+                    Observaciones del Colaborador (uso interno)
+                </label>
+                <textarea
+                    {...register("collaborator_observations")}
+                    disabled={!canViewAdminContent()}
+                    className="w-full mt-1 p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 disabled:bg-gray-100 dark:disabled:bg-gray-800"
+                    rows={4}
+                    placeholder={
+                    isEmployee
+                        ? "Añade tus observaciones aquí..."
+                        : "Campo de uso exclusivo para el empleado asignado."
+                    }
+                ></textarea>
+                </div>
+            </Card>
         </div>
       </form>
     </>

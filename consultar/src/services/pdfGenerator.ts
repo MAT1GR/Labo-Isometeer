@@ -14,7 +14,7 @@ const staticBaseUrl = axiosInstance.defaults.baseURL?.replace("/api", "") || "";
 
 // Helper function to save the generated PDF
 const savePdf = (uint8Array: Uint8Array, filename: string) => {
-  const blob = new Blob([uint8Array], { type: "application/pdf" });
+  const blob = new Blob([uint8Array as BlobPart], { type: "application/pdf" });
   const link = document.createElement("a");
   link.href = URL.createObjectURL(blob);
   link.download = filename;

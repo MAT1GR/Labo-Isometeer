@@ -13,13 +13,13 @@ import {
   Menu,
   X,
   UserCircle,
-  Settings,
   FileSignature,
   Award,
   Image,
 } from "lucide-react";
 import ThemeToggle from "./ui/ThemeToggle";
 import { cn } from "../lib/utils";
+import Notifications from "./ui/Notifications";
 
 const SidebarNavigation: React.FC = () => {
   const { user, logout, canManageAdminPanel } = useAuth();
@@ -86,18 +86,21 @@ const SidebarNavigation: React.FC = () => {
   const isHomeActive = location.pathname === "/";
 
   return (
-    <div className="flex grow flex-col gap-y-5 overflow-y-auto bg-white dark:bg-gray-800 px-6 pb-4 shadow-sm border-r border-gray-200 dark:border-gray-700">
+    <div className="flex grow flex-col gap-y-5 bg-white dark:bg-gray-800 px-6 pb-4 shadow-sm border-r border-gray-200 dark:border-gray-700">
+      {/* === INICIO CAMBIO 1: Se restaura subtítulo === */}
       <div className="flex h-16 shrink-0 items-center gap-3">
-        <img className="h-8 w-auto" src="/logo.png" alt="Logo de la Empresa" />
+        <img className="h-8 w-auto" src="/logo.png" alt="Logo de ISOMeter Go" />
         <div>
           <h1 className="text-lg font-bold text-blue-600 dark:text-blue-500">
-            Lab Consultar
+            ISOMeter Go
           </h1>
           <p className="text-xs text-gray-500 dark:text-gray-400">
-            Sistema de Gestión
+            Sistema de gestión interno
           </p>
         </div>
       </div>
+      {/* === FIN CAMBIO 1 === */}
+
       <div className="bg-blue-50 dark:bg-gray-700/50 rounded-lg p-3 flex justify-between items-center">
         <div>
           <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
@@ -107,18 +110,23 @@ const SidebarNavigation: React.FC = () => {
             {user?.role}
           </p>
         </div>
-        <ThemeToggle />
+        <div className="flex items-center gap-x-1">
+          <ThemeToggle />
+          <Notifications />
+        </div>
       </div>
-      <nav className="flex flex-1 flex-col">
+
+      <nav className="flex flex-1 flex-col overflow-y-auto">
         <ul className="flex flex-1 flex-col gap-y-7">
+          {/* === INICIO CAMBIO 2 y 3: Se corrige hover y scrollbar === */}
           <li>
-            <ul className="-mx-2 space-y-1">
+            <ul className="space-y-1">
               {filteredMenuItems.map((item) => (
                 <li key={item.path}>
                   <button
                     onClick={() => navigate(item.path)}
                     className={cn(
-                      "group flex w-full gap-x-3 rounded-md p-3 text-left text-base font-medium leading-6 transition-colors",
+                      "group flex w-full items-center gap-x-3 rounded-md p-3 text-base font-medium leading-6 transition-colors",
                       (
                         item.path === "/"
                           ? isHomeActive
@@ -129,7 +137,7 @@ const SidebarNavigation: React.FC = () => {
                     )}
                   >
                     <item.icon className="h-6 w-6 shrink-0" />
-                    {item.label}
+                    <span>{item.label}</span>
                   </button>
                 </li>
               ))}
@@ -141,20 +149,20 @@ const SidebarNavigation: React.FC = () => {
               <div className="text-xs font-semibold leading-6 text-gray-400">
                 Panel de Administrador
               </div>
-              <ul className="-mx-2 mt-2 space-y-1">
+              <ul className="mt-2 space-y-1">
                 {adminMenuItems.map((item) => (
                   <li key={item.path}>
                     <button
                       onClick={() => navigate(item.path)}
                       className={cn(
-                        "group flex w-full gap-x-3 rounded-md p-3 text-left text-base font-medium leading-6 transition-colors",
+                        "group flex w-full items-center gap-x-3 rounded-md p-3 text-base font-medium leading-6 transition-colors",
                         isActivePath(item.path)
                           ? "bg-blue-50 text-blue-700 dark:bg-blue-900/50 dark:text-white"
                           : "text-gray-700 hover:bg-gray-100 hover:text-blue-700 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-white"
                       )}
                     >
                       <item.icon className="h-6 w-6 shrink-0" />
-                      {item.label}
+                      <span>{item.label}</span>
                     </button>
                   </li>
                 ))}
@@ -162,32 +170,34 @@ const SidebarNavigation: React.FC = () => {
             </li>
           )}
 
-          <li className="mt-auto -mx-2 space-y-1">
+          <li className="mt-auto space-y-1">
             <button
               onClick={() => navigate("/perfil")}
               className={cn(
-                "group flex w-full gap-x-3 rounded-md p-3 text-left text-base font-medium leading-6 transition-colors",
+                "group flex w-full items-center gap-x-3 rounded-md p-3 text-base font-medium leading-6 transition-colors",
                 isActivePath("/perfil")
                   ? "bg-blue-50 text-blue-700 dark:bg-blue-900/50 dark:text-white"
                   : "text-gray-700 hover:bg-gray-100 hover:text-blue-700 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-white"
               )}
             >
               <UserCircle className="h-6 w-6 shrink-0" />
-              Perfil
+              <span>Perfil</span>
             </button>
             <button
               onClick={handleLogout}
-              className="group flex w-full gap-x-3 rounded-md p-3 text-left text-base font-medium leading-6 text-gray-700 hover:bg-gray-100 hover:text-red-700 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-red-500"
+              className="group flex w-full items-center gap-x-3 rounded-md p-3 text-base font-medium leading-6 text-gray-700 hover:bg-gray-100 hover:text-red-700 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-red-500"
             >
               <LogOut className="h-6 w-6 shrink-0" />
-              Cerrar Sesión
+              <span>Cerrar Sesión</span>
             </button>
           </li>
+          {/* === FIN CAMBIO 2 y 3 === */}
         </ul>
       </nav>
     </div>
   );
 };
+
 const Layout: React.FC = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
@@ -248,11 +258,11 @@ const Layout: React.FC = () => {
         </Dialog>
       </Transition.Root>
 
-      <div className="hidden lg:fixed lg:inset-y-0 lg:z-50 lg:flex lg:w-64 lg:flex-col">
+      <div className="hidden lg:fixed lg:inset-y-0 lg:z-50 lg:flex lg:w-72 lg:flex-col">
         <SidebarNavigation />
       </div>
 
-      <div className="flex flex-1 flex-col lg:pl-64">
+      <div className="flex flex-1 flex-col lg:pl-72">
         <div className="sticky top-0 z-40 flex h-16 shrink-0 items-center gap-x-4 border-b border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800 px-4 shadow-sm sm:gap-x-6 sm:px-6 lg:hidden">
           <button
             type="button"
