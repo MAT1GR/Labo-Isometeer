@@ -2,8 +2,54 @@
 
 import { Router, Request, Response } from "express";
 import db from "../config/database";
+import { getClients, setClients } from "../server"; // --- CAMBIO: Importamos los manejadores de clientes ---
 
 const router = Router();
+
+// --- INICIO CAMBIO: Función para enviar notificaciones a usuarios específicos ---
+export const sendNotificationToUser = (userId: number, notification: any) => {
+  const clients = getClients();
+  const userClient = clients.find((c) => c.id === userId);
+  if (userClient) {
+    userClient.res.write(`data: ${JSON.stringify(notification)}\n\n`);
+  }
+};
+// --- FIN CAMBIO ---
+
+// --- INICIO CAMBIO: Endpoint para Server-Sent Events (SSE) ---
+router.get("/events/:userId", (req: Request, res: Response) => {
+  const { userId } = req.params;
+
+  // Configurar cabeceras para SSE
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache");
+  res.setHeader("Connection", "keep-alive");
+  res.flushHeaders(); // Enviar cabeceras inmediatamente
+
+  // Guardar el cliente
+  const newClient = {
+    id: parseInt(userId, 10),
+    res,
+  };
+  let clients = getClients();
+  clients.push(newClient);
+  setClients(clients);
+
+  console.log(`Cliente ${userId} conectado para notificaciones SSE.`);
+
+  // Enviar un evento inicial de conexión (opcional)
+  res.write(
+    'data: {"message": "Conectado a notificaciones en tiempo real"}\n\n'
+  );
+
+  // Manejar desconexión del cliente
+  req.on("close", () => {
+    console.log(`Cliente ${userId} desconectado.`);
+    clients = getClients();
+    setClients(clients.filter((c) => c.id !== parseInt(userId, 10)));
+  });
+});
+// --- FIN CAMBIO ---
 
 // [GET] /api/notifications/:userId
 router.get("/:userId", (req: Request, res: Response) => {

@@ -1,4 +1,4 @@
-// RUTA: /cliente/src/components/ui/Notifications.tsx
+// RUTA: /consultar/src/components/ui/Notifications.tsx
 
 import React, { Fragment, useEffect, useRef } from "react";
 import { useAuth } from "../../contexts/AuthContext";
@@ -13,50 +13,96 @@ import { formatDistanceToNow } from "date-fns";
 import { es } from "date-fns/locale";
 import { useNavigate } from "react-router-dom";
 import Button from "./Button";
+import axiosInstance from "../../api/axiosInstance";
 
 const Notifications: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
+  // Usamos una ref para el audio para evitar que se cree en cada render
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
-  const { data: notifications } = useSWR(
+  const { data: notifications, mutate: mutateNotifications } = useSWR<
+    Notification[]
+  >(
     user ? `/notifications/${user.id}` : null,
-    () => (user ? notificationService.getNotifications(user.id) : []),
-    { refreshInterval: 15000 } // Refresca cada 15 segundos
+    () =>
+      user
+        ? notificationService.getNotifications(user.id)
+        : Promise.resolve([]),
+    {
+      revalidateOnFocus: false, // La revalidación se maneja por SSE
+    }
   );
 
-  const unreadNotifications = notifications?.filter((n) => !n.is_read) || [];
-
-  // === INICIO CAMBIO 1: Lógica para reproducir sonido ===
-  const prevUnreadCount = useRef(unreadNotifications.length);
-  const initialLoad = useRef(true);
-
   useEffect(() => {
-    // Evita que el sonido se reproduzca en la carga inicial de la página
-    if (initialLoad.current) {
-      initialLoad.current = false;
-      prevUnreadCount.current = unreadNotifications.length;
-      return;
-    }
+    if (user) {
+      // Inicializamos el objeto Audio una sola vez
+      if (!audioRef.current) {
+        audioRef.current = new Audio("/notification.mp3");
+      }
 
-    // Si el nuevo conteo de no leídas es mayor que el anterior, reproduce el sonido
-    if (unreadNotifications.length > prevUnreadCount.current) {
-      const audio = new Audio("/notification.mp3");
-      audio.play().catch((error) => {
-        // La reproducción automática puede ser bloqueada por el navegador.
-        // El usuario debe interactuar con la página primero.
-        console.error("Error al reproducir el sonido de notificación:", error);
-      });
-    }
+      const eventSource = new EventSource(
+        `${axiosInstance.defaults.baseURL}/notifications/events/${user.id}`
+      );
 
-    // Actualiza el conteo previo para la siguiente comparación
-    prevUnreadCount.current = unreadNotifications.length;
-  }, [unreadNotifications.length]);
-  // === FIN CAMBIO 1 ===
+      eventSource.onopen = () => {
+        console.log("Conexión SSE para notificaciones establecida.");
+      };
+
+      eventSource.onmessage = (event) => {
+        // Ignorar mensajes de conexión que no son notificaciones JSON
+        try {
+          const newNotification = JSON.parse(event.data) as Notification;
+          if (!newNotification.id) return;
+
+          console.log("Nueva notificación recibida:", newNotification);
+
+          // Actualizamos el estado local de SWR para reflejar el cambio al instante
+          mutateNotifications((currentNotifications) => {
+            // Evitamos duplicados si la notificación ya existe
+            if (
+              currentNotifications?.find((n) => n.id === newNotification.id)
+            ) {
+              return currentNotifications;
+            }
+            return [newNotification, ...(currentNotifications || [])];
+          }, false);
+
+          // Reproducimos el sonido
+          if (audioRef.current) {
+            audioRef.current.play().catch((error) => {
+              console.error(
+                "No se pudo reproducir el sonido. Interacción del usuario requerida.",
+                error
+              );
+            });
+          }
+        } catch (e) {
+          console.log("Mensaje SSE recibido (no es JSON):", event.data);
+        }
+      };
+
+      eventSource.onerror = (error) => {
+        console.error("Error en la conexión SSE, se cerrará:", error);
+        eventSource.close();
+      };
+
+      // Limpieza al desmontar el componente
+      return () => {
+        if (eventSource.readyState !== EventSource.CLOSED) {
+          eventSource.close();
+          console.log("Conexión SSE para notificaciones cerrada.");
+        }
+      };
+    }
+  }, [user, mutateNotifications]);
+
+  const unreadNotifications = notifications?.filter((n) => !n.is_read) || [];
 
   const handleNotificationClick = async (notification: Notification) => {
     if (user && !notification.is_read) {
       await notificationService.markAsRead([notification.id], user.id);
-      mutate(`/notifications/${user.id}`);
+      mutateNotifications();
     }
     if (notification.ot_id) {
       navigate(`/ot/editar/${notification.ot_id}`);
@@ -67,7 +113,7 @@ const Notifications: React.FC = () => {
     if (user && unreadNotifications.length > 0) {
       const unreadIds = unreadNotifications.map((n) => n.id);
       await notificationService.markAsRead(unreadIds, user.id);
-      mutate(`/notifications/${user.id}`);
+      mutateNotifications();
     }
   };
 
@@ -75,13 +121,11 @@ const Notifications: React.FC = () => {
     <Popover className="relative">
       <Popover.Button className="relative rounded-full p-1.5 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none">
         <Bell className="h-4 w-4" />
-        {/* === INICIO CAMBIO 2: Indicador numérico (badge) === */}
         {unreadNotifications.length > 0 && (
           <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-white text-xs font-bold ring-2 ring-white dark:ring-gray-800">
             {unreadNotifications.length}
           </span>
         )}
-        {/* === FIN CAMBIO 2 === */}
       </Popover.Button>
       <Transition
         as={Fragment}
@@ -92,6 +136,7 @@ const Notifications: React.FC = () => {
         leaveFrom="opacity-100 translate-y-0"
         leaveTo="opacity-0 translate-y-1"
       >
+        {/* --- CAMBIO: Se ajustan las clases de posicionamiento del panel --- */}
         <Popover.Panel className="absolute left-0 z-50 mt-2 w-80 origin-top-left rounded-md bg-white dark:bg-gray-800 py-1 shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
           <div className="px-4 py-2 flex justify-between items-center border-b dark:border-gray-700">
             <p className="font-semibold">Notificaciones</p>

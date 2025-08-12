@@ -2,10 +2,51 @@
 
 import { Router, Request, Response } from "express";
 import db from "../config/database";
+import { sendNotificationToUser } from "./notifications.routes";
 
 const router = Router();
 
-// --- Helper function to generate custom OT ID ---
+/**
+ * Función unificada para crear una notificación en la base de datos y
+ * enviarla en tiempo real a un usuario específico a través de SSE.
+ * @param userId - ID del usuario que recibirá la notificación.
+ * @param message - Mensaje de la notificación.
+ * @param otId - ID de la Orden de Trabajo relacionada.
+ */
+const createAndSendNotification = (
+  userId: number,
+  message: string,
+  otId: number
+) => {
+  try {
+    // 1. Insertar la notificación en la base de datos
+    const stmt = db.prepare(
+      "INSERT INTO notifications (user_id, message, ot_id) VALUES (?, ?, ?)"
+    );
+    const info = stmt.run(userId, message, otId);
+    const notificationId = info.lastInsertRowid;
+
+    // 2. Obtener la notificación recién creada para enviarla completa
+    const newNotification = db
+      .prepare("SELECT * FROM notifications WHERE id = ?")
+      .get(notificationId);
+
+    // 3. Enviar por SSE al cliente conectado
+    if (newNotification) {
+      sendNotificationToUser(userId, newNotification);
+    }
+  } catch (error) {
+    console.error("Error al crear o enviar notificación:", error);
+  }
+};
+
+/**
+ * Genera un ID de OT personalizado basado en la fecha, tipo y cliente.
+ * @param date - Fecha de la OT (YYYY-MM-DD).
+ * @param type - Tipo de OT (e.g., 'Produccion', 'Calibracion').
+ * @param client_id - ID del cliente.
+ * @returns Un string con el ID personalizado.
+ */
 const generateCustomId = (
   date: string,
   type: string,
@@ -158,6 +199,7 @@ router.post("/", (req: Request, res: Response) => {
       .status(403)
       .json({ error: "No tienes permisos para crear una OT." });
   }
+
   const insertOTStmt = db.prepare(
     `INSERT INTO work_orders (
       custom_id, date, type, client_id, contact_id, product, brand, model,
@@ -194,13 +236,13 @@ router.post("/", (req: Request, res: Response) => {
       data.otData.estimated_delivery_date,
       data.otData.collaborator_observations,
       data.created_by,
-      "pendiente",
+      "pendiente", // <- Status inicial
       data.otData.quotation_amount,
       data.otData.quotation_details,
       data.otData.disposition,
       data.otData.contract_type
     );
-    const otId = info.lastInsertRowid;
+    const otId = info.lastInsertRowid as number;
     for (const act of data.activities) {
       if (act.activity) {
         const activityInfo = insertActivityStmt.run(
@@ -213,6 +255,7 @@ router.post("/", (req: Request, res: Response) => {
         if (act.assigned_to && Array.isArray(act.assigned_to)) {
           for (const userId of act.assigned_to) {
             insertAssignmentStmt.run(activityId, userId);
+            // La notificación ahora se envía al autorizar la OT.
           }
         }
       }
@@ -283,6 +326,28 @@ router.get("/:id", (req: Request, res: Response) => {
 router.put("/:id", (req: Request, res: Response) => {
   const { id } = req.params;
   const { activities = [], role, ...otData } = req.body;
+
+  // --- OBTENER DATOS ANTIGUOS ---
+  const oldOT = db
+    .prepare(
+      "SELECT collaborator_observations, authorized FROM work_orders WHERE id = ?"
+    )
+    .get(id) as { collaborator_observations: string; authorized: number };
+  if (!oldOT) {
+    return res.status(404).json({ error: "OT no encontrada" });
+  }
+  const isAuthorized = oldOT.authorized === 1;
+
+  const oldAssignmentsStmt = db.prepare(`
+     SELECT waa.activity_id, waa.user_id
+     FROM work_order_activity_assignments waa
+     JOIN work_order_activities wa ON waa.activity_id = wa.id
+     WHERE wa.work_order_id = ?
+  `);
+  const oldAssignments = new Set(
+    oldAssignmentsStmt.all(id).map((a: any) => `${a.activity_id}-${a.user_id}`)
+  );
+
   if (role === "empleado") {
     const info = db
       .prepare(
@@ -291,8 +356,35 @@ router.put("/:id", (req: Request, res: Response) => {
       .run(otData.collaborator_observations, id);
     if (info.changes === 0)
       return res.status(404).json({ error: "OT no encontrada" });
+
+    // Notificar Menciones en Observaciones (Empleado)
+    const newMentions = (
+      otData.collaborator_observations.match(/@(\w+)/g) || []
+    ).map((mention: string) => mention.substring(1));
+    const oldMentions = (
+      oldOT.collaborator_observations.match(/@(\w+)/g) || []
+    ).map((mention: string) => mention.substring(1));
+
+    const trulyNewMentions = newMentions.filter(
+      (m: string) => !oldMentions.includes(m)
+    );
+
+    if (trulyNewMentions.length > 0) {
+      const users = db
+        .prepare(
+          `SELECT id, name FROM users WHERE name IN (${trulyNewMentions
+            .map(() => "?")
+            .join(",")})`
+        )
+        .all(trulyNewMentions);
+      for (const mentionedUser of users as { id: number; name: string }[]) {
+        const message = `${req.body.userName} te mencionó en la OT #${otData.custom_id}.`;
+        createAndSendNotification(mentionedUser.id, message, parseInt(id));
+      }
+    }
     return res.status(200).json({ message: "Observaciones guardadas." });
   }
+
   const updateStmt = db.prepare(
     `UPDATE work_orders SET date=?, type=?, product=?, brand=?, model=?, seal_number=?, observations=?, certificate_expiry=?, estimated_delivery_date=?, status=?, quotation_amount=?, quotation_details=?, disposition=?, contract_type=?, collaborator_observations=?, contact_id=?, updated_at=CURRENT_TIMESTAMP WHERE id=?`
   );
@@ -326,7 +418,7 @@ router.put("/:id", (req: Request, res: Response) => {
       otData.contact_id,
       id
     );
-    deleteActivitiesStmt.run(id); // Esto eliminará en cascada las asignaciones
+    deleteActivitiesStmt.run(id); // Elimina actividades y sus asignaciones en cascada
     for (const act of activities) {
       if (act.activity) {
         const activityInfo = insertActivityStmt.run(
@@ -339,8 +431,41 @@ router.put("/:id", (req: Request, res: Response) => {
         if (act.assigned_to && Array.isArray(act.assigned_to)) {
           for (const userId of act.assigned_to) {
             insertAssignmentStmt.run(activityId, userId);
+            // Notificar si es una nueva asignación Y LA OT ESTÁ AUTORIZADA
+            if (
+              isAuthorized &&
+              !oldAssignments.has(`${activityId}-${userId}`)
+            ) {
+              const message = `Te han asignado a la actividad "${act.activity}" en la OT #${otData.custom_id}.`;
+              createAndSendNotification(userId, message, parseInt(id));
+            }
           }
         }
+      }
+    }
+    // Notificar Menciones en Observaciones (Admin/Director)
+    const newMentions = (
+      otData.collaborator_observations.match(/@(\w+)/g) || []
+    ).map((mention: string) => mention.substring(1));
+    const oldMentions = (
+      oldOT.collaborator_observations.match(/@(\w+)/g) || []
+    ).map((mention: string) => mention.substring(1));
+
+    const trulyNewMentions = newMentions.filter(
+      (m: string) => !oldMentions.includes(m)
+    );
+
+    if (trulyNewMentions.length > 0) {
+      const users = db
+        .prepare(
+          `SELECT id, name FROM users WHERE name IN (${trulyNewMentions
+            .map(() => "?")
+            .join(",")})`
+        )
+        .all(trulyNewMentions);
+      for (const mentionedUser of users as { id: number; name: string }[]) {
+        const message = `Te mencionaron en la OT #${otData.custom_id}.`;
+        createAndSendNotification(mentionedUser.id, message, parseInt(id));
       }
     }
   });
@@ -370,16 +495,44 @@ router.put("/:id/authorize", (req: Request, res: Response) => {
       .json({ error: "No tienes permisos para autorizar OTs." });
   }
   try {
+    const otId = parseInt(req.params.id);
     const info = db
       .prepare(
-        "UPDATE work_orders SET authorized = 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?"
+        "UPDATE work_orders SET authorized = 1, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND authorized = 0"
       )
-      .run(req.params.id);
-    if (info.changes === 0)
-      return res.status(404).json({ error: "OT no encontrada." });
+      .run(otId);
+
+    if (info.changes > 0) {
+      // Crear Notificación para todos los asignados
+      const ot = db
+        .prepare("SELECT custom_id FROM work_orders WHERE id = ?")
+        .get(otId) as { custom_id: string };
+      const assignedUsers = db
+        .prepare(
+          `
+        SELECT DISTINCT waa.user_id
+        FROM work_order_activities wa
+        JOIN work_order_activity_assignments waa ON wa.id = waa.activity_id
+        WHERE wa.work_order_id = ?
+      `
+        )
+        .all(otId) as { user_id: number }[];
+
+      if (ot && assignedUsers.length > 0) {
+        const message = `La OT #${ot.custom_id} fue autorizada y tienes tareas asignadas.`;
+        for (const user of assignedUsers) {
+          createAndSendNotification(user.user_id, message, otId);
+        }
+      }
+    } else {
+      return res
+        .status(404)
+        .json({ error: "OT no encontrada o ya estaba autorizada." });
+    }
+
     const updatedOT = db
       .prepare("SELECT * FROM work_orders WHERE id = ?")
-      .get(req.params.id);
+      .get(otId);
     res.status(200).json(updatedOT);
   } catch (error) {
     res.status(500).json({ error: "Error al autorizar la OT." });
@@ -465,6 +618,12 @@ router.put("/:id/close", (req: Request, res: Response) => {
       const points = getPointsForActivity(act.activity);
       if (points > 0 && act.user_id) {
         pointsToAward[act.user_id] = (pointsToAward[act.user_id] || 0) + points;
+        // Notificar al usuario sobre los puntos ganados
+        createAndSendNotification(
+          act.user_id,
+          `Has ganado ${points} puntos por la actividad "${act.activity}" en la OT #${ot.custom_id}.`,
+          ot.id
+        );
       }
     }
 
@@ -521,9 +680,28 @@ router.put("/activities/:activityId/start", (req: Request, res: Response) => {
       "UPDATE work_order_activities SET status = 'en_progreso', started_at = CURRENT_TIMESTAMP WHERE id = ?"
     ).run(activityId);
 
-    db.prepare(
-      "UPDATE work_orders SET status = 'en_progreso' WHERE id = ? AND status = 'pendiente'"
-    ).run(activity.work_order_id);
+    const info = db
+      .prepare(
+        "UPDATE work_orders SET status = 'en_progreso' WHERE id = ? AND status = 'pendiente'"
+      )
+      .run(activity.work_order_id);
+
+    // Si el estado de la OT cambió a "en progreso", notificar al creador
+    if (info.changes > 0) {
+      const ot = db
+        .prepare("SELECT created_by, custom_id FROM work_orders WHERE id = ?")
+        .get(activity.work_order_id) as {
+        created_by: number;
+        custom_id: string;
+      };
+      if (ot) {
+        createAndSendNotification(
+          ot.created_by,
+          `La OT #${ot.custom_id} ha comenzado.`,
+          activity.work_order_id
+        );
+      }
+    }
   });
 
   try {
@@ -559,6 +737,17 @@ router.put("/activities/:activityId/stop", (req: Request, res: Response) => {
       db.prepare(
         "UPDATE work_orders SET status = 'finalizada' WHERE id = ?"
       ).run(otId);
+      // Notificar al creador que la OT completa ha finalizado
+      const ot = db
+        .prepare("SELECT created_by, custom_id FROM work_orders WHERE id = ?")
+        .get(otId) as { created_by: number; custom_id: string };
+      if (ot) {
+        createAndSendNotification(
+          ot.created_by,
+          `Todas las actividades de la OT #${ot.custom_id} han finalizado.`,
+          otId
+        );
+      }
     }
   });
   try {
