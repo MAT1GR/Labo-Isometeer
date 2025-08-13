@@ -1,5 +1,3 @@
-// RUTA: /consultar/src/pages/OTCreate.tsx
-
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useForm, useWatch, useFieldArray, Controller } from "react-hook-form";
@@ -12,7 +10,6 @@ import { useAuth } from "../contexts/AuthContext";
 import Input from "../components/ui/Input";
 import Button from "../components/ui/Button";
 import {
-  ArrowLeft,
   Save,
   PlusCircle,
   Trash2,
@@ -27,7 +24,7 @@ import MultiUserSelect from "../components/ui/MultiUserSelect";
 import { calculateEstimatedDeliveryDate } from "../lib/utils";
 import ClienteSelect from "../components/ui/ClienteSelect";
 import Card from "../components/ui/Card";
-import UnsavedChangesWarning from "../components/ui/UnsavedChangesWarning";
+import NavigationPrompt from "../components/ui/NavigationPrompt";
 
 type OTCreateFormData = Omit<
   WorkOrder,
@@ -59,6 +56,7 @@ const OTCreate: React.FC = () => {
     name: "activities" as never,
   });
 
+  const [isSaving, setIsSaving] = useState(false);
   const [clients, setClients] = useState<Client[]>([]);
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [users, setUsers] = useState<User[]>([]);
@@ -160,6 +158,7 @@ const OTCreate: React.FC = () => {
 
   const onSubmit = async (data: any) => {
     if (!user) return;
+    setIsSaving(true);
     try {
       const dataToSubmit = {
         ...data,
@@ -172,6 +171,7 @@ const OTCreate: React.FC = () => {
       navigate(`/ot/editar/${newOt.id}`);
     } catch (error) {
       alert("Hubo un error al crear la Orden de Trabajo.");
+      setIsSaving(false);
     }
   };
 
@@ -196,7 +196,12 @@ const OTCreate: React.FC = () => {
 
   return (
     <>
-      <UnsavedChangesWarning isDirty={isDirty} />
+      {/* LA LÍNEA CORREGIDA */}
+      <NavigationPrompt
+        when={isDirty && !isSaving}
+        onSave={() => handleSubmit(onSubmit)()}
+      />
+
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
         <div className="flex justify-between items-center">
           <h1 className="text-3xl font-bold">Crear Nueva Orden de Trabajo</h1>

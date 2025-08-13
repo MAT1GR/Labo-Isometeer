@@ -1,6 +1,4 @@
-// RUTA: /cliente/src/components/Layout.tsx
-
-import React, { useState, Fragment } from "react";
+import React, { useState, Fragment, ReactNode } from "react"; // 1. Importar ReactNode
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { Dialog, Transition } from "@headlessui/react";
@@ -21,6 +19,7 @@ import ThemeToggle from "./ui/ThemeToggle";
 import { cn } from "../lib/utils";
 import Notifications from "./ui/Notifications";
 
+// ... (El componente SidebarNavigation se mantiene igual, no es necesario mostrarlo)
 const SidebarNavigation: React.FC = () => {
   const { user, logout, canManageAdminPanel } = useAuth();
   const location = useLocation();
@@ -49,11 +48,6 @@ const SidebarNavigation: React.FC = () => {
 
   const adminMenuItems = [
     {
-      icon: FileText,
-      label: "Usuarios",
-      path: "/usuarios",
-    },
-    {
       icon: FileSignature,
       label: "Contratos",
       path: "/admin/contratos",
@@ -67,6 +61,11 @@ const SidebarNavigation: React.FC = () => {
       icon: Image,
       label: "Cambiar Favicon",
       path: "/admin/favicon",
+    },
+    {
+      icon: Users,
+      label: "Usuarios",
+      path: "/usuarios",
     },
   ];
 
@@ -86,7 +85,6 @@ const SidebarNavigation: React.FC = () => {
 
   return (
     <div className="flex grow flex-col gap-y-5 bg-white dark:bg-gray-800 px-6 pb-4 shadow-sm border-r border-gray-200 dark:border-gray-700">
-      {/* === INICIO CAMBIO 1: Se restaura subtítulo === */}
       <div className="flex h-16 shrink-0 items-center gap-3">
         <img className="h-8 w-auto" src="/logo.png" alt="Logo de ISOMeter Go" />
         <div>
@@ -98,7 +96,6 @@ const SidebarNavigation: React.FC = () => {
           </p>
         </div>
       </div>
-      {/* === FIN CAMBIO 1 === */}
 
       <div className="bg-blue-50 dark:bg-gray-700/50 rounded-lg p-3 flex justify-between items-center">
         <div>
@@ -117,7 +114,6 @@ const SidebarNavigation: React.FC = () => {
 
       <nav className="flex flex-1 flex-col overflow-y-auto">
         <ul className="flex flex-1 flex-col gap-y-7">
-          {/* === INICIO CAMBIO 2 y 3: Se corrige hover y scrollbar === */}
           <li>
             <ul className="space-y-1">
               {filteredMenuItems.map((item) => (
@@ -190,14 +186,19 @@ const SidebarNavigation: React.FC = () => {
               <span>Cerrar Sesión</span>
             </button>
           </li>
-          {/* === FIN CAMBIO 2 y 3 === */}
         </ul>
       </nav>
     </div>
   );
 };
 
-const Layout: React.FC = () => {
+// 2. Definimos la interfaz para las props del Layout
+interface LayoutProps {
+  children: ReactNode; // <-- AQUÍ ESTÁ LA SOLUCIÓN
+}
+
+const Layout: React.FC<LayoutProps> = ({ children }) => {
+  // 3. Aplicamos la interfaz
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   return (
@@ -277,7 +278,7 @@ const Layout: React.FC = () => {
 
         <main className="flex-1 py-10">
           <div className="px-4 sm:px-6 lg:px-8">
-            <Outlet />
+            {children} {/* 4. Renderizamos los hijos aquí */}
           </div>
         </main>
       </div>

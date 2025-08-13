@@ -1,69 +1,41 @@
-// RUTA: /consultar/src/components/ui/UnsavedChangesWarning.tsx
+// RUTA: consultar/src/components/ui/UnsavedChangesWarning.tsx
 
-import React, { useEffect, useState } from "react";
-import { useBlocker } from "react-router-dom";
-import ConfirmationModal from "./ConfirmationModal";
+import React, { useEffect } from "react";
 
 interface UnsavedChangesWarningProps {
   isDirty: boolean;
 }
 
+/**
+ * Este componente no renderiza nada visible. Su única función es
+ * mostrar un diálogo de advertencia nativo del navegador si el usuario
+ * intenta salir de la página cuando hay cambios sin guardar (isDirty = true).
+ */
 const UnsavedChangesWarning: React.FC<UnsavedChangesWarningProps> = ({
   isDirty,
 }) => {
-  const [showModal, setShowModal] = useState(false);
-
-  // Bloquea la navegación interna de React Router si hay cambios
-  const blocker = useBlocker(
-    ({ currentLocation, nextLocation }) =>
-      isDirty && currentLocation.pathname !== nextLocation.pathname
-  );
-
   useEffect(() => {
-    // Maneja el cierre de pestaña o recarga de página
     const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      // Si el formulario tiene cambios, se activa la advertencia.
       if (isDirty) {
+        // Previene la acción por defecto (como navegar o cerrar la pestaña).
         event.preventDefault();
+        // Requerido por la mayoría de los navegadores para mostrar el diálogo.
         event.returnValue =
-          "Tienes cambios sin guardar. ¿Estás seguro de que quieres salir?";
+          "Tienes cambios sin guardar. ¿Seguro que quieres salir?";
       }
     };
 
+    // Agrega el listener al montar el componente.
     window.addEventListener("beforeunload", handleBeforeUnload);
 
+    // Limpia el listener cuando el componente se desmonta (al cambiar de página).
     return () => {
       window.removeEventListener("beforeunload", handleBeforeUnload);
     };
-  }, [isDirty]);
+  }, [isDirty]); // Este efecto se ejecutará cada vez que el valor de 'isDirty' cambie.
 
-  useEffect(() => {
-    // Muestra el modal cuando la navegación es bloqueada
-    if (blocker.state === "blocked") {
-      setShowModal(true);
-    }
-  }, [blocker.state]);
-
-  const handleConfirm = () => {
-    setShowModal(false);
-    blocker.proceed?.(); // Permite la navegación
-  };
-
-  const handleClose = () => {
-    setShowModal(false);
-    blocker.reset?.(); // Cancela la navegación
-  };
-
-  return (
-    <ConfirmationModal
-      isOpen={showModal}
-      onClose={handleClose}
-      onConfirm={handleConfirm}
-      title="Salir sin guardar"
-      message="Tienes cambios sin guardar. ¿Estás seguro de que quieres salir? Perderás la información no guardada."
-      confirmText="Salir"
-      cancelText="Permanecer"
-    />
-  );
+  return null;
 };
 
 export default UnsavedChangesWarning;

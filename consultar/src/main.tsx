@@ -1,15 +1,60 @@
-// RUTA: /cliente/src/main.tsx
+// RUTA: /consultar/src/main.tsx
 
-import { StrictMode } from 'react';
-import { createRoot } from 'react-dom/client';
-import App from './App.tsx';
-import './index.css';
-import { ThemeProvider } from './contexts/ThemeContext.tsx';
+import React, { StrictMode } from "react";
+import { createRoot } from "react-dom/client";
+import { createBrowserRouter, RouterProvider } from "react-router-dom";
+import App from "./App.tsx";
+import "./index.css";
+import { ThemeProvider } from "./contexts/ThemeContext.tsx";
+import { AuthProvider } from "./contexts/AuthContext.tsx";
 
-createRoot(document.getElementById('root')!).render(
+// Importamos las páginas para definir las rutas
+import Login from "./pages/Login.tsx";
+import Dashboard from "./pages/Dashboard.tsx";
+import OT from "./pages/ot.tsx";
+import OTCreate from "./pages/OTCreate.tsx";
+import OTDetail from "./pages/OTdetail.tsx";
+import Clientes from "./pages/Clientes.tsx";
+import ClienteCreate from "./pages/ClienteCreate.tsx";
+import ClienteDetail from "./pages/ClienteDetail.tsx";
+import Contratos from "./pages/Contratos.tsx";
+import Usuarios from "./pages/Usuarios.tsx";
+import Perfil from "./pages/Perfil.tsx";
+import AdminPuntajes from "./pages/Actividades.tsx";
+import AdminFavicon from "./pages/AdminFavicon.tsx";
+import UserChart from "./pages/UserChart.tsx";
+
+// Creamos el enrutador con la nueva API
+const router = createBrowserRouter([
+  {
+    path: "/",
+    element: <App />, // App ahora actúa como el Layout principal
+    children: [
+      { path: "login", element: <Login /> },
+      { path: "/", element: <Dashboard /> },
+      { path: "ot", element: <OT /> },
+      { path: "ot/crear", element: <OTCreate /> },
+      { path: "ot/editar/:id", element: <OTDetail /> },
+      { path: "clientes", element: <Clientes /> },
+      { path: "clientes/crear", element: <ClienteCreate /> },
+      { path: "clientes/editar/:id", element: <ClienteDetail /> },
+      { path: "perfil", element: <Perfil /> },
+      { path: "usuarios", element: <Usuarios /> },
+      { path: "usuarios/grafico", element: <UserChart /> },
+      { path: "admin/contratos", element: <Contratos /> },
+      { path: "admin/puntajes", element: <AdminPuntajes /> },
+      { path: "admin/favicon", element: <AdminFavicon /> },
+    ],
+  },
+]);
+
+createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <ThemeProvider>
-      <App />
+      <AuthProvider>
+        {/* Usamos RouterProvider para entregar el enrutador a la app */}
+        <RouterProvider router={router} />
+      </AuthProvider>
     </ThemeProvider>
   </StrictMode>
 );

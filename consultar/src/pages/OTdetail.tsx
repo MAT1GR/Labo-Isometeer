@@ -1,5 +1,3 @@
-// RUTA: /consultar/src/pages/OTDetail.tsx
-
 import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useForm, useWatch, useFieldArray, Controller } from "react-hook-form";
@@ -34,7 +32,7 @@ import { formatDateTime, calculateEstimatedDeliveryDate } from "../lib/utils";
 import MultiUserSelect from "../components/ui/MultiUserSelect";
 import ExportOtModal from "../components/ui/ExportOtModal";
 import Card from "../components/ui/Card";
-import UnsavedChangesWarning from "../components/ui/UnsavedChangesWarning";
+import NavigationPrompt from "../components/ui/NavigationPrompt";
 
 const OTDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -55,6 +53,7 @@ const OTDetail: React.FC = () => {
     name: "activities" as never,
   });
 
+  const [isSaving, setIsSaving] = useState(false);
   const [otData, setOtData] = useState<WorkOrder | null>(null);
   const [dataForExport, setDataForExport] = useState<WorkOrder | null>(null);
   const [users, setUsers] = useState<User[]>([]);
@@ -167,6 +166,7 @@ const OTDetail: React.FC = () => {
   }, [watchedActivities, otDate, isFormEditable, setValue, getValues]);
 
   const onSubmit = async (data: WorkOrder) => {
+    setIsSaving(true);
     try {
       const dataToSubmit = {
         ...data,
@@ -178,6 +178,7 @@ const OTDetail: React.FC = () => {
       navigate("/ot");
     } catch (error: any) {
       alert(error.message || "Hubo un error al guardar los cambios.");
+      setIsSaving(false);
     }
   };
 
@@ -243,7 +244,12 @@ const OTDetail: React.FC = () => {
 
   return (
     <>
-      <UnsavedChangesWarning isDirty={isDirty} />
+      {/* LA LÍNEA CORREGIDA */}
+      <NavigationPrompt
+        when={isDirty && !isSaving}
+        onSave={() => handleSubmit(onSubmit)()}
+      />
+
       <ExportOtModal
         isOpen={isExportModalOpen}
         onClose={() => setIsExportModalOpen(false)}
