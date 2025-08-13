@@ -179,7 +179,7 @@ const AdminDirectorDashboard: React.FC = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             <Card>
               <div className="flex justify-between items-center">
-                <p className="text-sm font-medium">Total OT ({periodTitle})</p>
+                <p className="text-sm font-medium">Total OT</p>
                 <FileText className="h-6 w-6 text-gray-400" />
               </div>
               <p className="text-3xl font-bold">{stats?.totalOT}</p>
@@ -193,7 +193,7 @@ const AdminDirectorDashboard: React.FC = () => {
             </Card>
             <Card>
               <div className="flex justify-between items-center">
-                <p className="text-sm font-medium">Ingresos ({periodTitle})</p>
+                <p className="text-sm font-medium">Ingresos</p>
                 <TrendingUp className="h-6 w-6 text-green-500" />
               </div>
               <p className="text-3xl font-bold">
@@ -212,7 +212,7 @@ const AdminDirectorDashboard: React.FC = () => {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <Card className="lg:col-span-2">
               <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
-                <TrendingUp /> Ingresos ({periodTitle})
+                <TrendingUp /> Ingresos
               </h2>
               <div className="h-80">
                 <ResponsiveContainer width="100%" height="100%">
@@ -277,7 +277,7 @@ const AdminDirectorDashboard: React.FC = () => {
             </Card>
             <Card>
               <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
-                <PieIcon /> Estado de OTs ({periodTitle})
+                <PieIcon /> Estado de OTs
               </h2>
               <div className="h-80">
                 <ResponsiveContainer width="100%" height="100%">

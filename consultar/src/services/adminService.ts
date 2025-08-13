@@ -14,8 +14,27 @@ class AdminService {
     return response.data;
   }
 
-  async updatePuntajes(puntajes: ActivityPoint[]): Promise<void> {
-    await axiosInstance.put("/admin/puntajes", { puntajes });
+  async createActivity(activityData: {
+    activity: string;
+    points: number;
+  }): Promise<ActivityPoint> {
+    const response = await axiosInstance.post("/admin/puntajes", activityData);
+    return response.data;
+  }
+
+  async updateActivity(
+    id: number,
+    activityData: { activity: string; points: number }
+  ): Promise<ActivityPoint> {
+    const response = await axiosInstance.put(
+      `/admin/puntajes/${id}`,
+      activityData
+    );
+    return response.data;
+  }
+
+  async deleteActivity(id: number): Promise<void> {
+    await axiosInstance.delete(`/admin/puntajes/${id}`);
   }
 
   async uploadFavicon(file: File): Promise<void> {

@@ -21,7 +21,7 @@ import OTCreate from "./pages/OTCreate";
 import OTDetail from "./pages/OTdetail";
 import Perfil from "./pages/Perfil";
 import Contratos from "./pages/Contratos";
-import AdminPuntajes from "./pages/AdminPuntajes";
+import AdminPuntajes from "./pages/Actividades";
 import AdminFavicon from "./pages/AdminFavicon";
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({
@@ -76,11 +76,12 @@ function App() {
             <Route path="clientes" element={<Clientes />} />
             <Route path="clientes/crear" element={<ClienteCreate />} />
             <Route path="clientes/editar/:id" element={<ClienteDetail />} />
-            <Route path="usuarios" element={<Usuarios />} />
-            <Route path="usuarios/grafico" element={<UserChart />} />
+
             <Route path="perfil" element={<Perfil />} />
 
             {/* Rutas de Admin */}
+            <Route path="usuarios" element={<Usuarios />} />
+            <Route path="usuarios/grafico" element={<UserChart />} />
             <Route path="admin/contratos" element={<Contratos />} />
             <Route path="admin/puntajes" element={<AdminPuntajes />} />
             <Route path="admin/favicon" element={<AdminFavicon />} />

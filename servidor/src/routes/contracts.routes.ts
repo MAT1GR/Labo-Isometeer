@@ -17,7 +17,7 @@ const storage = multer.diskStorage({
     cb(null, dest);
   },
   filename: (req, file, cb) => {
-    const contractId = req.params.id;
+    const contractId = req.params.id || `new-${Date.now()}`;
     const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
     cb(
       null,
@@ -31,11 +31,43 @@ const upload = multer({ storage });
 // [GET] /api/contracts
 router.get("/", (req: Request, res: Response) => {
   try {
-    const contracts = db.prepare("SELECT * FROM contracts").all();
+    const contracts = db.prepare("SELECT * FROM contracts ORDER BY name").all();
     res.status(200).json(contracts);
   } catch (error) {
     console.error("Error al obtener contratos:", error);
     res.status(500).json({ error: "Error al obtener los contratos." });
+  }
+});
+
+// [POST] /api/contracts
+router.post("/", upload.single("pdf"), (req: Request, res: Response) => {
+  const { name } = req.body;
+  const pdfFile = req.file;
+
+  if (!name) {
+    return res
+      .status(400)
+      .json({ error: "El nombre del contrato es requerido." });
+  }
+
+  try {
+    const info = db
+      .prepare("INSERT INTO contracts (name, pdf_path) VALUES (?, ?)")
+      .run(name, pdfFile ? `uploads/${pdfFile.filename}` : null);
+
+    const newContract = db
+      .prepare("SELECT * FROM contracts WHERE id = ?")
+      .get(info.lastInsertRowid);
+
+    res.status(201).json(newContract);
+  } catch (error: any) {
+    if (error.code === "SQLITE_CONSTRAINT_UNIQUE") {
+      return res
+        .status(409)
+        .json({ error: "Ya existe un contrato con ese nombre." });
+    }
+    console.error("Error al crear contrato:", error);
+    res.status(500).json({ error: "Error interno al crear el contrato." });
   }
 });
 
@@ -49,10 +81,13 @@ router.put("/:id", upload.single("pdf"), (req: Request, res: Response) => {
 
   try {
     const { id } = req.params;
-    const { content } = req.body;
+    const { name } = req.body;
     const pdfFile = req.file;
 
-    // Obtener el contrato actual para eliminar el archivo antiguo si existe
+    if (!name) {
+      return res.status(400).json({ error: "El nombre no puede estar vacío." });
+    }
+
     console.log(`[LOG] Buscando contrato con ID: ${id}`);
     const currentContract = db
       .prepare("SELECT pdf_path FROM contracts WHERE id = ?")
@@ -70,11 +105,10 @@ router.put("/:id", upload.single("pdf"), (req: Request, res: Response) => {
 
     if (pdfFile) {
       console.log("[LOG] Nuevo archivo PDF detectado:", pdfFile.filename);
-      // Si se sube un nuevo PDF, eliminar el anterior si existe
       if (currentContract.pdf_path) {
         const oldPath = path.join(
           __dirname,
-          "../../", // Ajusta la ruta para subir un nivel desde 'src/routes' a la raíz del servidor
+          "../../",
           currentContract.pdf_path
         );
         console.log("[LOG] Intentando eliminar archivo antiguo:", oldPath);
@@ -92,28 +126,58 @@ router.put("/:id", upload.single("pdf"), (req: Request, res: Response) => {
     }
 
     console.log(
-      `[LOG] Actualizando base de datos con content: "${content}" y pdf_path: "${pdf_path}"`
+      `[LOG] Actualizando base de datos con name: "${name}" y pdf_path: "${pdf_path}"`
     );
     const info = db
-      .prepare("UPDATE contracts SET content = ?, pdf_path = ? WHERE id = ?")
-      .run(content, pdf_path, id);
+      .prepare("UPDATE contracts SET name = ?, pdf_path = ? WHERE id = ?")
+      .run(name, pdf_path, id);
 
     console.log("[LOG] Resultado de la actualización en BD:", info);
 
     if (info.changes === 0) {
       console.error("[ERROR] La actualización no afectó a ninguna fila.");
-      return res
-        .status(404)
-        .json({ error: "No se pudo actualizar el contrato." });
+      // Esto puede pasar si los datos son los mismos, así que devolvemos éxito de todos modos.
     }
 
+    const updatedContract = db
+      .prepare("SELECT * FROM contracts WHERE id = ?")
+      .get(id);
+
     console.log("[LOG] Contrato actualizado con éxito.");
-    res.status(200).json({ message: "Contrato actualizado con éxito." });
+    res.status(200).json(updatedContract);
   } catch (error) {
     console.error("[ERROR FATAL] Error al actualizar contrato:", error);
     res
       .status(500)
       .json({ error: "Error interno del servidor al actualizar el contrato." });
+  }
+});
+
+// [DELETE] /api/contracts/:id
+router.delete("/:id", (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const contract = db
+      .prepare("SELECT pdf_path FROM contracts WHERE id = ?")
+      .get(id) as { pdf_path?: string };
+
+    if (contract && contract.pdf_path) {
+      const filePath = path.join(__dirname, "../../", contract.pdf_path);
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+      }
+    }
+
+    const info = db.prepare("DELETE FROM contracts WHERE id = ?").run(id);
+
+    if (info.changes === 0) {
+      return res.status(404).json({ error: "Contrato no encontrado." });
+    }
+
+    res.status(200).json({ message: "Contrato eliminado con éxito." });
+  } catch (error) {
+    console.error("Error al eliminar contrato:", error);
+    res.status(500).json({ error: "Error al eliminar el contrato." });
   }
 });
 

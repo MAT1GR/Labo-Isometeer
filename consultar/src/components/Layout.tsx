@@ -45,15 +45,14 @@ const SidebarNavigation: React.FC = () => {
       path: "/clientes",
       roles: ["director", "administracion", "administrador"],
     },
+  ];
+
+  const adminMenuItems = [
     {
       icon: FileText,
       label: "Usuarios",
       path: "/usuarios",
-      roles: ["administrador"],
     },
-  ];
-
-  const adminMenuItems = [
     {
       icon: FileSignature,
       label: "Contratos",
@@ -61,7 +60,7 @@ const SidebarNavigation: React.FC = () => {
     },
     {
       icon: Award,
-      label: "Puntajes de OT",
+      label: "Actividades",
       path: "/admin/puntajes",
     },
     {

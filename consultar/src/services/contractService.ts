@@ -1,4 +1,4 @@
-// RUTA: /cliente/src/services/contractService.ts
+// RUTA: /consultar/src/services/contractService.ts
 
 import axiosInstance from "../api/axiosInstance";
 
@@ -15,13 +15,26 @@ class ContractService {
     return response.data;
   }
 
+  async createContract(name: string, pdfFile: File): Promise<Contract> {
+    const formData = new FormData();
+    formData.append("name", name);
+    formData.append("pdf", pdfFile);
+
+    const response = await axiosInstance.post("/contracts", formData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    });
+    return response.data;
+  }
+
   async updateContract(
     id: number,
-    content: string,
+    name: string,
     pdfFile: File | null
   ): Promise<void> {
     const formData = new FormData();
-    formData.append("content", content);
+    formData.append("name", name);
     if (pdfFile) {
       formData.append("pdf", pdfFile);
     }
@@ -31,6 +44,10 @@ class ContractService {
         "Content-Type": "multipart/form-data",
       },
     });
+  }
+
+  async deleteContract(id: number): Promise<void> {
+    await axiosInstance.delete(`/contracts/${id}`);
   }
 }
 

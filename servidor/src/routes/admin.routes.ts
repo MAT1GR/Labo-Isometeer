@@ -8,7 +8,7 @@ import fs from "fs";
 
 const router = Router();
 
-// --- RUTAS PARA PUNTAJES ---
+// --- RUTAS PARA ACTIVIDADES Y PUNTAJES ---
 
 // [GET] /api/admin/puntajes
 router.get("/puntajes", (req: Request, res: Response) => {
@@ -24,24 +24,80 @@ router.get("/puntajes", (req: Request, res: Response) => {
   }
 });
 
-// [PUT] /api/admin/puntajes
-router.put("/puntajes", (req: Request, res: Response) => {
-  const { puntajes } = req.body;
-  if (!Array.isArray(puntajes)) {
-    return res.status(400).json({ error: "Formato de datos incorrecto." });
+// [POST] /api/admin/puntajes
+router.post("/puntajes", (req: Request, res: Response) => {
+  const { activity, points } = req.body;
+  if (!activity || points === undefined) {
+    return res
+      .status(400)
+      .json({
+        error: "El nombre y los puntos de la actividad son requeridos.",
+      });
   }
-  const stmt = db.prepare("UPDATE activity_points SET points = ? WHERE id = ?");
-  const updateTransaction = db.transaction((items) => {
-    for (const item of items) {
-      stmt.run(item.points, item.id);
-    }
-  });
 
   try {
-    updateTransaction(puntajes);
-    res.status(200).json({ message: "Puntajes actualizados correctamente." });
+    const info = db
+      .prepare("INSERT INTO activity_points (activity, points) VALUES (?, ?)")
+      .run(activity, points);
+    const newActivity = db
+      .prepare("SELECT * FROM activity_points WHERE id = ?")
+      .get(info.lastInsertRowid);
+    res.status(201).json(newActivity);
+  } catch (error: any) {
+    if (error.code === "SQLITE_CONSTRAINT_UNIQUE") {
+      return res
+        .status(409)
+        .json({ error: "Ya existe una actividad con ese nombre." });
+    }
+    res.status(500).json({ error: "Error al crear la actividad." });
+  }
+});
+
+// [PUT] /api/admin/puntajes/:id
+router.put("/puntajes/:id", (req: Request, res: Response) => {
+  const { id } = req.params;
+  const { activity, points } = req.body;
+
+  if (!activity || points === undefined) {
+    return res
+      .status(400)
+      .json({ error: "El nombre y los puntos son requeridos." });
+  }
+
+  try {
+    const info = db
+      .prepare(
+        "UPDATE activity_points SET activity = ?, points = ? WHERE id = ?"
+      )
+      .run(activity, points, id);
+    if (info.changes === 0) {
+      return res.status(404).json({ error: "Actividad no encontrada." });
+    }
+    const updatedActivity = db
+      .prepare("SELECT * FROM activity_points WHERE id = ?")
+      .get(id);
+    res.status(200).json(updatedActivity);
+  } catch (error: any) {
+    if (error.code === "SQLITE_CONSTRAINT_UNIQUE") {
+      return res
+        .status(409)
+        .json({ error: "Ya existe otra actividad con ese nombre." });
+    }
+    res.status(500).json({ error: "Error al actualizar la actividad." });
+  }
+});
+
+// [DELETE] /api/admin/puntajes/:id
+router.delete("/puntajes/:id", (req: Request, res: Response) => {
+  const { id } = req.params;
+  try {
+    const info = db.prepare("DELETE FROM activity_points WHERE id = ?").run(id);
+    if (info.changes === 0) {
+      return res.status(404).json({ error: "Actividad no encontrada." });
+    }
+    res.status(200).json({ message: "Actividad eliminada con éxito." });
   } catch (error) {
-    res.status(500).json({ error: "Error al actualizar los puntajes." });
+    res.status(500).json({ error: "Error al eliminar la actividad." });
   }
 });
 
