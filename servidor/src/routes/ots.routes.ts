@@ -93,7 +93,8 @@ const generateCustomId = (
   return `${datePrefix}${sequentialNumber} ${typeInitial} ${client.code}`;
 };
 
-// --- RUTA: [GET] /api/ots ---
+// --- RUTA PRINCIPAL MODIFICADA ---
+// [GET] /api/ots
 router.get("/", (req: Request, res: Response) => {
   const {
     role,
@@ -108,8 +109,9 @@ router.get("/", (req: Request, res: Response) => {
   try {
     let query = `
       SELECT
-        ot.id, ot.custom_id, ot.product, ot.status, ot.authorized,
+        ot.id, ot.custom_id, ot.product as title, ot.status, ot.authorized,
         c.name as client_name,
+        ot.client_id,
         (SELECT GROUP_CONCAT(DISTINCT u.name)
          FROM work_order_activities wa
          JOIN work_order_activity_assignments waa ON wa.id = waa.activity_id
@@ -122,13 +124,13 @@ router.get("/", (req: Request, res: Response) => {
     const params: any[] = [];
     const whereClauses: string[] = [];
 
+    // Lógica de filtros existente
     if (role === "empleado" && assigned_to) {
       whereClauses.push(
         `ot.id IN (SELECT work_order_id FROM work_order_activities wa JOIN work_order_activity_assignments waa ON wa.id = waa.activity_id WHERE waa.user_id = ?) AND ot.authorized = 1`
       );
       params.push(assigned_to);
-    } else {
-      // Aplicar filtros solo para vistas de admin/director
+    } else if (Object.keys(req.query).length > 0) {
       if (searchTerm) {
         whereClauses.push(`(ot.custom_id LIKE ? OR ot.product LIKE ?)`);
         params.push(`%${searchTerm}%`, `%${searchTerm}%`);

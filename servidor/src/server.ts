@@ -5,10 +5,12 @@ import cors from "cors";
 import path from "path";
 import fs from "fs";
 import "./config/database";
+import facturacionRoutes from "./routes/facturacion.routes";
 
 import authRoutes from "./routes/auth.routes";
 import userRoutes from "./routes/users.routes";
 import clientRoutes from "./routes/clients.routes";
+import workOrderRoutes from "./routes/work_orders.routes";
 import otRoutes from "./routes/ots.routes";
 import dashboardRoutes from "./routes/dashboard.routes";
 import contractRoutes from "./routes/contracts.routes";
@@ -59,6 +61,8 @@ app.use("/api/contracts", contractRoutes);
 app.use("/api/statistics", statisticsRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/notifications", notificationRoutes);
+app.use("/api/facturacion", facturacionRoutes);
+app.use("/api/work-orders", workOrderRoutes);
 
 app.listen(port, () => {
   console.log(`🚀 Servidor corriendo en http://localhost:${port}`);

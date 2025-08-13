@@ -90,6 +90,28 @@ db.exec(`
     PRIMARY KEY (activity_id, user_id)
   );
   
+
+
+  CREATE TABLE IF NOT EXISTS facturas (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    numero_factura TEXT UNIQUE NOT NULL,
+    monto REAL NOT NULL,
+    vencimiento TEXT NOT NULL,
+    estado TEXT NOT NULL DEFAULT 'pendiente' CHECK(estado IN ('pendiente', 'pagada')),
+    cliente_id INTEGER, -- Lo mantenemos para saber a qué cliente pertenece la factura
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (cliente_id) REFERENCES clients(id) ON DELETE SET NULL
+  );
+
+
+  CREATE TABLE IF NOT EXISTS factura_ots (
+    factura_id INTEGER NOT NULL,
+    ot_id INTEGER NOT NULL,
+    PRIMARY KEY (factura_id, ot_id),
+    FOREIGN KEY (factura_id) REFERENCES facturas(id) ON DELETE CASCADE,
+    FOREIGN KEY (ot_id) REFERENCES work_orders(id) ON DELETE CASCADE
+  );
+
   -- --- INICIO: NUEVA TABLA DE NOTIFICACIONES ---
   CREATE TABLE IF NOT EXISTS notifications (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

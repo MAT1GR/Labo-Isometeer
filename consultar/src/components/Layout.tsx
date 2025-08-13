@@ -14,6 +14,7 @@ import {
   FileSignature,
   Award,
   Image,
+  Receipt,
 } from "lucide-react";
 import ThemeToggle from "./ui/ThemeToggle";
 import { cn } from "../lib/utils";
@@ -43,6 +44,12 @@ const SidebarNavigation: React.FC = () => {
       label: "Clientes",
       path: "/clientes",
       roles: ["director", "administracion", "administrador"],
+    },
+    {
+      icon: Receipt, // --- AÑADIR ESTE BLOQUE ---
+      label: "Facturación",
+      path: "/facturacion",
+      roles: ["administracion", "administrador"],
     },
   ];
 
