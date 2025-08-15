@@ -1,7 +1,6 @@
 // RUTA: /consultar/src/services/facturacionService.ts
-
 import axiosInstance from "../api/axiosInstance";
-import { WorkOrder } from "./workOrderService"; // --- AÑADIR ESTA LÍNEA ---
+import { WorkOrder } from "./otService";
 
 export interface Cobro {
   id: number;
@@ -17,14 +16,14 @@ export interface Factura {
   numero_factura: string;
   monto: number;
   vencimiento: string;
-  estado: "pendiente" | "pagada";
+  estado: "pendiente" | "pagada" | "vencida";
   cliente_id?: number;
   created_at: string;
   cliente_name?: string;
   pagado: number;
-  ots_asociadas?: string; // Para la vista de lista
-  cobros?: Cobro[]; // Para la vista de detalle
-  ots?: WorkOrder[]; // --- AÑADIR ESTA LÍNEA (Para la vista de detalle) ---
+  ots_asociadas?: string;
+  cobros?: Cobro[];
+  ots?: WorkOrder[];
 }
 
 class FacturacionService {
@@ -38,11 +37,12 @@ class FacturacionService {
     return response.data;
   }
 
-  // --- MODIFICAR LA FIRMA DE ESTE MÉTODO ---
   async createFactura(data: {
+    numero_factura: string;
     monto: number;
     vencimiento: string;
-    ot_ids: number[];
+    cliente_id: number;
+    ot_ids?: number[];
   }): Promise<{ id: number }> {
     const response = await axiosInstance.post("/facturacion", data);
     return response.data;

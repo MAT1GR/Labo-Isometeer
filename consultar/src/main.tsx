@@ -23,9 +23,9 @@ import Perfil from "./pages/Perfil.tsx";
 import AdminPuntajes from "./pages/Actividades.tsx";
 import AdminFavicon from "./pages/AdminFavicon.tsx";
 import UserChart from "./pages/UserChart.tsx";
-import FacturacionPage from "./pages/Facturacion.tsx"; // --- AÑADIR ESTA LÍNEA ---
+import FacturacionPage from "./pages/Facturacion.tsx";
 import FacturaDetail from "./pages/FacturaDetail.tsx";
-import FacturaCreate from "./pages/FacturaCreate.tsx";
+import FacturaCreate from "./pages/FacturaCreate.tsx"; // Se mantiene el nombre del archivo anterior
 
 // Creamos el enrutador con la nueva API
 const router = createBrowserRouter([
@@ -40,7 +40,7 @@ const router = createBrowserRouter([
       { path: "ot/editar/:id", element: <OTDetail /> },
       { path: "facturacion", element: <FacturacionPage /> },
       { path: "facturacion/:id", element: <FacturaDetail /> },
-      { path: "facturacion/crear", element: <FacturaCreate /> },
+      { path: "facturacion/crear", element: <FacturaCreate /> }, // Ruta actualizada
       { path: "clientes", element: <Clientes /> },
       { path: "clientes/crear", element: <ClienteCreate /> },
       { path: "clientes/editar/:id", element: <ClienteDetail /> },

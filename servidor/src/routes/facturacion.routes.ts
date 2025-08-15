@@ -1,5 +1,3 @@
-// RUTA: /servidor/src/routes/facturacion.routes.ts
-
 import { Router, Request, Response } from "express";
 import db from "../config/database";
 
@@ -56,7 +54,7 @@ router.get("/:id", (req: Request, res: Response) => {
     const ots = db
       .prepare(
         `
-        SELECT ot.id, ot.custom_id, ot.title, ot.status
+        SELECT ot.id, ot.custom_id, ot.product as title, ot.status
         FROM work_orders ot
         JOIN factura_ots fo ON ot.id = fo.ot_id
         WHERE fo.factura_id = ?
@@ -79,75 +77,48 @@ router.get("/:id", (req: Request, res: Response) => {
   }
 });
 
-// [POST] /api/facturacion - Crear una nueva factura vinculada a OTs
+// [POST] /api/facturacion - Crear una nueva factura
 router.post("/", (req: Request, res: Response) => {
-  const { monto, vencimiento, ot_ids } = req.body;
+  const { numero_factura, monto, vencimiento, cliente_id, ot_ids } = req.body;
 
-  if (
-    !monto ||
-    !vencimiento ||
-    !ot_ids ||
-    !Array.isArray(ot_ids) ||
-    ot_ids.length === 0
-  ) {
-    return res
-      .status(400)
-      .json({ error: "Monto, vencimiento y al menos una OT son requeridos." });
+  if (!numero_factura || !monto || !vencimiento || !cliente_id) {
+    return res.status(400).json({
+      error: "Número de factura, monto, vencimiento y cliente son requeridos.",
+    });
   }
 
-  const createInvoiceTransaction = db.transaction(() => {
-    // 1. Validar que todas las OTs pertenezcan al mismo cliente
-    const firstOt = db
-      .prepare("SELECT client_id FROM work_orders WHERE id = ?")
-      .get(ot_ids[0]) as { client_id: number };
-    if (!firstOt) throw new Error("Una de las OTs seleccionadas no existe.");
-    const cliente_id = firstOt.client_id;
-
-    for (const ot_id of ot_ids) {
-      const ot = db
-        .prepare("SELECT client_id FROM work_orders WHERE id = ?")
-        .get(ot_id) as { client_id: number };
-      if (ot.client_id !== cliente_id) {
-        throw new Error("Todas las OTs deben pertenecer al mismo cliente.");
-      }
-    }
-
-    // 2. Generar número de factura
-    const year = new Date().getFullYear();
-    const lastInvoice = db
-      .prepare(
-        "SELECT MAX(CAST(SUBSTR(numero_factura, 6) AS INTEGER)) as max_num FROM facturas WHERE numero_factura LIKE ?"
-      )
-      .get(`${year}-%`) as { max_num: number | null };
-    const nextNum = (lastInvoice?.max_num || 0) + 1;
-    const numero_factura = `${year}-${String(nextNum).padStart(5, "0")}`;
-
-    // 3. Insertar la factura
-    const info = db
-      .prepare(
-        "INSERT INTO facturas (numero_factura, monto, vencimiento, cliente_id) VALUES (?, ?, ?, ?)"
-      )
-      .run(numero_factura, monto, vencimiento, cliente_id);
-    const factura_id = info.lastInsertRowid;
-
-    // 4. Vincular las OTs a la factura
-    const insertLink = db.prepare(
-      "INSERT INTO factura_ots (factura_id, ot_id) VALUES (?, ?)"
-    );
-    for (const ot_id of ot_ids) {
-      insertLink.run(factura_id, ot_id);
-    }
-
-    return { id: factura_id, numero_factura };
-  });
-
   try {
+    const createInvoiceTransaction = db.transaction(() => {
+      const info = db
+        .prepare(
+          "INSERT INTO facturas (numero_factura, monto, vencimiento, cliente_id) VALUES (?, ?, ?, ?)"
+        )
+        .run(numero_factura, monto, vencimiento, cliente_id);
+      const factura_id = info.lastInsertRowid;
+
+      if (ot_ids && Array.isArray(ot_ids) && ot_ids.length > 0) {
+        const insertLink = db.prepare(
+          "INSERT INTO factura_ots (factura_id, ot_id) VALUES (?, ?)"
+        );
+        for (const ot_id of ot_ids) {
+          insertLink.run(factura_id, ot_id);
+          db.prepare(
+            "UPDATE work_orders SET status = 'facturada' WHERE id = ?"
+          ).run(ot_id);
+        }
+      }
+
+      return { id: factura_id, numero_factura };
+    });
+
     const result = createInvoiceTransaction();
     res.status(201).json(result);
   } catch (error: any) {
-    res
-      .status(500)
-      .json({ error: error.message || "Error al crear la factura." });
+    console.error("[ERROR] Creando factura:", error);
+    res.status(500).json({
+      error: "Error del servidor al crear la factura.",
+      details: error.message,
+    });
   }
 });
 
@@ -166,36 +137,35 @@ router.post("/:id/cobros", (req: Request, res: Response) => {
     const factura = db
       .prepare("SELECT monto, estado FROM facturas WHERE id = ?")
       .get(factura_id) as { monto: number; estado: string };
+
     if (!factura) {
       throw new Error("Factura no encontrada.");
     }
     if (factura.estado === "pagada") {
-      throw new Error("La factura ya está pagada.");
+      throw new Error("La factura ya está completamente pagada.");
     }
 
-    db.prepare(
-      "INSERT INTO cobros (factura_id, monto, medio_de_pago, fecha) VALUES (?, ?, ?, ?)"
-    ).run(factura_id, monto, medio_de_pago, fecha);
+    const info = db
+      .prepare(
+        "INSERT INTO cobros (factura_id, monto, medio_de_pago, fecha) VALUES (?, ?, ?, ?)"
+      )
+      .run(factura_id, monto, medio_de_pago, fecha);
 
-    const totalPagado =
-      (
-        db
-          .prepare(
-            "SELECT SUM(monto) as total FROM cobros WHERE factura_id = ?"
-          )
-          .get(factura_id) as { total: number }
-      ).total || 0;
+    const cobro_id = info.lastInsertRowid;
 
-    if (totalPagado >= factura.monto) {
+    const totalPagadoResult = db
+      .prepare("SELECT SUM(monto) as total FROM cobros WHERE factura_id = ?")
+      .get(factura_id) as { total: number | null };
+
+    const totalPagado = totalPagadoResult?.total || 0;
+
+    if (totalPagado >= factura.monto - 0.001) {
       db.prepare("UPDATE facturas SET estado = 'pagada' WHERE id = ?").run(
         factura_id
       );
     }
 
-    const nuevoCobro = db
-      .prepare("SELECT * FROM cobros WHERE id = (SELECT last_insert_rowid())")
-      .get();
-    return nuevoCobro;
+    return db.prepare("SELECT * FROM cobros WHERE id = ?").get(cobro_id);
   });
 
   try {

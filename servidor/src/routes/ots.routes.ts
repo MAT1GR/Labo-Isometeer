@@ -805,4 +805,22 @@ router.get("/user-summary/:userId", (req: Request, res: Response) => {
   }
 });
 
+// NUEVA RUTA: Obtener OTs por ID de cliente que no estén ya facturadas
+router.get("/cliente/:id", (req, res) => {
+  try {
+    const ots = db
+      .prepare(
+        `
+        SELECT id, custom_id, product, status 
+        FROM work_orders 
+        WHERE client_id = ? AND status != 'facturada'
+      `
+      )
+      .all(req.params.id);
+    res.json(ots);
+  } catch (error) {
+    res.status(500).json({ error: "Error al obtener las órdenes de trabajo." });
+  }
+});
+
 export default router;

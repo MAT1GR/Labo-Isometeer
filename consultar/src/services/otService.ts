@@ -1,5 +1,6 @@
-// RUTA: /cliente/src/services/otService.ts
+// RUTA: /consultar/src/services/otService.ts
 
+import { ReactNode } from "react";
 import axiosInstance from "../api/axiosInstance";
 import { User } from "./auth";
 import { Client } from "./clientService";
@@ -17,8 +18,7 @@ export interface Activity {
 }
 
 export interface WorkOrder {
-  client_name: string | number | readonly string[] | undefined;
-  completed_at: any;
+  title: ReactNode;
   id: number;
   custom_id?: string;
   date: string;
@@ -44,7 +44,8 @@ export interface WorkOrder {
   created_at: string;
   updated_at?: string;
   assigned_to_name?: string;
-  estimated_delivery_date?: string; // NUEVO CAMPO
+  estimated_delivery_date?: string;
+  client_name?: string;
 }
 
 // Interfaz para los filtros
@@ -130,6 +131,12 @@ class OTService {
 
   async getUserSummary(userId: number): Promise<UserSummaryItem[]> {
     const response = await axiosInstance.get(`/ots/user-summary/${userId}`);
+    return response.data;
+  }
+
+  async getOtsByClientId(clientId: number): Promise<WorkOrder[]> {
+    if (!clientId) return [];
+    const response = await axiosInstance.get(`/ots/cliente/${clientId}`);
     return response.data;
   }
 }

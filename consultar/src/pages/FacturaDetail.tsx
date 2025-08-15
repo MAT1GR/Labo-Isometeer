@@ -9,7 +9,6 @@ import {
   Factura,
   Cobro,
 } from "../services/facturacionService";
-import { workOrderService } from "../services/workOrderService";
 import Card from "../components/ui/Card";
 import Button from "../components/ui/Button";
 import Input from "../components/ui/Input";
@@ -26,6 +25,7 @@ const FacturaDetail: React.FC = () => {
     data: factura,
     error,
     isLoading,
+    mutate: mutateFactura,
   } = useSWR<Factura>(id ? `/facturacion/${id}` : null, () =>
     facturacionService.getFacturaById(Number(id))
   );
@@ -34,7 +34,7 @@ const FacturaDetail: React.FC = () => {
     register,
     handleSubmit,
     reset,
-    formState: { isSubmitting },
+    formState: { isSubmitting, errors },
   } = useForm<CobroFormData>({
     defaultValues: { fecha: new Date().toISOString().split("T")[0] },
   });
@@ -45,8 +45,8 @@ const FacturaDetail: React.FC = () => {
     if (!id) return;
     try {
       await facturacionService.createCobro(Number(id), data);
-      mutate(`/facturacion/${id}`); // Recarga los datos de esta factura
-      mutate(`/facturacion`); // Recarga la lista de todas las facturas
+      mutateFactura();
+      mutate(`/facturacion`);
       reset({
         fecha: new Date().toISOString().split("T")[0],
         monto: 0,
@@ -62,6 +62,17 @@ const FacturaDetail: React.FC = () => {
   if (isLoading) return <div>Cargando...</div>;
   if (!factura) return <div>Factura no encontrada.</div>;
 
+  const getStatusColorClasses = (status: string) => {
+    switch (status) {
+      case "pagada":
+        return "text-green-600";
+      case "vencida":
+        return "text-red-600";
+      default:
+        return "text-yellow-600";
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -75,6 +86,7 @@ const FacturaDetail: React.FC = () => {
         <h1 className="text-3xl font-bold">
           Detalle de Factura: {factura.numero_factura}
         </h1>
+        <div></div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -83,7 +95,7 @@ const FacturaDetail: React.FC = () => {
             <h2 className="text-xl font-semibold mb-4">Información General</h2>
             <div className="space-y-3">
               <p>
-                <strong>Cliente:</strong> {factura.cliente_name}
+                <strong>Cliente:</strong> {factura.cliente_name || "N/A"}
               </p>
               <p>
                 <strong>Monto Total:</strong> {formatCurrency(factura.monto)}
@@ -106,11 +118,9 @@ const FacturaDetail: React.FC = () => {
               <p>
                 <strong>Estado:</strong>{" "}
                 <span
-                  className={`font-semibold ${
-                    factura.estado === "pagada"
-                      ? "text-green-600"
-                      : "text-yellow-600"
-                  }`}
+                  className={`font-semibold capitalize ${getStatusColorClasses(
+                    factura.estado
+                  )}`}
                 >
                   {factura.estado}
                 </span>
@@ -118,57 +128,72 @@ const FacturaDetail: React.FC = () => {
             </div>
           </Card>
 
-          <Card>
-            <h2 className="text-xl font-semibold mb-4">
-              Órdenes de Trabajo Incluidas
-            </h2>
-            <ul className="space-y-2">
-              {factura.ots?.map((ot) => (
-                <li
-                  key={ot.id}
-                  className="flex items-center justify-between p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700"
-                >
-                  <div className="flex items-center gap-3">
-                    <FileText className="text-gray-500" size={18} />
-                    <div>
-                      <p className="font-semibold">{ot.custom_id}</p>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">
-                        {ot.title}
-                      </p>
+          {factura.ots && factura.ots.length > 0 && (
+            <Card>
+              <h2 className="text-xl font-semibold mb-4">
+                Órdenes de Trabajo Incluidas
+              </h2>
+              <ul className="space-y-2">
+                {factura.ots?.map((ot) => (
+                  <li
+                    key={ot.id}
+                    className="flex items-center justify-between p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700"
+                  >
+                    <div className="flex items-center gap-3">
+                      <FileText className="text-gray-500" size={18} />
+                      <div>
+                        <p className="font-semibold">{ot.custom_id}</p>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">
+                          {ot.title}
+                        </p>
+                      </div>
                     </div>
-                  </div>
-                  <Link to={`/ordenes-de-trabajo/${ot.id}`}>
-                    <Button variant="outline" size="sm">
-                      Ver
-                    </Button>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </Card>
+                    <Link to={`/ot/editar/${ot.id}`}>
+                      <Button variant="outline" size="sm">
+                        Ver
+                      </Button>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </Card>
+          )}
 
-          {factura.estado === "pendiente" && (
+          {factura.estado !== "pagada" && (
             <Card>
               <h2 className="text-xl font-semibold mb-4">Añadir Cobro</h2>
               <form onSubmit={handleSubmit(onAddCobro)} className="space-y-4">
                 <Input
-                  label="Monto"
+                  label="Monto (ARS)"
                   type="number"
                   step="0.01"
                   {...register("monto", {
                     valueAsNumber: true,
-                    required: true,
+                    required: "El monto es requerido",
+                    max: {
+                      value: saldo,
+                      message: "El monto no puede superar el saldo pendiente",
+                    },
+                    min: {
+                      value: 0.01,
+                      message: "El monto debe ser positivo",
+                    },
                   })}
+                  error={errors.monto?.message}
                 />
                 <Input
                   label="Medio de Pago"
-                  {...register("medio_de_pago", { required: true })}
+                  {...register("medio_de_pago", {
+                    required: "Este campo es requerido",
+                  })}
                   placeholder="Ej: Transferencia, Efectivo..."
+                  error={errors.medio_de_pago?.message}
                 />
                 <Input
                   label="Fecha"
                   type="date"
-                  {...register("fecha", { required: true })}
+                  {...register("fecha", { required: "La fecha es requerida" })}
+                  error={errors.fecha?.message}
                 />
                 <Button
                   type="submit"
@@ -185,34 +210,40 @@ const FacturaDetail: React.FC = () => {
         <div className="lg:col-span-2">
           <Card>
             <h2 className="text-xl font-semibold mb-4">Historial de Cobros</h2>
-            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-              <thead className="bg-gray-50 dark:bg-gray-700">
-                <tr>
-                  <th className="px-4 py-2 text-left text-xs font-medium">
-                    Fecha
-                  </th>
-                  <th className="px-4 py-2 text-left text-xs font-medium">
-                    Monto
-                  </th>
-                  <th className="px-4 py-2 text-left text-xs font-medium">
-                    Medio de Pago
-                  </th>
-                  <th className="px-4 py-2 text-left text-xs font-medium">
-                    ID Cobro
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200 dark:bg-gray-800">
-                {factura.cobros?.map((cobro) => (
-                  <tr key={cobro.id}>
-                    <td className="px-4 py-3">{formatDate(cobro.fecha)}</td>
-                    <td className="px-4 py-3">{formatCurrency(cobro.monto)}</td>
-                    <td className="px-4 py-3">{cobro.medio_de_pago}</td>
-                    <td className="px-4 py-3">{cobro.id}</td>
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                <thead className="bg-gray-50 dark:bg-gray-700">
+                  <tr>
+                    <th className="px-4 py-2 text-left text-xs font-medium uppercase">
+                      ID Cobro
+                    </th>
+                    <th className="px-4 py-2 text-left text-xs font-medium uppercase">
+                      Fecha
+                    </th>
+                    <th className="px-4 py-2 text-left text-xs font-medium uppercase">
+                      Medio de Pago
+                    </th>
+                    <th className="px-4 py-2 text-right text-xs font-medium uppercase">
+                      Monto
+                    </th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200 dark:bg-gray-800">
+                  {factura.cobros?.map((cobro) => (
+                    <tr key={cobro.id}>
+                      <td className="px-4 py-3 font-mono text-sm">
+                        {cobro.id}
+                      </td>
+                      <td className="px-4 py-3">{formatDate(cobro.fecha)}</td>
+                      <td className="px-4 py-3">{cobro.medio_de_pago}</td>
+                      <td className="px-4 py-3 text-right font-semibold">
+                        {formatCurrency(cobro.monto)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
             {(!factura.cobros || factura.cobros.length === 0) && (
               <p className="text-center text-gray-500 py-4">
                 No hay cobros registrados para esta factura.
