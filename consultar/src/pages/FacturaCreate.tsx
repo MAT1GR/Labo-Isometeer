@@ -4,7 +4,7 @@ import React, { useState } from "react";
 import { useForm, Controller } from "react-hook-form";
 import { useNavigate } from "react-router-dom";
 import useSWR from "swr";
-import { clientService, Client } from "../services/clientService";
+import { Client } from "../services/clientService";
 import { otService, WorkOrder } from "../services/otService";
 import { facturacionService } from "../services/facturacionService";
 import Card from "../components/ui/Card";
@@ -13,6 +13,7 @@ import Button from "../components/ui/Button";
 import { Checkbox } from "../components/ui/Checkbox";
 import { ArrowLeft } from "lucide-react";
 import ClienteSelect from "../components/ui/ClienteSelect";
+import { fetcher } from "../api/axiosInstance";
 
 interface FacturaFormData {
   numero_factura: string;
@@ -24,14 +25,13 @@ interface FacturaFormData {
 
 const FacturaCreate: React.FC = () => {
   const navigate = useNavigate();
-  const [selectedClientId, setSelectedClientId] = useState<number | null>(null);
+  const [selectedClientId, setSelectedClientId] = useState<
+    number | undefined
+  >();
 
-  const { data: clients } = useSWR<Client[]>(
-    "/clients",
-    clientService.getAllClients
-  );
+  const { data: clients } = useSWR<Client[]>("/clients", fetcher);
   const { data: ots } = useSWR<WorkOrder[]>(
-    selectedClientId ? `/ot/cliente/${selectedClientId}` : null,
+    selectedClientId ? `/ots/cliente/${selectedClientId}` : null,
     () => otService.getOtsByClientId(selectedClientId!)
   );
 

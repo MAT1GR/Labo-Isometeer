@@ -14,7 +14,7 @@ const FacturacionPage: React.FC = () => {
     data: facturas,
     error,
     isLoading,
-  } = useSWR<Factura[]>("/facturacion", facturacionService.getFacturas);
+  } = useSWR<Factura[]>("/facturacion", () => facturacionService.getFacturas());
   const navigate = useNavigate();
 
   const getStatusColor = (status: string) => {
@@ -69,15 +69,17 @@ const FacturacionPage: React.FC = () => {
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200 dark:bg-gray-800 dark:divide-gray-700">
-            {facturas?.map((factura) => (
+            {(facturas || []).map((factura) => (
               <tr key={factura.id}>
                 <td className="px-6 py-4 font-medium">
                   {factura.numero_factura}
                 </td>
-                <td className="px-6 py-4">{factura.cliente_name || "N/A"}</td>
-                <td className="px-6 py-4">{formatCurrency(factura.monto)}</td>
+                <td className="px-6 py-4">{factura.cliente_nombre || "N/A"}</td>
+                <td className="px-6 py-4">
+                  {formatCurrency(Number(factura.monto))}
+                </td>
                 <td className="px-6 py-4 font-semibold text-green-600">
-                  {formatCurrency(factura.pagado)}
+                  {formatCurrency(Number(factura.pagado))}
                 </td>
                 <td className="px-6 py-4">{formatDate(factura.vencimiento)}</td>
                 <td className="px-6 py-4">

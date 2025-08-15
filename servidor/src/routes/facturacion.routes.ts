@@ -1,169 +1,182 @@
-import { Router } from "express";
-import sqlite3 from "sqlite3";
+// RUTA: /servidor/src/routes/facturacion.routes.ts
+
+import { Router, Request, Response } from "express";
+import db from "../config/database";
 
 const router = Router();
 
-// Función para conectar a la base de datos
-const connectDb = () => {
-  return new sqlite3.Database('./laboratorio.db');
-};
-// Obtener todas las facturas con filtros
-router.get("/", async (req, res) => {
-  const db = await connectDb();
-  const { clienteId, fechaDesde, fechaHasta, estado } = req.query;
-
-  let query = `
-    SELECT f.id, f.cliente_id, c.nombre as cliente_nombre, f.fecha_emision, f.fecha_vencimiento, f.total, f.estado
-    FROM facturas f
-    JOIN clientes c ON f.cliente_id = c.id
-    WHERE 1=1
-  `;
-  const params = [];
-
-  if (clienteId) {
-    query += " AND f.cliente_id = ?";
-    params.push(clienteId);
-  }
-  if (fechaDesde) {
-    query += " AND f.fecha_emision >= ?";
-    params.push(fechaDesde);
-  }
-  if (fechaHasta) {
-    query += " AND f.fecha_emision <= ?";
-    params.push(fechaHasta);
-  }
-  if (estado) {
-    query += " AND f.estado = ?";
-    params.push(estado);
-  }
-
+// [GET] /api/facturacion - Obtener todas las facturas
+router.get("/", (req: Request, res: Response) => {
   try {
-    const facturas = await db.all(query, params);
-    res.json(facturas);
+    const facturas = db
+      .prepare(
+        `
+        SELECT
+          f.id,
+          f.numero_factura,
+          f.monto,
+          f.vencimiento,
+          f.estado,
+          c.name as cliente_name,
+          (SELECT SUM(monto) FROM cobros WHERE factura_id = f.id) as pagado,
+          json_group_array(json_object('id', ot.id, 'custom_id', ot.custom_id, 'product', ot.product)) FILTER (WHERE ot.id IS NOT NULL) as ots
+        FROM facturas f
+        LEFT JOIN clients c ON f.cliente_id = c.id
+        LEFT JOIN factura_ots fo ON f.id = fo.factura_id
+        LEFT JOIN work_orders ot ON fo.ot_id = ot.id
+        GROUP BY f.id
+        ORDER BY f.created_at DESC
+      `
+      )
+      .all()
+      .map((factura: any) => ({
+        ...factura,
+        ots: factura.ots ? JSON.parse(factura.ots) : [],
+        pagado: factura.pagado || 0,
+      }));
+
+    res.status(200).json(facturas);
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: "Error al obtener las facturas" });
+    console.error("Error al obtener las facturas:", error);
+    res.status(500).json({ error: "Error interno del servidor." });
   }
 });
 
-// Obtener una factura por ID
-router.get("/:id", async (req, res) => {
-  const db = await connectDb();
-  const { id } = req.params;
-
+// [GET] /api/facturacion/:id - Obtener una factura por ID
+router.get("/:id", (req, res) => {
   try {
-    const factura = await db.get(
-      "SELECT f.*, c.nombre as cliente_nombre FROM facturas f JOIN clientes c ON f.cliente_id = c.id WHERE f.id = ?",
-      [id]
-    );
+    const factura = db
+      .prepare(
+        `
+        SELECT
+          f.*,
+          c.name as cliente_name,
+          (SELECT SUM(monto) FROM cobros WHERE factura_id = f.id) as pagado
+        FROM facturas f
+        LEFT JOIN clients c ON f.cliente_id = c.id
+        WHERE f.id = ?
+      `
+      )
+      .get(req.params.id);
+
     if (factura) {
-      const detalles = await db.all(
-        "SELECT df.*, ot.id as ot_numero FROM detalles_factura df JOIN ots ot ON df.ot_id = ot.id WHERE df.factura_id = ?",
-        [id]
-      );
-      res.json({ ...factura, detalles });
+      const cobros = db
+        .prepare("SELECT * FROM cobros WHERE factura_id = ?")
+        .all(req.params.id);
+      const ots = db
+        .prepare(
+          `
+        SELECT ot.id, ot.custom_id, ot.product as title 
+        FROM work_orders ot
+        JOIN factura_ots fo ON ot.id = fo.ot_id
+        WHERE fo.factura_id = ?
+      `
+        )
+        .all(req.params.id);
+      res.json({
+        ...factura,
+        pagado: (factura as any).pagado || 0,
+        cobros,
+        ots,
+      });
     } else {
-      res.status(404).json({ message: "Factura no encontrada" });
+      res.status(404).json({ error: "Factura no encontrada" });
     }
   } catch (error) {
-    console.error("Error al obtener la factura:", error);
-    res.status(500).json({ message: "Error al obtener la factura" });
+    res.status(500).json({ error: "Error al obtener la factura" });
   }
 });
 
-// Crear una nueva factura
-router.post("/", async (req, res) => {
-  const { cliente_id, fecha_emision, fecha_vencimiento, detalles, total } =
-    req.body;
+// [POST] /api/facturacion - Crear una nueva factura
+router.post("/", (req, res) => {
+  const {
+    numero_factura,
+    monto,
+    vencimiento,
+    cliente_id,
+    ot_ids = [],
+  } = req.body;
 
-  // --- Validación de Entrada ---
-  if (
-    !cliente_id ||
-    !fecha_emision ||
-    !fecha_vencimiento ||
-    !detalles ||
-    !Array.isArray(detalles) ||
-    detalles.length === 0 ||
-    total === undefined
-  ) {
-    return res
-      .status(400)
-      .json({ message: "Datos de factura incompletos o inválidos." });
+  if (!numero_factura || !monto || !vencimiento || !cliente_id) {
+    return res.status(400).json({ error: "Faltan datos requeridos." });
   }
 
-  const db = await connectDb();
+  const createTransaction = db.transaction(() => {
+    const info = db
+      .prepare(
+        "INSERT INTO facturas (numero_factura, monto, vencimiento, cliente_id) VALUES (?, ?, ?, ?)"
+      )
+      .run(numero_factura, monto, vencimiento, cliente_id);
+    const facturaId = info.lastInsertRowid;
+
+    if (ot_ids.length > 0) {
+      const stmt = db.prepare(
+        "INSERT INTO factura_ots (factura_id, ot_id) VALUES (?, ?)"
+      );
+      for (const ot_id of ot_ids) {
+        stmt.run(facturaId, ot_id);
+        db.prepare(
+          "UPDATE work_orders SET status = 'facturada' WHERE id = ?"
+        ).run(ot_id);
+      }
+    }
+    return { id: facturaId };
+  });
 
   try {
-    // --- Transacción ---
-    await db.exec("BEGIN TRANSACTION");
+    const result = createTransaction();
+    res.status(201).json(result);
+  } catch (error) {
+    console.error("Error al crear la factura:", error);
+    res.status(500).json({ error: "Error al crear la factura." });
+  }
+});
 
-    const result = await db.run(
-      "INSERT INTO facturas (cliente_id, fecha_emision, fecha_vencimiento, total, estado) VALUES (?, ?, ?, ?, ?)",
-      [cliente_id, fecha_emision, fecha_vencimiento, total, "pendiente"]
-    );
-    const facturaId = (result as any).lastID;
+// [POST] /api/facturacion/:id/cobros - Registrar un cobro
+router.post("/:id/cobros", (req, res) => {
+  const { id: factura_id } = req.params;
+  const { monto, medio_de_pago, fecha } = req.body;
 
-    if (!facturaId) {
-      // Si lastID no se devuelve, algo salió mal con la inserción.
-      throw new Error("No se pudo crear la cabecera de la factura.");
-    }
+  if (!monto || !medio_de_pago || !fecha) {
+    return res.status(400).json({ error: "Faltan datos del cobro." });
+  }
 
-    const stmt = await db.prepare(
-      "INSERT INTO detalles_factura (factura_id, ot_id, descripcion, monto) VALUES (?, ?, ?, ?)"
-    );
-    for (const detalle of detalles) {
-      // Validación adicional dentro del bucle
-      if (
-        detalle.ot_id === undefined ||
-        detalle.descripcion === undefined ||
-        detalle.monto === undefined
-      ) {
-        throw new Error("El detalle de la factura es inválido.");
-      }
-      await stmt.run(
-        facturaId,
-        detalle.ot_id,
-        detalle.descripcion,
-        detalle.monto
+  const registerPayment = db.transaction(() => {
+    // 1. Registrar el cobro
+    const info = db
+      .prepare(
+        "INSERT INTO cobros (factura_id, monto, medio_de_pago, fecha) VALUES (?, ?, ?, ?)"
+      )
+      .run(factura_id, monto, medio_de_pago, fecha);
+
+    // 2. Obtener el total de la factura y la suma de todos los cobros (incluido el nuevo)
+    const data = db
+      .prepare(
+        `
+        SELECT
+          f.monto as total_factura,
+          (SELECT SUM(c.monto) FROM cobros c WHERE c.factura_id = f.id) as total_pagado
+        FROM facturas f
+        WHERE f.id = ?
+      `
+      )
+      .get(factura_id) as { total_factura: number; total_pagado: number };
+
+    // 3. Actualizar el estado de la factura si está totalmente pagada
+    if (data && data.total_pagado >= data.total_factura) {
+      db.prepare("UPDATE facturas SET estado = 'pagada' WHERE id = ?").run(
+        factura_id
       );
     }
-    await stmt.finalize();
-
-    await db.exec("COMMIT");
-
-    res
-      .status(201)
-      .json({ id: facturaId, message: "Factura creada con éxito" });
-  } catch (error) {
-    await db.exec("ROLLBACK");
-    console.error("Error al crear la factura:", error);
-    // Enviar un mensaje de error más específico si es posible
-    const errorMessage =
-      error instanceof Error ? error.message : "Error interno del servidor.";
-    res
-      .status(500)
-      .json({ message: "Error al crear la factura.", error: errorMessage });
-  }
-});
-
-// Actualizar el estado de una factura
-router.put("/:id/estado", async (req, res) => {
-  const db = await connectDb();
-  const { id } = req.params;
-  const { estado } = req.body;
-
-  if (!estado) {
-    return res.status(400).json({ message: "El estado es requerido" });
-  }
+    return { id: info.lastInsertRowid };
+  });
 
   try {
-    await db.run("UPDATE facturas SET estado = ? WHERE id = ?", [estado, id]);
-    res.json({ message: "Estado de la factura actualizado" });
+    const result = registerPayment();
+    res.status(201).json(result);
   } catch (error) {
-    console.error("Error al actualizar estado de la factura:", error);
-    res
-      .status(500)
-      .json({ message: "Error al actualizar el estado de la factura" });
+    console.error("Error al registrar el cobro:", error);
+    res.status(500).json({ error: "Error al registrar el cobro." });
   }
 });
 

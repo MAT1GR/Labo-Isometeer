@@ -1,4 +1,4 @@
-// RUTA: /cliente/src/components/ui/ClienteSelect.tsx
+// RUTA: /consultar/src/components/ui/ClienteSelect.tsx
 
 import React, { useState, useMemo } from "react";
 import { Client } from "../../services/clientService";
@@ -12,6 +12,7 @@ interface ClienteSelectProps {
   selectedClientId: number | undefined;
   onChange: (selectedId: number | undefined) => void;
   disabled?: boolean;
+  error?: string;
 }
 
 const ClienteSelect: React.FC<ClienteSelectProps> = ({
@@ -19,6 +20,7 @@ const ClienteSelect: React.FC<ClienteSelectProps> = ({
   selectedClientId,
   onChange,
   disabled = false,
+  error,
 }) => {
   const [searchTerm, setSearchTerm] = useState("");
 
@@ -43,7 +45,6 @@ const ClienteSelect: React.FC<ClienteSelectProps> = ({
 
   const handleSelect = (clientId: number) => {
     onChange(clientId);
-    // Cierra el popover (opcional, manejado por Headless UI)
   };
 
   return (
@@ -60,7 +61,8 @@ const ClienteSelect: React.FC<ClienteSelectProps> = ({
                 "w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-left cursor-pointer",
                 "focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500",
                 "dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100",
-                "disabled:bg-gray-100 dark:disabled:bg-gray-800 disabled:cursor-not-allowed flex items-center justify-between"
+                "disabled:bg-gray-100 dark:disabled:bg-gray-800 disabled:cursor-not-allowed flex items-center justify-between",
+                error && "border-red-500"
               )}
             >
               {selectedClient ? (
@@ -102,7 +104,7 @@ const ClienteSelect: React.FC<ClienteSelectProps> = ({
                         key={client.id}
                         onClick={() => {
                           handleSelect(client.id);
-                          close(); // Cierra el popover al seleccionar
+                          close();
                         }}
                         className="flex items-center justify-between p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer"
                       >
@@ -125,6 +127,7 @@ const ClienteSelect: React.FC<ClienteSelectProps> = ({
           </>
         )}
       </Popover>
+      {error && <p className="text-sm text-red-600 mt-1">{error}</p>}
     </div>
   );
 };
