@@ -33,6 +33,9 @@ const FacturacionPage: React.FC = () => {
   if (error) return <div>Error al cargar las facturas.</div>;
   if (isLoading) return <div>Cargando facturas...</div>;
 
+  // Asegurarse de que facturas sea un array antes de mapear
+  const facturasArray = Array.isArray(facturas) ? facturas : [];
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -69,7 +72,7 @@ const FacturacionPage: React.FC = () => {
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200 dark:bg-gray-800 dark:divide-gray-700">
-            {facturas?.map((factura) => (
+            {facturasArray.map((factura) => (
               <tr key={factura.id}>
                 <td className="px-6 py-4 font-medium">
                   {factura.numero_factura}
