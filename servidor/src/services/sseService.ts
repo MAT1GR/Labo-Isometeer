@@ -58,6 +58,3 @@ export const sendNotificationToUser = (userId: number, data: any) => {
     client.res.write(`data: ${JSON.stringify(data)}\n\n`);
   }
 };
-export function sendToUser(id: number, newNotification: {}) {
-  throw new Error("Function not implemented.");
-}

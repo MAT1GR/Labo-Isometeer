@@ -3,8 +3,6 @@
 import axiosInstance from "../api/axiosInstance";
 
 export interface Notification {
-  read: any;
-  title: ReactNode;
   id: number;
   user_id: number;
   message: string;
