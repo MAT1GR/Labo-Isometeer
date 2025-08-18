@@ -1,3 +1,4 @@
+// RUTA: servidor/src/routes/facturacion.routes.ts
 import { Router, Request, Response } from "express";
 import db from "../config/database";
 
@@ -124,7 +125,7 @@ router.post("/", (req: Request, res: Response) => {
 
 // [POST] /api/facturacion/:id/cobros - Añadir un cobro a una factura
 router.post("/:id/cobros", (req: Request, res: Response) => {
-  const { id: factura_id } = req.params;
+  const { id } = req.params;
   const { monto, medio_de_pago, fecha } = req.body;
 
   if (!monto || !medio_de_pago || !fecha) {
@@ -133,48 +134,57 @@ router.post("/:id/cobros", (req: Request, res: Response) => {
       .json({ error: "Todos los campos del cobro son requeridos." });
   }
 
-  const addCobroTransaction = db.transaction(() => {
-    const factura = db
-      .prepare("SELECT monto, estado FROM facturas WHERE id = ?")
-      .get(factura_id) as { monto: number; estado: string };
-
-    if (!factura) {
-      throw new Error("Factura no encontrada.");
-    }
-    if (factura.estado === "pagada") {
-      throw new Error("La factura ya está completamente pagada.");
-    }
-
-    const info = db
-      .prepare(
-        "INSERT INTO cobros (factura_id, monto, medio_de_pago, fecha) VALUES (?, ?, ?, ?)"
-      )
-      .run(factura_id, monto, medio_de_pago, fecha);
-
-    const cobro_id = info.lastInsertRowid;
-
-    const totalPagadoResult = db
-      .prepare("SELECT SUM(monto) as total FROM cobros WHERE factura_id = ?")
-      .get(factura_id) as { total: number | null };
-
-    const totalPagado = totalPagadoResult?.total || 0;
-
-    if (totalPagado >= factura.monto - 0.001) {
-      db.prepare("UPDATE facturas SET estado = 'pagada' WHERE id = ?").run(
-        factura_id
-      );
-    }
-
-    return db.prepare("SELECT * FROM cobros WHERE id = ?").get(cobro_id);
-  });
-
   try {
-    const nuevoCobro = addCobroTransaction();
-    res.status(201).json(nuevoCobro);
+    const addCobroTransaction = db.transaction(() => {
+      const factura = db
+        .prepare("SELECT monto, estado FROM facturas WHERE id = ?")
+        .get(id) as { monto: number; estado: string };
+
+      if (!factura) {
+        return { error: "Factura no encontrada.", status: 404 };
+      }
+      if (factura.estado === "pagada") {
+        return {
+          error: "La factura ya está completamente pagada.",
+          status: 400,
+        };
+      }
+
+      const info = db
+        .prepare(
+          "INSERT INTO cobros (factura_id, monto, medio_de_pago, fecha) VALUES (?, ?, ?, ?)"
+        )
+        .run(id, monto, medio_de_pago, fecha);
+
+      const cobro_id = info.lastInsertRowid;
+
+      const totalPagadoResult = db
+        .prepare("SELECT SUM(monto) as total FROM cobros WHERE factura_id = ?")
+        .get(id) as { total: number | null };
+
+      const totalPagado = totalPagadoResult?.total || 0;
+
+      if (totalPagado >= factura.monto - 0.001) {
+        db.prepare("UPDATE facturas SET estado = 'pagada' WHERE id = ?").run(
+          id
+        );
+      }
+
+      return db.prepare("SELECT * FROM cobros WHERE id = ?").get(cobro_id);
+    });
+
+    const result = addCobroTransaction() as any;
+
+    if (result && result.error) {
+      return res.status(result.status).json({ error: result.error });
+    }
+
+    res.status(201).json(result);
   } catch (error: any) {
+    console.error("Error al registrar el cobro:", error);
     res
       .status(500)
-      .json({ error: error.message || "Error al añadir el cobro." });
+      .json({ error: "Error interno del servidor al añadir el cobro." });
   }
 });
 
