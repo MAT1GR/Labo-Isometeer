@@ -41,11 +41,13 @@ export const setClients = (newClients: Client[]) => {
   clients = newClients;
 };
 
+// --- FUNCIÓN PARA MARCAR FACTURAS COMO VENCIDAS ---
 const checkOverdueInvoices = () => {
   try {
+    // Obtiene la fecha de hoy en formato YYYY-MM-DD
     const today = new Date().toISOString().split("T")[0];
 
-    // 1. Encontrar facturas que están pendientes y cuya fecha de vencimiento ya pasó
+    // 1. Busca facturas que estén 'pendientes' y cuya fecha de vencimiento sea anterior a hoy.
     const invoicesToUpdate = db
       .prepare(
         "SELECT id, numero_factura FROM facturas WHERE vencimiento < ? AND estado = 'pendiente'"
@@ -58,7 +60,7 @@ const checkOverdueInvoices = () => {
       );
       const invoiceIds = invoicesToUpdate.map((inv) => inv.id);
 
-      // 2. Actualizarlas a 'vencida' en una sola transacción
+      // 2. Actualiza todas las facturas encontradas al estado 'vencida' en una sola operación.
       const updateStmt = db.prepare(
         `UPDATE facturas SET estado = 'vencida' WHERE id IN (${invoiceIds
           .map(() => "?")
@@ -66,14 +68,14 @@ const checkOverdueInvoices = () => {
       );
       updateStmt.run(...invoiceIds);
 
-      // 3. Obtener los usuarios a notificar (administracion y director)
+      // 3. Obtiene los usuarios de administración y dirección para notificarles.
       const usersToNotify = db
         .prepare(
-          "SELECT id FROM users WHERE role IN ('administracion', 'director')"
+          "SELECT id FROM users WHERE role IN ('administracion', 'director', 'administrador')"
         )
         .all() as { id: number }[];
 
-      // 4. Crear y enviar notificaciones para cada factura vencida a cada usuario relevante
+      // 4. Crea y envía una notificación para cada factura vencida a cada usuario relevante.
       for (const invoice of invoicesToUpdate) {
         const message = `La factura N° ${invoice.numero_factura} ha vencido.`;
         for (const user of usersToNotify) {
@@ -111,6 +113,8 @@ app.use("/api/work-orders", workOrderRoutes);
 app.listen(port, () => {
   console.log(`🚀 Servidor corriendo en http://localhost:${port}`);
 
+  // Ejecuta la verificación de facturas vencidas al iniciar el servidor.
   checkOverdueInvoices();
-  setInterval(checkOverdueInvoices, 1000 * 60 * 60); // Cada 1 hora
+  // Y luego, la ejecuta repetidamente cada hora.
+  setInterval(checkOverdueInvoices, 1000 * 60 * 60);
 });

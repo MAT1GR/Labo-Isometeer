@@ -128,37 +128,7 @@ const FacturaDetail: React.FC = () => {
             </div>
           </Card>
 
-          {factura.ots && factura.ots.length > 0 && (
-            <Card>
-              <h2 className="text-xl font-semibold mb-4">
-                Órdenes de Trabajo Incluidas
-              </h2>
-              <ul className="space-y-2">
-                {factura.ots?.map((ot) => (
-                  <li
-                    key={ot.id}
-                    className="flex items-center justify-between p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700"
-                  >
-                    <div className="flex items-center gap-3">
-                      <FileText className="text-gray-500" size={18} />
-                      <div>
-                        <p className="font-semibold">{ot.custom_id}</p>
-                        <p className="text-sm text-gray-600 dark:text-gray-400">
-                          {ot.title}
-                        </p>
-                      </div>
-                    </div>
-                    <Link to={`/ot/editar/${ot.id}`}>
-                      <Button variant="outline" size="sm">
-                        Ver
-                      </Button>
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </Card>
-          )}
-
+          {/* === PANEL DE AÑADIR COBRO (MOVIDO AQUÍ) === */}
           {factura.estado !== "pagada" && (
             <Card>
               <h2 className="text-xl font-semibold mb-4">Añadir Cobro</h2>
@@ -204,6 +174,37 @@ const FacturaDetail: React.FC = () => {
                   {isSubmitting ? "Registrando..." : "Registrar Cobro"}
                 </Button>
               </form>
+            </Card>
+          )}
+
+          {factura.ots && factura.ots.length > 0 && (
+            <Card>
+              <h2 className="text-xl font-semibold mb-4">
+                Órdenes de Trabajo Incluidas
+              </h2>
+              <ul className="space-y-2">
+                {factura.ots?.map((ot) => (
+                  <li
+                    key={ot.id}
+                    className="flex items-center justify-between p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700"
+                  >
+                    <div className="flex items-center gap-3">
+                      <FileText className="text-gray-500" size={18} />
+                      <div>
+                        <p className="font-semibold">{ot.custom_id}</p>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">
+                          {ot.title}
+                        </p>
+                      </div>
+                    </div>
+                    <Link to={`/ot/editar/${ot.id}`}>
+                      <Button variant="outline" size="sm">
+                        Ver
+                      </Button>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
             </Card>
           )}
         </div>
