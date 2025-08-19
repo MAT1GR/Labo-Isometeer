@@ -1,3 +1,5 @@
+// RUTA: /consultar/src/pages/OTCreate.tsx
+
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useForm, useWatch, useFieldArray, Controller } from "react-hook-form";
@@ -6,6 +8,7 @@ import { clientService, Client, Contact } from "../services/clientService";
 import { authService, User } from "../services/auth";
 import { contractService, Contract } from "../services/contractService";
 import { adminService, ActivityPoint } from "../services/adminService";
+import { facturacionService, Factura } from "../services/facturacionService";
 import { useAuth } from "../contexts/AuthContext";
 import Input from "../components/ui/Input";
 import Button from "../components/ui/Button";
@@ -18,13 +21,15 @@ import {
   Package,
   ClipboardList,
   BookText,
+  FileText,
 } from "lucide-react";
 import axiosInstance from "../api/axiosInstance";
 import MultiUserSelect from "../components/ui/MultiUserSelect";
-import { calculateEstimatedDeliveryDate } from "../lib/utils";
+import { calculateEstimatedDeliveryDate, formatCurrency } from "../lib/utils";
 import ClienteSelect from "../components/ui/ClienteSelect";
 import Card from "../components/ui/Card";
 import NavigationPrompt from "../components/ui/NavigationPrompt";
+import Select from "react-select";
 
 type OTCreateFormData = Omit<
   WorkOrder,
@@ -62,6 +67,7 @@ const OTCreate: React.FC = () => {
   const [users, setUsers] = useState<User[]>([]);
   const [contracts, setContracts] = useState<Contract[]>([]);
   const [activityOptions, setActivityOptions] = useState<ActivityPoint[]>([]);
+  const [facturasCliente, setFacturasCliente] = useState<Factura[]>([]); // <-- Nuevo estado
   const [idPreview, setIdPreview] = useState("Completar campos...");
   const [isIdLoading, setIsIdLoading] = useState(false);
 
@@ -110,18 +116,25 @@ const OTCreate: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    const fetchContacts = async () => {
+    const fetchClientData = async () => {
       if (selectedClientId) {
         const client = await clientService.getClientById(
           Number(selectedClientId)
         );
         setContacts(client.contacts);
         setValue("contact_id", undefined);
+
+        // Cargar facturas del cliente seleccionado
+        const facturas = await facturacionService.getFacturasByCliente(
+          Number(selectedClientId)
+        );
+        setFacturasCliente(facturas);
       } else {
         setContacts([]);
+        setFacturasCliente([]); // Limpiar facturas si no hay cliente
       }
     };
-    fetchContacts();
+    fetchClientData();
   }, [selectedClientId, setValue]);
 
   useEffect(() => {
@@ -194,9 +207,13 @@ const OTCreate: React.FC = () => {
     { value: "Otros Servicios", label: "Otros Servicios" },
   ];
 
+  const facturaOptions = facturasCliente.map((f) => ({
+    value: f.id,
+    label: `${f.numero_factura} - ${formatCurrency(f.monto)}`,
+  }));
+
   return (
     <>
-      {/* LA LÍNEA CORREGIDA */}
       <NavigationPrompt
         when={isDirty && !isSaving}
         onSave={() => handleSubmit(onSubmit)()}
@@ -225,6 +242,7 @@ const OTCreate: React.FC = () => {
         </div>
 
         <div className="space-y-6">
+          {/* ... Card de Datos Generales ... */}
           <Card>
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
               <Input
@@ -273,6 +291,7 @@ const OTCreate: React.FC = () => {
             </div>
           </Card>
 
+          {/* ... Card de Cliente ... */}
           <Card>
             <h2 className="text-lg font-semibold text-blue-700 dark:text-blue-400 col-span-full mb-4 flex items-center gap-2">
               <UserSquare size={20} /> Información del Cliente
@@ -314,6 +333,7 @@ const OTCreate: React.FC = () => {
             </div>
           </Card>
 
+          {/* ... Card de Producto ... */}
           <Card>
             <h2 className="text-lg font-semibold text-blue-700 dark:text-blue-400 col-span-full mb-4 flex items-center gap-2">
               <Package size={20} /> Producto
@@ -344,6 +364,7 @@ const OTCreate: React.FC = () => {
             </div>
           </Card>
 
+          {/* ... Card de Actividades ... */}
           <Card>
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-lg font-semibold text-blue-700 dark:text-blue-400 flex items-center gap-2">
@@ -435,6 +456,42 @@ const OTCreate: React.FC = () => {
             </div>
           </Card>
 
+          {/* =========== NUEVA SECCIÓN DE FACTURAS =========== */}
+          <Card>
+            <h2 className="text-lg font-semibold text-blue-700 dark:text-blue-400 col-span-full mb-4 flex items-center gap-2">
+              <FileText size={20} /> Facturas Vinculadas
+            </h2>
+            <div>
+              <label className="text-sm font-medium dark:text-gray-300">
+                Vincular facturas existentes
+              </label>
+              <Controller
+                name="factura_ids"
+                control={control}
+                render={({ field }) => (
+                  <Select
+                    isMulti
+                    options={facturaOptions}
+                    isDisabled={!selectedClientId}
+                    placeholder={
+                      !selectedClientId
+                        ? "Seleccione un cliente primero"
+                        : "Buscar y seleccionar facturas..."
+                    }
+                    onChange={(selectedOptions) =>
+                      field.onChange(
+                        selectedOptions.map((option) => option.value)
+                      )
+                    }
+                    className="react-select-container mt-1"
+                    classNamePrefix="react-select"
+                  />
+                )}
+              />
+            </div>
+          </Card>
+
+          {/* ... Card de Observaciones ... */}
           <Card>
             <h2 className="text-lg font-semibold text-blue-700 dark:text-blue-400 col-span-full mb-4 flex items-center gap-2">
               <BookText size={20} /> Observaciones

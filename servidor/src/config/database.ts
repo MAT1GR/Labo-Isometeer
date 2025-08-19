@@ -209,6 +209,15 @@ db.exec(`
     activity TEXT UNIQUE NOT NULL,
     points REAL NOT NULL
   );
+  
+  CREATE TABLE IF NOT EXISTS ot_facturas (
+            ot_id INTEGER NOT NULL,
+            factura_id INTEGER NOT NULL,
+            PRIMARY KEY (ot_id, factura_id),
+            FOREIGN KEY (ot_id) REFERENCES ordenes_trabajo(id) ON DELETE CASCADE,
+            FOREIGN KEY (factura_id) REFERENCES facturas(id) ON DELETE CASCADE
+        )
+
 `);
 
 // --- DATOS INICIALES ---

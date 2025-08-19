@@ -4,6 +4,7 @@ import { ReactNode } from "react";
 import axiosInstance from "../api/axiosInstance";
 import { User } from "./auth";
 import { Client } from "./clientService";
+import { Factura } from "./facturacionService";
 
 export interface Activity {
   id: number;
@@ -46,8 +47,9 @@ export interface WorkOrder {
   assigned_to_name?: string;
   estimated_delivery_date?: string;
   client_name?: string;
+  factura_ids?: number[];
+  facturas?: Factura[];
 }
-
 // Interfaz para los filtros
 export interface OTFilters {
   [key: string]: any;

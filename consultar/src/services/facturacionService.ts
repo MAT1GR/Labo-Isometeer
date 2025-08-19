@@ -58,6 +58,13 @@ class FacturacionService {
     );
     return response.data;
   }
+
+  async getFacturasByCliente(cliente_id: number): Promise<Factura[]> {
+    const response = await axiosInstance.get(
+      `/facturacion/cliente/${cliente_id}`
+    );
+    return response.data;
+  }
 }
 
 export const facturacionService = new FacturacionService();

@@ -6,32 +6,24 @@ import { sendNotificationToUser } from "./notifications.routes";
 
 const router = Router();
 
-/**
- * Función unificada para crear una notificación en la base de datos y
- * enviarla en tiempo real a un usuario específico a través de SSE.
- * @param userId - ID del usuario que recibirá la notificación.
- * @param message - Mensaje de la notificación.
- * @param otId - ID de la Orden de Trabajo relacionada.
- */
+// ... (otras funciones como createAndSendNotification y generateCustomId permanecen igual)
+
 const createAndSendNotification = (
   userId: number,
   message: string,
   otId: number
 ) => {
   try {
-    // 1. Insertar la notificación en la base de datos
     const stmt = db.prepare(
       "INSERT INTO notifications (user_id, message, ot_id) VALUES (?, ?, ?)"
     );
     const info = stmt.run(userId, message, otId);
     const notificationId = info.lastInsertRowid;
 
-    // 2. Obtener la notificación recién creada para enviarla completa
     const newNotification = db
       .prepare("SELECT * FROM notifications WHERE id = ?")
       .get(notificationId);
 
-    // 3. Enviar por SSE al cliente conectado
     if (newNotification) {
       sendNotificationToUser(userId, newNotification);
     }
@@ -40,13 +32,6 @@ const createAndSendNotification = (
   }
 };
 
-/**
- * Genera un ID de OT personalizado basado en la fecha, tipo y cliente.
- * @param date - Fecha de la OT (YYYY-MM-DD).
- * @param type - Tipo de OT (e.g., 'Produccion', 'Calibracion').
- * @param client_id - ID del cliente.
- * @returns Un string con el ID personalizado.
- */
 const generateCustomId = (
   date: string,
   type: string,
@@ -93,7 +78,6 @@ const generateCustomId = (
   return `${datePrefix}${sequentialNumber} ${typeInitial} ${client.code}`;
 };
 
-// --- RUTA PRINCIPAL MODIFICADA ---
 // [GET] /api/ots
 router.get("/", (req: Request, res: Response) => {
   const {
@@ -169,34 +153,16 @@ router.get("/", (req: Request, res: Response) => {
   }
 });
 
-// --- RUTA generate-id (DEBE IR ANTES DE /:id) ---
-router.get("/generate-id", (req: Request, res: Response) => {
-  try {
-    const { date, type, client_id } = req.query;
-    if (!date || !type || !client_id)
-      return res.status(200).json({ previewId: "Completar campos..." });
-
-    const custom_id = generateCustomId(
-      date as string,
-      type as string,
-      client_id as string
-    );
-    res.status(200).json({ previewId: custom_id });
-  } catch (error: any) {
-    console.error("Error al generar ID:", error);
-    res
-      .status(500)
-      .json({ error: "Error al generar el ID", details: error.message });
-  }
-});
-
 // [POST] /api/ots
 router.post("/", (req: Request, res: Response) => {
-  const { activities = [], created_by, ...otData } = req.body;
+  const { activities = [], created_by, factura_ids = [], ...otData } = req.body;
   const creator = db
     .prepare("SELECT role FROM users WHERE id = ?")
     .get(created_by) as { role: string };
-  if (!creator || creator.role === "empleado") {
+  if (
+    !creator ||
+    !["administrador", "administracion", "director"].includes(creator.role)
+  ) {
     return res
       .status(403)
       .json({ error: "No tienes permisos para crear una OT." });
@@ -214,6 +180,9 @@ router.post("/", (req: Request, res: Response) => {
   );
   const insertAssignmentStmt = db.prepare(
     "INSERT INTO work_order_activity_assignments (activity_id, user_id) VALUES (?, ?)"
+  );
+  const insertFacturaLinkStmt = db.prepare(
+    "INSERT INTO factura_ots (factura_id, ot_id) VALUES (?, ?)"
   );
 
   const createTransaction = db.transaction((data) => {
@@ -238,13 +207,14 @@ router.post("/", (req: Request, res: Response) => {
       data.otData.estimated_delivery_date,
       data.otData.collaborator_observations,
       data.created_by,
-      "pendiente", // <- Status inicial
+      "pendiente",
       data.otData.quotation_amount,
       data.otData.quotation_details,
       data.otData.disposition,
       data.otData.contract_type
     );
     const otId = info.lastInsertRowid as number;
+
     for (const act of data.activities) {
       if (act.activity) {
         const activityInfo = insertActivityStmt.run(
@@ -257,15 +227,27 @@ router.post("/", (req: Request, res: Response) => {
         if (act.assigned_to && Array.isArray(act.assigned_to)) {
           for (const userId of act.assigned_to) {
             insertAssignmentStmt.run(activityId, userId);
-            // La notificación ahora se envía al autorizar la OT.
           }
         }
       }
     }
+
+    if (data.factura_ids && Array.isArray(data.factura_ids)) {
+      for (const factura_id of data.factura_ids) {
+        insertFacturaLinkStmt.run(factura_id, otId);
+      }
+    }
+
     return { id: otId };
   });
+
   try {
-    const result = createTransaction({ otData, activities, created_by });
+    const result = createTransaction({
+      otData,
+      activities,
+      created_by,
+      factura_ids,
+    });
     res.status(201).json(result);
   } catch (error: any) {
     console.error("Error al crear OT:", error);
@@ -287,7 +269,6 @@ router.get("/:id", (req: Request, res: Response) => {
       .get(req.params.id);
 
     if (ot) {
-      // Adjuntar datos completos del cliente
       const client = db
         .prepare("SELECT * FROM clients WHERE id = ?")
         .get(ot.client_id);
@@ -315,7 +296,26 @@ router.get("/:id", (req: Request, res: Response) => {
             (u: any) => u.id !== null
           ),
         }));
-      res.status(200).json({ ...ot, activities });
+
+      const facturas = db
+        .prepare(
+          `
+        SELECT f.id, f.numero_factura, f.monto 
+        FROM facturas f
+        JOIN factura_ots fo ON f.id = fo.factura_id
+        WHERE fo.ot_id = ?
+      `
+        )
+        .all(req.params.id);
+
+      res
+        .status(200)
+        .json({
+          ...ot,
+          activities,
+          facturas,
+          factura_ids: facturas.map((f: any) => f.id),
+        });
     } else {
       res.status(404).json({ error: "OT no encontrada." });
     }
@@ -327,9 +327,20 @@ router.get("/:id", (req: Request, res: Response) => {
 // [PUT] /api/ots/:id
 router.put("/:id", (req: Request, res: Response) => {
   const { id } = req.params;
-  const { activities = [], role, ...otData } = req.body;
+  const { activities = [], role, factura_ids = [], ...otData } = req.body;
 
-  // --- OBTENER DATOS ANTIGUOS ---
+  const user = db
+    .prepare("SELECT role FROM users WHERE id = ?")
+    .get(otData.user_id) as { role: string };
+  if (
+    !user ||
+    !["administrador", "administracion", "director"].includes(user.role)
+  ) {
+    return res
+      .status(403)
+      .json({ error: "No tienes permisos para editar esta OT." });
+  }
+
   const oldOT = db
     .prepare(
       "SELECT collaborator_observations, authorized FROM work_orders WHERE id = ?"
@@ -359,7 +370,6 @@ router.put("/:id", (req: Request, res: Response) => {
     if (info.changes === 0)
       return res.status(404).json({ error: "OT no encontrada" });
 
-    // Notificar Menciones en Observaciones (Empleado)
     const newMentions = (
       otData.collaborator_observations.match(/@(\w+)/g) || []
     ).map((mention: string) => mention.substring(1));
@@ -399,6 +409,12 @@ router.put("/:id", (req: Request, res: Response) => {
   const insertAssignmentStmt = db.prepare(
     "INSERT INTO work_order_activity_assignments (activity_id, user_id) VALUES (?, ?)"
   );
+  const deleteFacturaLinksStmt = db.prepare(
+    "DELETE FROM factura_ots WHERE ot_id = ?"
+  );
+  const insertFacturaLinkStmt = db.prepare(
+    "INSERT INTO factura_ots (factura_id, ot_id) VALUES (?, ?)"
+  );
 
   const updateTransaction = db.transaction(() => {
     updateStmt.run(
@@ -420,7 +436,8 @@ router.put("/:id", (req: Request, res: Response) => {
       otData.contact_id,
       id
     );
-    deleteActivitiesStmt.run(id); // Elimina actividades y sus asignaciones en cascada
+
+    deleteActivitiesStmt.run(id);
     for (const act of activities) {
       if (act.activity) {
         const activityInfo = insertActivityStmt.run(
@@ -433,7 +450,6 @@ router.put("/:id", (req: Request, res: Response) => {
         if (act.assigned_to && Array.isArray(act.assigned_to)) {
           for (const userId of act.assigned_to) {
             insertAssignmentStmt.run(activityId, userId);
-            // Notificar si es una nueva asignación Y LA OT ESTÁ AUTORIZADA
             if (
               isAuthorized &&
               !oldAssignments.has(`${activityId}-${userId}`)
@@ -445,7 +461,14 @@ router.put("/:id", (req: Request, res: Response) => {
         }
       }
     }
-    // Notificar Menciones en Observaciones (Admin/Director)
+
+    deleteFacturaLinksStmt.run(id);
+    if (factura_ids && Array.isArray(factura_ids)) {
+      for (const factura_id of factura_ids) {
+        insertFacturaLinkStmt.run(factura_id, id);
+      }
+    }
+
     const newMentions = (
       otData.collaborator_observations.match(/@(\w+)/g) || []
     ).map((mention: string) => mention.substring(1));
@@ -471,6 +494,7 @@ router.put("/:id", (req: Request, res: Response) => {
       }
     }
   });
+
   try {
     updateTransaction();
     res.status(200).json({ message: "OT actualizada con éxito." });
@@ -479,7 +503,7 @@ router.put("/:id", (req: Request, res: Response) => {
   }
 });
 
-// --- RUTAS DE ACCIONES DE OT ---
+// ... (el resto de las rutas como authorize, deauthorize, close, delete, etc., permanecen igual)
 router.put("/:id/authorize", (req: Request, res: Response) => {
   const { userId } = req.body;
   if (!userId) {
@@ -562,7 +586,6 @@ router.put("/:id/deauthorize", (req, res) => {
   }
 });
 
-// --- RUTA DE CIERRE DE OT ---
 router.put("/:id/close", (req: Request, res: Response) => {
   const { id } = req.params;
   const { userId } = req.body;
@@ -651,7 +674,6 @@ router.put("/:id/close", (req: Request, res: Response) => {
   }
 });
 
-// [DELETE] /api/ots/:id
 router.delete("/:id", (req: Request, res: Response) => {
   try {
     const { id } = req.params;
@@ -664,7 +686,6 @@ router.delete("/:id", (req: Request, res: Response) => {
   }
 });
 
-// --- RUTAS DE ACCIONES DE ACTIVIDADES ---
 router.put("/activities/:activityId/start", (req: Request, res: Response) => {
   const { activityId } = req.params;
   const startTransaction = db.transaction(() => {
@@ -763,7 +784,6 @@ router.put("/activities/:activityId/stop", (req: Request, res: Response) => {
   }
 });
 
-// [GET] /api/ots/user-summary/:userId
 router.get("/user-summary/:userId", (req: Request, res: Response) => {
   try {
     const { userId } = req.params;
@@ -805,7 +825,6 @@ router.get("/user-summary/:userId", (req: Request, res: Response) => {
   }
 });
 
-// NUEVA RUTA: Obtener OTs por ID de cliente que no estén ya facturadas
 router.get("/cliente/:id", (req, res) => {
   try {
     const ots = db
