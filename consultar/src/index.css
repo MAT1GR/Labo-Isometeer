@@ -91,3 +91,100 @@
     @apply text-gray-600 dark:text-gray-300;
   }
 }
+
+@layer components {
+  /* Fondo del menú desplegable */
+  .dark .react-select__menu {
+    @apply bg-gray-800 border-gray-700;
+  }
+
+  /* Fondo de la lista interna (evita el fondo blanco) */
+  .dark .react-select__menu-list {
+    @apply bg-transparent;
+  }
+
+  /* Color del texto de cada opción */
+  .dark .react-select__option {
+    @apply text-gray-200;
+  }
+
+  /* Opción con el cursor encima */
+  .dark .react-select__option--is-focused {
+    @apply bg-gray-700;
+  }
+
+  /* Opción ya seleccionada */
+  .dark .react-select__option--is-selected {
+    @apply bg-blue-600 text-white;
+  }
+}
+
+@layer components {
+  /* --- Input/Control Principal (LO NUEVO) --- */
+  .dark .react-select__control {
+    @apply bg-gray-800 border-gray-700;
+  }
+  .dark .react-select__control--is-focused {
+    @apply border-blue-500 ring-1 ring-blue-500 ring-opacity-50;
+  }
+  .dark .react-select__single-value,
+  .dark .react-select__input-container {
+    @apply text-gray-50;
+  }
+  .dark .react-select__multi-value {
+    @apply bg-gray-600;
+  }
+  .dark .react-select__multi-value__label {
+    @apply text-gray-50;
+  }
+
+  /* --- Menú Desplegable (ListView) --- */
+  .dark .react-select__menu {
+    @apply bg-gray-800 border-gray-700;
+  }
+  .dark .react-select__menu-list {
+    @apply bg-transparent;
+  }
+  .dark .react-select__option {
+    @apply text-gray-200;
+  }
+  .dark .react-select__option--is-focused {
+    @apply bg-gray-700;
+  }
+  .dark .react-select__option--is-selected {
+    @apply bg-blue-600 text-white;
+  }
+}
+
+@layer utilities {
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .animate-fade-in {
+    animation: fade-in 0.4s ease-out forwards;
+  }
+
+  @keyframes fade-in-item {
+    from {
+      opacity: 0;
+      transform: translateX(-15px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+
+  .animate-list-item {
+    opacity: 0; /* Empieza oculto para que la animación se vea */
+    animation: fade-in-item 0.5s ease-out forwards;
+  }
+}

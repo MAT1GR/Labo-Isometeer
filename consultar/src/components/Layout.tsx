@@ -1,4 +1,4 @@
-import React, { useState, Fragment, ReactNode } from "react"; // 1. Importar ReactNode
+import React, { useState, Fragment } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { Dialog, Transition } from "@headlessui/react";
@@ -6,7 +6,6 @@ import {
   Home,
   Users,
   Briefcase,
-  FileText,
   LogOut,
   Menu,
   X,
@@ -20,7 +19,6 @@ import ThemeToggle from "./ui/ThemeToggle";
 import { cn } from "../lib/utils";
 import Notifications from "./ui/Notifications";
 
-// ... (El componente SidebarNavigation se mantiene igual, no es necesario mostrarlo)
 const SidebarNavigation: React.FC = () => {
   const { user, logout, canManageAdminPanel } = useAuth();
   const location = useLocation();
@@ -46,10 +44,10 @@ const SidebarNavigation: React.FC = () => {
       roles: ["director", "administracion", "administrador"],
     },
     {
-      icon: Receipt, // --- AÑADIR ESTE BLOQUE ---
+      icon: Receipt,
       label: "Facturación",
       path: "/facturacion",
-      roles: ["administracion", "administrador"],
+      roles: ["administracion", "administrador", "director"], // Rol de director agregado para visualización
     },
   ];
 
@@ -86,7 +84,7 @@ const SidebarNavigation: React.FC = () => {
   };
 
   const isActivePath = (path: string) =>
-    location.pathname.startsWith(path) && path !== "/";
+    path !== "/" && location.pathname.startsWith(path);
 
   const isHomeActive = location.pathname === "/";
 
@@ -199,14 +197,9 @@ const SidebarNavigation: React.FC = () => {
   );
 };
 
-// 2. Definimos la interfaz para las props del Layout
-interface LayoutProps {
-  children: ReactNode; // <-- AQUÍ ESTÁ LA SOLUCIÓN
-}
-
-const Layout: React.FC<LayoutProps> = ({ children }) => {
-  // 3. Aplicamos la interfaz
+const Layout: React.FC = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const location = useLocation(); // <--- 1. OBTENER LA UBICACIÓN ACTUAL
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
@@ -216,6 +209,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           className="relative z-50 lg:hidden"
           onClose={setSidebarOpen}
         >
+          {/* ... (código del Dialog y Transition sin cambios) ... */}
           <Transition.Child
             as={Fragment}
             enter="transition-opacity ease-linear duration-300"
@@ -227,7 +221,6 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           >
             <div className="fixed inset-0 bg-gray-900/80" />
           </Transition.Child>
-
           <div className="fixed inset-0 flex">
             <Transition.Child
               as={Fragment}
@@ -284,8 +277,14 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         </div>
 
         <main className="flex-1 py-10">
-          <div className="px-4 sm:px-6 lg:px-8">
-            {children} {/* 4. Renderizamos los hijos aquí */}
+          {/* --- 2. APLICAR LA ANIMACIÓN AQUÍ --- */}
+          {/* Usamos la ruta (pathname) como `key` para forzar la re-renderización y la animación en cada cambio de página */}
+          <div
+            key={location.pathname}
+            className="px-4 sm:px-6 lg:px-8 animate-fade-in"
+          >
+            <Outlet />{" "}
+            {/* Reemplazamos `children` por `Outlet` para que funcione con las rutas anidadas */}
           </div>
         </main>
       </div>
