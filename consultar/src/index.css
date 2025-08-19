@@ -12,3 +12,82 @@
     @apply bg-gray-900 text-gray-100;
   }
 }
+
+@layer components {
+  /* Contenedor principal del selector */
+  .react-select__control {
+    @apply bg-white border-gray-300 dark:bg-gray-800 dark:border-gray-600 shadow-sm transition-colors;
+  }
+  .react-select__control:hover {
+    @apply border-gray-400 dark:border-gray-500;
+  }
+  .react-select__control--is-focused {
+    @apply border-blue-500 ring-1 ring-blue-500;
+  }
+
+  /* El texto del valor seleccionado */
+  .react-select__single-value {
+    @apply text-gray-900 dark:text-gray-50;
+  }
+
+  /* El input donde se escribe */
+  .react-select__input-container {
+    @apply text-gray-900 dark:text-gray-50;
+  }
+
+  /* Placeholder */
+  .react-select__placeholder {
+    @apply text-gray-500 dark:text-gray-400;
+  }
+
+  /* Contenedor del menú desplegable */
+  .react-select__menu {
+    @apply bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg;
+  }
+
+  /* ================================================================ */
+  /* -> LA LÍNEA QUE FALTABA: Fondo de la lista de opciones <-        */
+  /* ================================================================ */
+  .react-select__menu-list {
+    @apply !bg-transparent;
+  }
+
+  /* Opciones individuales en el menú */
+  .react-select__option {
+    @apply cursor-pointer;
+  }
+  .react-select__option--is-focused {
+    @apply bg-gray-100 dark:bg-gray-700;
+  }
+  .react-select__option--is-selected {
+    @apply bg-blue-600 text-white;
+  }
+  .react-select__option--is-selected:hover {
+    @apply bg-blue-700;
+  }
+
+  /* Etiquetas de valores múltiples */
+  .react-select__multi-value {
+    @apply bg-blue-100 dark:bg-gray-600 rounded-md;
+  }
+  .react-select__multi-value__label {
+    @apply text-blue-900 dark:text-gray-50 font-medium;
+  }
+  .react-select__multi-value__remove {
+    @apply text-blue-400 dark:text-gray-300;
+  }
+  .react-select__multi-value__remove:hover {
+    @apply bg-red-200 dark:bg-red-800 text-red-900 dark:text-white;
+  }
+
+  /* Otros elementos */
+  .react-select__indicator-separator {
+    @apply bg-gray-300 dark:bg-gray-600;
+  }
+  .react-select__indicator {
+    @apply text-gray-400 dark:text-gray-500;
+  }
+  .react-select__indicator:hover {
+    @apply text-gray-600 dark:text-gray-300;
+  }
+}

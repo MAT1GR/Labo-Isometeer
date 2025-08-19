@@ -2,7 +2,13 @@
 
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useForm, useWatch, useFieldArray, Controller } from "react-hook-form";
+import {
+  useForm,
+  useWatch,
+  useFieldArray,
+  Controller,
+  useForm as useModalForm,
+} from "react-hook-form";
 import { otService, WorkOrder } from "../services/otService";
 import { clientService, Client, Contact } from "../services/clientService";
 import { authService, User } from "../services/auth";
@@ -22,6 +28,7 @@ import {
   ClipboardList,
   BookText,
   FileText,
+  Plus,
 } from "lucide-react";
 import axiosInstance from "../api/axiosInstance";
 import MultiUserSelect from "../components/ui/MultiUserSelect";
@@ -30,6 +37,105 @@ import ClienteSelect from "../components/ui/ClienteSelect";
 import Card from "../components/ui/Card";
 import NavigationPrompt from "../components/ui/NavigationPrompt";
 import Select from "react-select";
+
+// --- Interfaces de Tipos para los Formularios ---
+interface FacturaFormData {
+  numero_factura: string;
+  monto: number;
+  vencimiento: string;
+}
+
+interface CreateFacturaModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  clienteId: number;
+  clienteName: string;
+  suggestedAmount: number;
+  onFacturaCreated: (newFactura: { id: number }) => void;
+}
+
+// --- Componente para el Modal de Creación de Factura ---
+const CreateFacturaModal: React.FC<CreateFacturaModalProps> = ({
+  isOpen,
+  onClose,
+  clienteId,
+  clienteName,
+  suggestedAmount,
+  onFacturaCreated,
+}) => {
+  const {
+    register,
+    handleSubmit,
+    setValue,
+    formState: { isSubmitting },
+  } = useModalForm<FacturaFormData>();
+
+  useEffect(() => {
+    if (isOpen) {
+      setValue("monto", suggestedAmount > 0 ? suggestedAmount : undefined);
+      setValue("vencimiento", new Date().toISOString().split("T")[0]);
+    }
+  }, [isOpen, suggestedAmount, setValue]);
+
+  const onSubmit = async (data: FacturaFormData) => {
+    if (!clienteId) {
+      alert("Error: No se ha seleccionado un cliente.");
+      return;
+    }
+    try {
+      const newFactura = await facturacionService.createFactura({
+        ...data,
+        monto: Number(data.monto),
+        cliente_id: clienteId,
+      });
+      onFacturaCreated(newFactura);
+    } catch (error) {
+      console.error("Error al crear la factura", error);
+      alert("No se pudo crear la factura.");
+    }
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-60 flex justify-center items-center z-50">
+      <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-xl w-full max-w-md">
+        <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100 mb-4">
+          Crear Nueva Factura
+        </h2>
+        <p className="mb-6 text-sm text-gray-600 dark:text-gray-300">
+          Cliente: <span className="font-semibold">{clienteName}</span>
+        </p>
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+          <Input
+            label="Número de Factura"
+            {...register("numero_factura", { required: true })}
+            autoFocus
+          />
+          <Input
+            label="Monto (sugerido por actividades)"
+            type="number"
+            step="0.01"
+            {...register("monto", { required: true, valueAsNumber: true })}
+          />
+          <Input
+            label="Fecha de Vencimiento"
+            type="date"
+            {...register("vencimiento", { required: true })}
+          />
+          <div className="flex justify-end gap-4 pt-4">
+            <Button type="button" variant="outline" onClick={onClose}>
+              Cancelar
+            </Button>
+            <Button type="submit" disabled={isSubmitting}>
+              {isSubmitting ? "Creando..." : "Crear Factura"}
+            </Button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
 
 type OTCreateFormData = Omit<
   WorkOrder,
@@ -44,6 +150,7 @@ const OTCreate: React.FC = () => {
     handleSubmit,
     control,
     setValue,
+    getValues,
     formState: { isSubmitting, isDirty },
   } = useForm<OTCreateFormData>({
     defaultValues: {
@@ -67,9 +174,10 @@ const OTCreate: React.FC = () => {
   const [users, setUsers] = useState<User[]>([]);
   const [contracts, setContracts] = useState<Contract[]>([]);
   const [activityOptions, setActivityOptions] = useState<ActivityPoint[]>([]);
-  const [facturasCliente, setFacturasCliente] = useState<Factura[]>([]); // <-- Nuevo estado
+  const [facturasCliente, setFacturasCliente] = useState<Factura[]>([]);
   const [idPreview, setIdPreview] = useState("Completar campos...");
   const [isIdLoading, setIsIdLoading] = useState(false);
+  const [isCreateFacturaModalOpen, setCreateFacturaModalOpen] = useState(false);
 
   const watchedActivities = useWatch({ control, name: "activities" });
   const watchedIdFields = useWatch({
@@ -115,6 +223,11 @@ const OTCreate: React.FC = () => {
     loadPrerequisites();
   }, []);
 
+  const fetchClientFacturas = async (clientId: number) => {
+    const facturas = await facturacionService.getFacturasByCliente(clientId);
+    setFacturasCliente(facturas);
+  };
+
   useEffect(() => {
     const fetchClientData = async () => {
       if (selectedClientId) {
@@ -123,15 +236,10 @@ const OTCreate: React.FC = () => {
         );
         setContacts(client.contacts);
         setValue("contact_id", undefined);
-
-        // Cargar facturas del cliente seleccionado
-        const facturas = await facturacionService.getFacturasByCliente(
-          Number(selectedClientId)
-        );
-        setFacturasCliente(facturas);
+        fetchClientFacturas(Number(selectedClientId));
       } else {
         setContacts([]);
-        setFacturasCliente([]); // Limpiar facturas si no hay cliente
+        setFacturasCliente([]);
       }
     };
     fetchClientData();
@@ -169,7 +277,7 @@ const OTCreate: React.FC = () => {
     }
   }, [watchedActivities, watchedIdFields, setValue]);
 
-  const onSubmit = async (data: any) => {
+  const onSubmit = async (data: OTCreateFormData) => {
     if (!user) return;
     setIsSaving(true);
     try {
@@ -185,6 +293,23 @@ const OTCreate: React.FC = () => {
     } catch (error) {
       alert("Hubo un error al crear la Orden de Trabajo.");
       setIsSaving(false);
+    }
+  };
+
+  const handleFacturaCreated = async (newFactura: { id: number }) => {
+    // --- CORRECCIÓN DEFINITIVA AQUÍ ---
+    // Esta comprobación es explícita y asegura a TypeScript que el valor es un número.
+    if (typeof selectedClientId === "number") {
+      await fetchClientFacturas(selectedClientId);
+      const currentFacturaIds = getValues("factura_ids") || [];
+      setValue("factura_ids", [...currentFacturaIds, newFactura.id], {
+        shouldDirty: true,
+      });
+      setCreateFacturaModalOpen(false);
+    } else {
+      console.error(
+        "ID de cliente no válido al intentar actualizar las facturas."
+      );
     }
   };
 
@@ -212,11 +337,27 @@ const OTCreate: React.FC = () => {
     label: `${f.numero_factura} - ${formatCurrency(f.monto)}`,
   }));
 
+  const suggestedAmountForFactura =
+    watchedActivities?.reduce(
+      (sum, act: any) => sum + (Number(act.precio_sin_iva) || 0),
+      0
+    ) || 0;
+
   return (
     <>
       <NavigationPrompt
         when={isDirty && !isSaving}
         onSave={() => handleSubmit(onSubmit)()}
+      />
+      <CreateFacturaModal
+        isOpen={isCreateFacturaModalOpen}
+        onClose={() => setCreateFacturaModalOpen(false)}
+        clienteId={Number(selectedClientId)}
+        clienteName={
+          clients.find((c) => c.id === Number(selectedClientId))?.name || ""
+        }
+        suggestedAmount={suggestedAmountForFactura}
+        onFacturaCreated={handleFacturaCreated}
       />
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
@@ -240,9 +381,7 @@ const OTCreate: React.FC = () => {
             </Button>
           </div>
         </div>
-
         <div className="space-y-6">
-          {/* ... Card de Datos Generales ... */}
           <Card>
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
               <Input
@@ -291,7 +430,6 @@ const OTCreate: React.FC = () => {
             </div>
           </Card>
 
-          {/* ... Card de Cliente ... */}
           <Card>
             <h2 className="text-lg font-semibold text-blue-700 dark:text-blue-400 col-span-full mb-4 flex items-center gap-2">
               <UserSquare size={20} /> Información del Cliente
@@ -333,7 +471,6 @@ const OTCreate: React.FC = () => {
             </div>
           </Card>
 
-          {/* ... Card de Producto ... */}
           <Card>
             <h2 className="text-lg font-semibold text-blue-700 dark:text-blue-400 col-span-full mb-4 flex items-center gap-2">
               <Package size={20} /> Producto
@@ -364,7 +501,6 @@ const OTCreate: React.FC = () => {
             </div>
           </Card>
 
-          {/* ... Card de Actividades ... */}
           <Card>
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-lg font-semibold text-blue-700 dark:text-blue-400 flex items-center gap-2">
@@ -456,11 +592,22 @@ const OTCreate: React.FC = () => {
             </div>
           </Card>
 
-          {/* =========== NUEVA SECCIÓN DE FACTURAS =========== */}
           <Card>
-            <h2 className="text-lg font-semibold text-blue-700 dark:text-blue-400 col-span-full mb-4 flex items-center gap-2">
-              <FileText size={20} /> Facturas Vinculadas
-            </h2>
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-lg font-semibold text-blue-700 dark:text-blue-400 flex items-center gap-2">
+                <FileText size={20} /> Facturas Vinculadas
+              </h2>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => setCreateFacturaModalOpen(true)}
+                disabled={!selectedClientId}
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Crear Factura
+              </Button>
+            </div>
             <div>
               <label className="text-sm font-medium dark:text-gray-300">
                 Vincular facturas existentes
@@ -472,6 +619,9 @@ const OTCreate: React.FC = () => {
                   <Select
                     isMulti
                     options={facturaOptions}
+                    value={facturaOptions.filter((option) =>
+                      field.value?.includes(option.value)
+                    )}
                     isDisabled={!selectedClientId}
                     placeholder={
                       !selectedClientId
@@ -491,7 +641,6 @@ const OTCreate: React.FC = () => {
             </div>
           </Card>
 
-          {/* ... Card de Observaciones ... */}
           <Card>
             <h2 className="text-lg font-semibold text-blue-700 dark:text-blue-400 col-span-full mb-4 flex items-center gap-2">
               <BookText size={20} /> Observaciones
