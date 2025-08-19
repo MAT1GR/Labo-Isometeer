@@ -84,7 +84,7 @@ const CreateFacturaModal: React.FC<CreateFacturaModalProps> = ({
         (sum, act) => sum + (act.precio_sin_iva || 0),
         0
       );
-      setValue("monto", totalActividades > 0 ? totalActividades : undefined);
+      setValue("monto", totalActividades >= 0 ? totalActividades : 0);
       setValue("vencimiento", new Date().toISOString().split("T")[0]);
     }
   }, [isOpen, otData, setValue]);

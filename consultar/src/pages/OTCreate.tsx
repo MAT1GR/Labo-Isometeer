@@ -72,7 +72,7 @@ const CreateFacturaModal: React.FC<CreateFacturaModalProps> = ({
 
   useEffect(() => {
     if (isOpen) {
-      setValue("monto", suggestedAmount > 0 ? suggestedAmount : undefined);
+      setValue("monto", suggestedAmount >= 0 ? suggestedAmount : 0);
       setValue("vencimiento", new Date().toISOString().split("T")[0]);
     }
   }, [isOpen, suggestedAmount, setValue]);
