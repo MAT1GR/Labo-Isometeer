@@ -74,6 +74,7 @@ const FacturaDetail: React.FC = () => {
   const montoPagado =
     factura.cobros?.reduce((acc, cobro) => acc + cobro.monto, 0) || 0;
   const saldoRestante = montoTotal - montoPagado;
+  const montoNeto = factura.monto - (factura.iva || 0);
 
   return (
     <div className="container mx-auto p-4 space-y-6">
@@ -96,7 +97,7 @@ const FacturaDetail: React.FC = () => {
               <p className="text-gray-600 dark:text-gray-400">
                 Cliente:{" "}
                 <Link
-                  to={`/clientes/${factura.cliente_id}`}
+                  to={`/clientes/editar/${factura.cliente_id}`}
                   className="text-blue-600 hover:underline"
                 >
                   {factura.cliente_name}
@@ -125,9 +126,27 @@ const FacturaDetail: React.FC = () => {
           <div className="mt-6 border-t pt-6 dark:border-gray-700 grid grid-cols-1 md:grid-cols-3 gap-6">
             <div>
               <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">
-                Monto Total
+                Monto Neto
               </h3>
               <p className="text-2xl font-semibold text-gray-800 dark:text-gray-100">
+                {formatCurrency(montoNeto)}
+              </p>
+            </div>
+            {factura.iva && (
+              <div>
+                <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">
+                  IVA
+                </h3>
+                <p className="text-2xl font-semibold text-gray-800 dark:text-gray-100">
+                  {formatCurrency(factura.iva)}
+                </p>
+              </div>
+            )}
+            <div>
+              <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">
+                Monto Total
+              </h3>
+              <p className="text-2xl font-bold text-gray-800 dark:text-gray-100">
                 {formatCurrency(montoTotal)}
               </p>
             </div>

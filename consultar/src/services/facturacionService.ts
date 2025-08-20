@@ -1,4 +1,3 @@
-// RUTA: /consultar/src/services/facturacionService.ts
 import axiosInstance from "../api/axiosInstance";
 import { WorkOrder } from "./otService";
 
@@ -15,6 +14,7 @@ export interface Factura {
   id: number;
   numero_factura: string;
   monto: number;
+  iva?: number;
   vencimiento: string;
   estado: "pendiente" | "pagada" | "vencida";
   cliente_id?: number;
@@ -39,10 +39,11 @@ class FacturacionService {
 
   async createFactura(data: {
     numero_factura: string;
-    monto: number;
+    monto?: number;
     vencimiento: string;
     cliente_id: number;
     ot_ids?: number[];
+    calculation_type: "manual" | "activities";
   }): Promise<{ id: number }> {
     const response = await axiosInstance.post("/facturacion", data);
     return response.data;

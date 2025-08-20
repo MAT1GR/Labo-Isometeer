@@ -308,14 +308,12 @@ router.get("/:id", (req: Request, res: Response) => {
         )
         .all(req.params.id);
 
-      res
-        .status(200)
-        .json({
-          ...ot,
-          activities,
-          facturas,
-          factura_ids: facturas.map((f: any) => f.id),
-        });
+      res.status(200).json({
+        ...ot,
+        activities,
+        facturas,
+        factura_ids: facturas.map((f: any) => f.id),
+      });
     } else {
       res.status(404).json({ error: "OT no encontrada." });
     }

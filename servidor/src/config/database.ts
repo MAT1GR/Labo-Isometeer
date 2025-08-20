@@ -57,9 +57,29 @@ const runMigration = () => {
         );
       })();
     }
+
+    // Migración para añadir la columna 'iva'
+    const tableInfoIva = db
+      .prepare(
+        `SELECT sql FROM sqlite_master WHERE type='table' AND name='facturas'`
+      )
+      .get() as { sql: string | null };
+
+    if (
+      tableInfoIva &&
+      tableInfoIva.sql &&
+      !tableInfoIva.sql.includes("iva REAL")
+    ) {
+      console.log("[MIGRATION] Adding 'iva' column to 'facturas' table.");
+      db.exec("ALTER TABLE facturas ADD COLUMN iva REAL;");
+      console.log("[MIGRATION] 'iva' column added successfully.");
+    }
   } catch (error: any) {
     // Si la tabla 'facturas' no existe, no hace nada, ya que se creará más abajo.
-    if (!error.message.includes("no such table")) {
+    if (
+      !error.message.includes("no such table") &&
+      !error.message.includes("duplicate column name")
+    ) {
       console.error(
         "[MIGRATION_ERROR] No se pudo migrar la base de datos:",
         error
@@ -161,6 +181,7 @@ db.exec(`
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     numero_factura TEXT NOT NULL,
     monto REAL NOT NULL,
+    iva REAL,
     vencimiento TEXT NOT NULL,
     estado TEXT NOT NULL DEFAULT 'pendiente' CHECK(estado IN ('pendiente', 'pagada', 'vencida')),
     cliente_id INTEGER,
