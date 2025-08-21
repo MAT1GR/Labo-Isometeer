@@ -6,7 +6,6 @@ import { useNavigate } from "react-router-dom";
 import useSWR from "swr";
 import { clientService, Client } from "../services/clientService";
 import { otService, WorkOrder } from "../services/otService";
-// Se importa la nueva interfaz junto con el servicio
 import {
   facturacionService,
   FacturaCreateData,
@@ -21,6 +20,9 @@ import ClienteSelect from "../components/ui/ClienteSelect";
 const FacturaCreate: React.FC = () => {
   const navigate = useNavigate();
   const [selectedClientId, setSelectedClientId] = useState<number | null>(null);
+  const [calculationType, setCalculationType] = useState<
+    "manual" | "activities"
+  >("manual");
 
   const { data: clients } = useSWR<Client[]>(
     "/clients",
@@ -36,24 +38,28 @@ const FacturaCreate: React.FC = () => {
     handleSubmit,
     control,
     setValue,
+    watch,
     formState: { errors, isSubmitting },
-    // Se usa la interfaz importada
   } = useForm<FacturaCreateData>({
     defaultValues: {
       vencimiento: new Date().toISOString().split("T")[0],
       ot_ids: [],
-      // Añadimos el valor por defecto para el campo que faltaba
-      calculation_type: "manual",
     },
   });
 
-  // El tipo de 'data' ahora es FacturaCreateData
+  const selectedOts = watch("ot_ids", []);
+
   const onSubmit = async (data: FacturaCreateData) => {
     try {
-      const result = await facturacionService.createFactura({
+      const dataToSend = {
         ...data,
         ot_ids: data.ot_ids.length > 0 ? data.ot_ids : undefined,
-      });
+        calculation_type: calculationType,
+        // Si es por actividades, no enviamos el monto manual
+        monto: calculationType === "manual" ? data.monto : undefined,
+      };
+
+      const result = await facturacionService.createFactura(dataToSend);
       navigate(`/facturacion/${result.id}`);
     } catch (error) {
       console.error("Error al crear la factura", error);
@@ -89,7 +95,7 @@ const FacturaCreate: React.FC = () => {
                     const id = Number(value);
                     field.onChange(id);
                     setSelectedClientId(id);
-                    setValue("ot_ids", []);
+                    setValue("ot_ids", []); // Limpiar OTs al cambiar de cliente
                   }}
                 />
               )}
@@ -102,16 +108,6 @@ const FacturaCreate: React.FC = () => {
               error={errors.numero_factura?.message}
             />
             <Input
-              label="Monto Total (ARS)"
-              type="number"
-              step="0.01"
-              {...register("monto", {
-                required: "El monto es obligatorio",
-                valueAsNumber: true,
-              })}
-              error={errors.monto?.message}
-            />
-            <Input
               label="Fecha de Vencimiento"
               type="date"
               {...register("vencimiento", {
@@ -119,22 +115,66 @@ const FacturaCreate: React.FC = () => {
               })}
               error={errors.vencimiento?.message}
             />
+
+            {/* --- NUEVO: Selector de Tipo de Cálculo --- */}
+            <div className="space-y-2">
+              <label className="block text-sm font-medium">
+                Tipo de Cálculo
+              </label>
+              <div className="flex items-center gap-4 p-2 border rounded-md">
+                <label className="flex items-center cursor-pointer">
+                  <input
+                    type="radio"
+                    value="manual"
+                    checked={calculationType === "manual"}
+                    onChange={() => setCalculationType("manual")}
+                    className="form-radio"
+                  />
+                  <span className="ml-2">Monto Manual</span>
+                </label>
+                <label className="flex items-center cursor-pointer">
+                  <input
+                    type="radio"
+                    value="activities"
+                    checked={calculationType === "activities"}
+                    onChange={() => setCalculationType("activities")}
+                    className="form-radio"
+                    disabled={selectedOts.length === 0}
+                  />
+                  <span className="ml-2">Según Actividades de OTs</span>
+                </label>
+              </div>
+            </div>
+
+            {/* --- MODIFICADO: Campo de Monto Condicional --- */}
+            {calculationType === "manual" && (
+              <Input
+                label="Monto Total (ARS)"
+                type="number"
+                step="0.01"
+                {...register("monto", {
+                  required:
+                    calculationType === "manual"
+                      ? "El monto es obligatorio"
+                      : false,
+                  valueAsNumber: true,
+                })}
+                error={errors.monto?.message}
+              />
+            )}
           </div>
 
           {selectedClientId && (
             <div>
               <h3 className="text-lg font-semibold border-t pt-6 mt-6">
-                Vincular Órdenes de Trabajo (Opcional)
+                Vincular Órdenes de Trabajo
               </h3>
               <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-                Seleccione las OTs de '
-                {clients?.find((c) => c.id === selectedClientId)?.name}' que
-                desea asociar a esta factura.
+                Seleccione las OTs que desea asociar a esta factura.
               </p>
               <div className="space-y-3 max-h-60 overflow-y-auto p-4 border rounded-md bg-gray-50 dark:bg-gray-700/50">
                 {ots && ots.length > 0 ? (
-                  // Se añade el tipo explícito 'WorkOrder' para 'ot'
-                  ots.map((ot: WorkOrder) => (
+                  ots.map((ot) => (
                     <Controller
                       key={ot.id}
                       name="ot_ids"

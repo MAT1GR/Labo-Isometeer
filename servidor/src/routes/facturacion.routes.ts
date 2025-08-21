@@ -65,73 +65,74 @@ router.get("/:id", (req, res) => {
   }
 });
 
-// [POST] /api/facturacion - Crear una nueva factura
+// [POST] /api/facturacion - Crear una nueva factura (Versión Refinada y Completa)
 router.post("/", (req, res) => {
   const {
     numero_factura,
-    monto, // Usado para el cálculo 'manual'
+    monto,
     vencimiento,
     cliente_id,
     ot_ids = [],
-    calculation_type = "manual", // Nuevo campo: 'manual' o 'activities'
+    calculation_type = "manual",
   } = req.body;
 
-  let montoNeto = 0;
-  let totalIva = 0;
+  // --- Validación de Entrada ---
+  if (!numero_factura || !vencimiento || !cliente_id) {
+    return res.status(400).json({ message: "Faltan campos obligatorios." });
+  }
 
   try {
-    if (calculation_type === "activities" && ot_ids.length > 0) {
-      const placeholders = ot_ids.map(() => "?").join(",");
-      const activitiesQuery = `
-        SELECT
-          wa.precio_sin_iva,
-          wo.type AS ot_type
-        FROM work_order_activities wa
-        JOIN work_orders wo ON wa.work_order_id = wo.id
-        WHERE wa.work_order_id IN (${placeholders}) AND wa.precio_sin_iva IS NOT NULL AND wa.precio_sin_iva > 0
-      `;
-      const activities = db.prepare(activitiesQuery).all(ot_ids) as {
-        precio_sin_iva: number;
-        ot_type: string;
-      }[];
+    const transaction = db.transaction(() => {
+      let montoNeto = 0;
+      let totalIva = 0;
 
-      for (const activity of activities) {
-        const precio = activity.precio_sin_iva;
-        montoNeto += precio;
-        if (activity.ot_type === "Produccion") {
-          totalIva += precio * 0.105;
-        } else {
-          totalIva += precio * 0.21;
-        }
-      }
-    } else {
-      // Cálculo manual o no hay OTs vinculadas
-      montoNeto = Number(monto) || 0;
-      if (ot_ids.length > 0) {
+      // --- Lógica de Cálculo ---
+      if (calculation_type === "activities" && ot_ids.length > 0) {
+        // **Cálculo basado en actividades de OTs**
         const placeholders = ot_ids.map(() => "?").join(",");
-        const stmt = db.prepare(
-          `SELECT type FROM work_orders WHERE id IN (${placeholders})`
-        );
-        const ots = stmt.all(ot_ids) as { type: string }[];
-        const hasOtherTypes = ots.some((ot) => ot.type !== "Produccion");
+        const activitiesQuery = `
+          SELECT
+            wa.precio_sin_iva,
+            wo.type AS ot_type
+          FROM work_order_activities wa
+          JOIN work_orders wo ON wa.work_order_id = wo.id
+          WHERE wa.work_order_id IN (${placeholders})
+        `;
+        const activities = db.prepare(activitiesQuery).all(ot_ids) as {
+          precio_sin_iva: number;
+          ot_type: string;
+        }[];
 
-        if (hasOtherTypes) {
-          totalIva = montoNeto * 0.21;
-        } else {
-          totalIva = montoNeto * 0.105;
+        if (activities.length === 0) {
+          throw new Error(
+            "No se encontraron actividades con precio para las OTs seleccionadas."
+          );
+        }
+
+        for (const activity of activities) {
+          const precio = activity.precio_sin_iva || 0;
+          montoNeto += precio;
+          totalIva +=
+            precio * (activity.ot_type === "Produccion" ? 0.105 : 0.21);
         }
       } else {
-        totalIva = montoNeto * 0.21;
+        // **Cálculo Manual**
+        montoNeto = Number(monto) || 0;
+        if (montoNeto <= 0) {
+          throw new Error(
+            "Para el cálculo manual, el monto debe ser mayor a cero."
+          );
+        }
+        totalIva = montoNeto * 0.21; // IVA general del 21% para monto manual
       }
-    }
 
-    const montoFinal = montoNeto + totalIva;
+      const montoFinal = montoNeto + totalIva;
 
-    const transaction = db.transaction(() => {
-      const stmt = db.prepare(
+      // --- Inserción en Base de Datos ---
+      const insertFacturaStmt = db.prepare(
         "INSERT INTO facturas (numero_factura, monto, iva, vencimiento, estado, cliente_id) VALUES (?, ?, ?, ?, 'pendiente', ?)"
       );
-      const info = stmt.run(
+      const info = insertFacturaStmt.run(
         numero_factura,
         montoFinal,
         totalIva,
@@ -140,6 +141,7 @@ router.post("/", (req, res) => {
       );
       const facturaId = info.lastInsertRowid;
 
+      // --- Vinculación de OTs ---
       if (ot_ids.length > 0) {
         const linkStmt = db.prepare(
           "INSERT INTO factura_ots (factura_id, ot_id) VALUES (?, ?)"
@@ -148,14 +150,18 @@ router.post("/", (req, res) => {
           linkStmt.run(facturaId, ot_id);
         }
       }
+
       return { id: facturaId };
     });
 
+    // Ejecutar la transacción
     const result = transaction();
     res.status(201).json(result);
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error al crear la factura:", error);
-    res.status(500).json({ error: "Error al crear la factura." });
+    res
+      .status(500)
+      .json({ error: error.message || "Error interno al crear la factura." });
   }
 });
 
