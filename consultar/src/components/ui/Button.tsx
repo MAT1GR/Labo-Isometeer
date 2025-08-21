@@ -1,16 +1,24 @@
-// RUTA: /cliente/src/components/ui/Button.tsx
+// RUTA: /consultar/src/components/ui/Button.tsx
 
 import React from "react";
-import { cn } from "../../utils/cn";
+import { cn } from "../../lib/utils"; // Asegúrate que la ruta a cn sea correcta
 
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: "primary" | "secondary" | "outline" | "ghost" | "danger";
+  // CORRECCIÓN: Se añade 'default' a las variantes posibles
+  variant?:
+    | "default"
+    | "primary"
+    | "secondary"
+    | "outline"
+    | "ghost"
+    | "danger";
   size?: "sm" | "md" | "lg" | "icon";
   children: React.ReactNode;
 }
 
 const Button: React.FC<ButtonProps> = ({
-  variant = "primary",
+  // CORRECCIÓN: Se establece 'default' como la variante por defecto
+  variant = "default",
   size = "md",
   className,
   children,
@@ -20,6 +28,8 @@ const Button: React.FC<ButtonProps> = ({
     "inline-flex items-center justify-center rounded-md font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-800 disabled:opacity-50 disabled:pointer-events-none";
 
   const variants = {
+    // CORRECCIÓN: Se define el estilo para la nueva variante 'default'
+    default: "bg-blue-600 text-white hover:bg-blue-700 focus:ring-blue-500",
     primary: "bg-blue-600 text-white hover:bg-blue-700 focus:ring-blue-500",
     secondary:
       "bg-gray-600 text-white hover:bg-gray-700 focus:ring-gray-500 dark:bg-gray-700 dark:hover:bg-gray-600",
