@@ -1,18 +1,19 @@
-// RUTA: /cliente/src/services/otService.ts
+// RUTA: /consultar/src/services/otService.ts
 
 import axiosInstance from "../api/axiosInstance";
 import { Client } from "./clientService";
 import { User } from "./auth";
-import { ReactNode } from "react";
 
+// --- INTERFAZ CORREGIDA ---
+// Se simplificó para tener una única propiedad 'name' de tipo string,
+// eliminando la duplicidad y el tipo conflictivo 'ReactNode'.
 export interface Activity {
-  name: ReactNode;
   id?: number;
-  work_order_id: number;
-  activity: string;
+  work_order_id?: number;
+  name: string; // Anteriormente 'activity: string' y 'name: ReactNode'
   norma?: string;
   precio_sin_iva?: number;
-  status: "pendiente" | "en_progreso" | "finalizada";
+  status?: "pendiente" | "en_progreso" | "finalizada";
   assigned_users?: { id: number; name: string }[];
 }
 
@@ -47,7 +48,6 @@ export interface WorkOrder {
   activities?: Activity[];
   client?: Client;
   facturada?: boolean;
-  // Estos campos son útiles para mostrar información en la tabla de OTs
   client_name?: string;
   assigned_to_name?: string;
 }
@@ -61,26 +61,18 @@ export interface OTFilters {
 }
 
 class OTService {
-  getOTs(arg0: { cliente_id: any; facturada: string }) {
-    throw new Error("Method not implemented.");
-  }
-  /**
-   * Obtiene las OTs del servidor.
-   * La lógica de qué OTs devolver se maneja en el backend según el rol del usuario.
-   */
+  // Este método no estaba implementado, se elimina para evitar confusiones.
+  // getOTs(arg0: { cliente_id: any; facturada: string }) { ... }
+
   async getAllOTs(user: User | null, filters: OTFilters): Promise<WorkOrder[]> {
     if (!user) {
-      return []; // No se pueden obtener OTs si no hay un usuario logueado.
+      return [];
     }
-
     const params: any = { ...filters };
-
-    // Si el usuario es un empleado, se envían sus datos para que el backend filtre las OTs.
     if (user.role === "empleado") {
       params.role = user.role;
       params.assigned_to = user.id;
     }
-
     const response = await axiosInstance.get("/ots", { params });
     return response.data;
   }
@@ -153,10 +145,6 @@ class OTService {
     return response.data;
   }
 
-  /**
-   * Autoriza una Orden de Trabajo.
-   * Se corrigió para usar PUT y enviar el ID del usuario que autoriza.
-   */
   async authorizeOT(id: number, userId: number): Promise<WorkOrder> {
     const response = await axiosInstance.put(`/ots/${id}/authorize`, {
       userId,
@@ -164,9 +152,6 @@ class OTService {
     return response.data;
   }
 
-  /**
-   * Desautoriza una Orden de Trabajo.
-   */
   async deauthorizeOT(id: number): Promise<void> {
     await axiosInstance.put(`/ots/${id}/deauthorize`);
   }

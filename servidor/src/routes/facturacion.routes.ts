@@ -5,17 +5,18 @@ import db from "../config/database";
 
 const router = Router();
 
-// [GET] /api/facturacion - Obtener todas las facturas
+// [GET] /api/facturacion - OBTENER FACTURAS (AHORA CON FILTROS)
 router.get("/", (req, res) => {
   try {
+    // Actualiza las facturas vencidas antes de cualquier consulta
     const today = new Date().toISOString().split("T")[0];
     db.prepare(
       `UPDATE facturas SET estado = 'vencida' WHERE vencimiento < ? AND estado = 'pendiente'`
     ).run(today);
 
-    const facturas = db
-      .prepare(
-        `
+    // Lógica de filtros
+    const { cliente_id, fecha_desde, fecha_hasta, estado } = req.query;
+    let baseQuery = `
       SELECT 
         f.id, f.numero_factura, f.monto, f.iva, f.vencimiento, f.estado, f.cliente_id, f.created_at,
         c.name as cliente_name,
@@ -25,11 +26,36 @@ router.get("/", (req, res) => {
       LEFT JOIN clients c ON f.cliente_id = c.id
       LEFT JOIN factura_ots fo ON f.id = fo.factura_id
       LEFT JOIN work_orders ot ON fo.ot_id = ot.id
-      GROUP BY f.id
-      ORDER BY f.created_at DESC
-    `
-      )
-      .all();
+    `;
+
+    const whereClauses: string[] = [];
+    const params: any[] = [];
+
+    if (cliente_id) {
+      whereClauses.push("f.cliente_id = ?");
+      params.push(cliente_id);
+    }
+    if (fecha_desde) {
+      whereClauses.push("f.created_at >= ?");
+      params.push(fecha_desde);
+    }
+    if (fecha_hasta) {
+      // Añadimos la hora final del día para incluir todos los registros de esa fecha
+      whereClauses.push("f.created_at <= ?");
+      params.push(`${fecha_hasta}T23:59:59`);
+    }
+    if (estado) {
+      whereClauses.push("f.estado = ?");
+      params.push(estado);
+    }
+
+    if (whereClauses.length > 0) {
+      baseQuery += ` WHERE ${whereClauses.join(" AND ")}`;
+    }
+
+    baseQuery += " GROUP BY f.id ORDER BY f.created_at DESC";
+
+    const facturas = db.prepare(baseQuery).all(params);
     res.json(facturas);
   } catch (error) {
     console.error("Error al obtener las facturas:", error);
@@ -37,7 +63,9 @@ router.get("/", (req, res) => {
   }
 });
 
-// [GET] /api/facturacion/:id - Obtener una factura por ID
+// ... (El resto del archivo permanece igual)
+// ... (El resto del archivo permanece igual)
+// [GET] /api/facturacion/:id - Obtener una factura por ID (VERSIÓN CORREGIDA)
 router.get("/:id", (req, res) => {
   try {
     const facturaId = req.params.id;
@@ -139,8 +167,6 @@ router.post("/", (req, res) => {
           WHERE wa.work_order_id IN (${placeholders})
         `;
 
-        // --- LA CORRECCIÓN ESTÁ AQUÍ ---
-        // Usamos el operador "spread" (...) para pasar cada ID como un argumento separado.
         const activities = db.prepare(activitiesQuery).all(...ot_ids) as {
           precio_sin_iva: number;
           ot_type: string;
@@ -203,7 +229,7 @@ router.post("/", (req, res) => {
   }
 });
 
-// [POST] /api/facturacion/:id/cobros - Añadir un cobro
+// [POST] /api/facturacion/:id/cobros - Añadir un cobro (CON HORA CORREGIDA)
 router.post("/:id/cobros", (req, res) => {
   const { monto, medio_de_pago, fecha } = req.body;
   const factura_id = req.params.id;
@@ -213,7 +239,8 @@ router.post("/:id/cobros", (req, res) => {
       const stmt = db.prepare(
         "INSERT INTO cobros (factura_id, monto, medio_de_pago, fecha) VALUES (?, ?, ?, ?)"
       );
-      const info = stmt.run(factura_id, monto, medio_de_pago, fecha);
+      const fechaParaGuardar = fecha || new Date().toISOString();
+      const info = stmt.run(factura_id, monto, medio_de_pago, fechaParaGuardar);
       const newCobroId = info.lastInsertRowid;
 
       const totalPagadoResult = db

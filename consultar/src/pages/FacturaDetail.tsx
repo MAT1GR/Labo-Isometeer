@@ -16,7 +16,6 @@ import {
   PlusCircle,
 } from "lucide-react";
 import { cn } from "../lib/utils";
-// CORRECCIÓN: Importamos los tipos WorkOrder y Activity
 import { WorkOrder, Activity } from "../services/otService";
 
 // Componente para el tag de estado
@@ -81,10 +80,10 @@ const OTAccordion: React.FC<{ ot: WorkOrder }> = ({ ot }) => {
       >
         <div className="border-t dark:border-gray-600 p-3">
           <ul className="list-disc pl-5 text-sm space-y-1">
-            {/* CORRECCIÓN: Usamos el tipo 'Activity' importado */}
             {ot.activities.map((act: Activity, index: number) => (
               <li key={index} className="flex justify-between">
                 <span className="text-gray-700 dark:text-gray-300">
+                  {/* Ahora 'act.name' es un string y no dará error */}
                   {act.name}
                 </span>
                 <span className="font-mono text-gray-800 dark:text-gray-100">
@@ -110,8 +109,11 @@ const FacturaDetail: React.FC = () => {
     register,
     handleSubmit,
     reset,
+    watch,
     formState: { isSubmitting },
   } = useForm();
+
+  const medioDePago = watch("medio_de_pago");
 
   const loadFactura = async () => {
     if (id) {
@@ -132,10 +134,19 @@ const FacturaDetail: React.FC = () => {
   const handleCobroSubmit = async (data: any) => {
     if (id) {
       try {
+        const finalMedioDePago =
+          data.medio_de_pago === "Otro"
+            ? data.otro_medio_de_pago
+            : data.medio_de_pago;
+
+        const fechaConHora = new Date(data.fecha).toISOString();
+
         await facturacionService.createCobro(Number(id), {
-          ...data,
           monto: Number(data.monto),
+          fecha: fechaConHora,
+          medio_de_pago: finalMedioDePago,
         });
+
         reset();
         setIsAddingCobro(false);
         await loadFactura();
@@ -290,12 +301,33 @@ const FacturaDetail: React.FC = () => {
                         <option value="Otro">Otro</option>
                       </select>
                     </div>
+
+                    <div
+                      className={cn(
+                        "transition-all duration-300 ease-in-out overflow-hidden",
+                        medioDePago === "Otro"
+                          ? "max-h-40 opacity-100"
+                          : "max-h-0 opacity-0"
+                      )}
+                    >
+                      {medioDePago === "Otro" && (
+                        <Input
+                          label="Especificar otro medio de pago"
+                          {...register("otro_medio_de_pago", {
+                            required: medioDePago === "Otro",
+                          })}
+                          className="mt-2"
+                        />
+                      )}
+                    </div>
+
                     <div className="flex gap-4">
                       <Button type="submit" disabled={isSubmitting}>
                         {isSubmitting ? "Guardando..." : "Guardar"}
                       </Button>
                       <Button
                         variant="outline"
+                        type="button"
                         onClick={() => {
                           setIsAddingCobro(false);
                           reset();

@@ -1,110 +1,176 @@
-// RUTA: /consultar/src/pages/Facturacion.tsx
+// RUTA: consultar/src/pages/Facturacion.tsx
 
-import React from "react";
-import useSWR from "swr";
+import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import useSWR from "swr";
 import { facturacionService, Factura } from "../services/facturacionService";
+import { formatCurrency, formatDateTime } from "../lib/utils";
 import Card from "../components/ui/Card";
 import Button from "../components/ui/Button";
-import { Receipt, Edit, PlusCircle } from "lucide-react";
-import { formatCurrency, formatDate } from "../lib/utils";
+import { PlusCircle, Filter } from "lucide-react";
+import FacturaFilters from "../components/FacturaFilters";
+import { cn } from "../lib/utils";
 
-const FacturacionPage: React.FC = () => {
-  const {
-    data: facturas,
-    error,
-    isLoading,
-  } = useSWR<Factura[]>("/facturacion", facturacionService.getFacturas);
+const Facturacion: React.FC = () => {
   const navigate = useNavigate();
+  const [filters, setFilters] = useState<any>({});
+  const [showFilters, setShowFilters] = useState(false);
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "pendiente":
-        return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-300";
-      case "pagada":
-        return "bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300";
-      case "vencida":
-        return "bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300";
-      default:
-        return "bg-gray-100 text-gray-800";
-    }
+  const { data: facturas, error } = useSWR<Factura[]>(
+    ["/facturacion", filters],
+    () => facturacionService.getFacturas(filters)
+  );
+
+  const handleFilterChange = (name: string, value: any) => {
+    setFilters((prev: any) => ({ ...prev, [name]: value || undefined }));
   };
 
-  if (error) return <div>Error al cargar las facturas.</div>;
-  if (isLoading) return <div>Cargando facturas...</div>;
+  const handleResetFilters = () => {
+    setFilters({});
+  };
+
+  if (error) return <div>Error al cargar facturas...</div>;
+  if (!facturas) return <div>Cargando facturas...</div>;
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold">Facturación</h1>
-        <Button onClick={() => navigate("/facturacion/crear")}>
-          <PlusCircle className="mr-2 h-4 w-4" /> Crear Factura
-        </Button>
+    <div className="container mx-auto p-4">
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-3xl font-bold">Gestión de Facturación</h1>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            onClick={() => setShowFilters(!showFilters)}
+          >
+            <Filter className="mr-2 h-4 w-4" />
+            Filtrar
+          </Button>
+          <Button onClick={() => navigate("/facturacion/crear")}>
+            <PlusCircle className="mr-2 h-4 w-4" />
+            Nueva Factura
+          </Button>
+        </div>
       </div>
+
+      {/* --- CORRECCIÓN: Se elimina 'overflow-hidden' para permitir que el menú se despliegue libremente --- */}
+      <div
+        className={cn(
+          "transition-all duration-300 ease-in-out",
+          showFilters
+            ? "max-h-96 opacity-100 mb-6 visible"
+            : "max-h-0 opacity-0 invisible"
+        )}
+      >
+        <FacturaFilters
+          filters={filters}
+          onFilterChange={handleFilterChange}
+          onResetFilters={handleResetFilters}
+        />
+      </div>
+
       <Card>
-        <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-          <thead className="bg-gray-50 dark:bg-gray-700">
-            <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">
-                N° Factura
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">
-                Cliente
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">
-                Monto
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">
-                Pagado
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">
-                Vencimiento
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">
-                Estado
-              </th>
-              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">
-                Acciones
-              </th>
-            </tr>
-          </thead>
-          <tbody className="bg-white divide-y divide-gray-200 dark:bg-gray-800 dark:divide-gray-700">
-            {facturas?.map((factura) => (
-              <tr key={factura.id}>
-                <td className="px-6 py-4 font-medium">
-                  {factura.numero_factura}
-                </td>
-                <td className="px-6 py-4">{factura.cliente_name || "N/A"}</td>
-                <td className="px-6 py-4">{formatCurrency(factura.monto)}</td>
-                <td className="px-6 py-4 font-semibold text-green-600">
-                  {formatCurrency(factura.pagado)}
-                </td>
-                <td className="px-6 py-4">{formatDate(factura.vencimiento)}</td>
-                <td className="px-6 py-4">
-                  <span
-                    className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(
-                      factura.estado
-                    )}`}
-                  >
-                    {factura.estado}
-                  </span>
-                </td>
-                <td className="px-6 py-4 text-right">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => navigate(`/facturacion/${factura.id}`)}
-                  >
-                    <Edit className="h-4 w-4" />
-                  </Button>
-                </td>
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+            <thead className="bg-gray-50 dark:bg-gray-800">
+              <tr>
+                <th
+                  scope="col"
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider"
+                >
+                  Factura #
+                </th>
+                <th
+                  scope="col"
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider"
+                >
+                  Cliente
+                </th>
+                <th
+                  scope="col"
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider"
+                >
+                  Monto Total
+                </th>
+                <th
+                  scope="col"
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider"
+                >
+                  Fecha Creación
+                </th>
+                <th
+                  scope="col"
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider"
+                >
+                  Vencimiento
+                </th>
+                <th
+                  scope="col"
+                  className="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider"
+                >
+                  Estado
+                </th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
+              {facturas.length > 0 ? (
+                facturas.map((factura) => {
+                  const statusStyles: { [key: string]: string } = {
+                    pagada:
+                      "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
+                    vencida:
+                      "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200",
+                    pendiente:
+                      "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200",
+                  };
+
+                  return (
+                    <tr
+                      key={factura.id}
+                      onClick={() => navigate(`/facturacion/${factura.id}`)}
+                      className="hover:bg-gray-50 dark:hover:bg-gray-800/50 cursor-pointer"
+                    >
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
+                        {factura.numero_factura}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">
+                        {factura.cliente_name}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-500 dark:text-gray-300">
+                        {formatCurrency(factura.monto)}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">
+                        {formatDateTime(factura.created_at)}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">
+                        {formatDateTime(factura.vencimiento)}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-center text-sm">
+                        <span
+                          className={`px-2.5 py-0.5 text-xs font-semibold rounded-full capitalize ${
+                            statusStyles[factura.estado] || "bg-gray-200"
+                          }`}
+                        >
+                          {factura.estado}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })
+              ) : (
+                <tr>
+                  <td
+                    colSpan={6}
+                    className="px-6 py-4 text-center text-sm text-gray-500 dark:text-gray-400"
+                  >
+                    No se encontraron facturas con los filtros seleccionados.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </Card>
     </div>
   );
 };
 
-export default FacturacionPage;
+export default Facturacion;

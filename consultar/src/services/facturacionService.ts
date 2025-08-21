@@ -1,3 +1,5 @@
+// RUTA: consultar/src/services/facturacionService.ts
+
 import axiosInstance from "../api/axiosInstance";
 import { WorkOrder } from "./otService";
 
@@ -24,22 +26,31 @@ export interface Factura {
   ots_asociadas?: string;
   cobros?: Cobro[];
   ots?: WorkOrder[];
+  calculation_type?: "manual" | "activities";
 }
 
-// Interfaz para los datos de creación de facturas
 export interface FacturaCreateData {
   numero_factura: string;
-  monto: number;
+  monto?: number;
   vencimiento: string;
   cliente_id: number;
   ot_ids: number[];
-  // Este campo era requerido por tu función pero no estaba en el formulario
   calculation_type: "manual" | "activities";
 }
 
 class FacturacionService {
-  async getFacturas(): Promise<Factura[]> {
-    const response = await axiosInstance.get("/facturacion");
+  // --- FUNCIÓN CORREGIDA PARA QUE LOS FILTROS FUNCIONEN ---
+  async getFacturas(filters: any = {}): Promise<Factura[]> {
+    const queryParams = new URLSearchParams();
+    // Añadimos cada filtro a la URL si tiene un valor
+    Object.keys(filters).forEach((key) => {
+      if (filters[key]) {
+        queryParams.append(key, filters[key]);
+      }
+    });
+    const queryString = queryParams.toString();
+
+    const response = await axiosInstance.get(`/facturacion?${queryString}`);
     return response.data;
   }
 
@@ -48,7 +59,6 @@ class FacturacionService {
     return response.data;
   }
 
-  // Ahora la función usa la interfaz que exportamos
   async createFactura(
     data: Partial<FacturaCreateData>
   ): Promise<{ id: number }> {
