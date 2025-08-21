@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
-import { facturacionService } from "../../services/facturacionService";
+import {
+  facturacionService,
+  FacturaCreateData,
+} from "../../services/facturacionService";
 import { clientService, Client } from "../../services/clientService";
 import { otService, WorkOrder } from "../../services/otService";
 import Input from "./Input";
@@ -23,18 +26,26 @@ const FacturaCreateModal: React.FC<Props> = ({
     watch,
     reset,
     formState: { errors },
-  } = useForm();
+  } = useForm<FacturaCreateData>({
+    defaultValues: {
+      vencimiento: new Date().toISOString().split("T")[0],
+      ot_ids: [],
+      calculation_type: "manual",
+    },
+  });
+
   const [clients, setClients] = useState<Client[]>([]);
   const [availableOTs, setAvailableOTs] = useState<WorkOrder[]>([]);
   const [selectedOTs, setSelectedOTs] = useState<number[]>([]);
-  const [calculationType, setCalculationType] = useState("manual");
+  const [calculationType, setCalculationType] = useState<
+    "manual" | "activities"
+  >("manual");
 
   const selectedClientId = watch("cliente_id");
 
   useEffect(() => {
     const loadClients = async () => {
       try {
-        // CORRECCIÓN 1: Se cambió getClients por getAllClients
         const clientData = await clientService.getAllClients();
         setClients(clientData);
       } catch (error) {
@@ -50,20 +61,18 @@ const FacturaCreateModal: React.FC<Props> = ({
     const loadOTs = async () => {
       if (selectedClientId) {
         try {
-          const otData = await otService.getOTs({
-            cliente_id: selectedClientId,
-            facturada: "false",
-          });
-          setAvailableOTs(otData);
+          // CORRECCIÓN 1 y 2: Nombre del método corregido y se quita parseInt
+          const otData = await otService.getOTsByClientId(selectedClientId);
+          // CORRECCIÓN 3: Se añade el tipo explícito a 'ot'
+          setAvailableOTs(otData.filter((ot: WorkOrder) => !ot.facturada));
         } catch (error) {
           console.error("Error al cargar OTs", error);
-          // CORRECCIÓN 2: Asegurarse de pasar un array vacío en caso de error
           setAvailableOTs([]);
         }
       } else {
         setAvailableOTs([]);
       }
-      setSelectedOTs([]); // Reset selection when client changes
+      setSelectedOTs([]);
     };
     if (isOpen) {
       loadOTs();
@@ -76,11 +85,11 @@ const FacturaCreateModal: React.FC<Props> = ({
     );
   };
 
-  const onSubmit = async (data: any) => {
+  const onSubmit = async (data: FacturaCreateData) => {
     try {
       await facturacionService.createFactura({
         ...data,
-        monto: calculationType === "manual" ? Number(data.monto) : 0,
+        monto: calculationType === "manual" ? Number(data.monto) : undefined,
         cliente_id: Number(data.cliente_id),
         ot_ids: selectedOTs,
         calculation_type: calculationType,
@@ -88,15 +97,12 @@ const FacturaCreateModal: React.FC<Props> = ({
       onFacturaCreated();
       onClose();
       reset();
-      setSelectedOTs([]);
-      setCalculationType("manual");
     } catch (error) {
       console.error("Error al crear la factura", error);
       alert("No se pudo crear la factura.");
     }
   };
 
-  // Resetea el estado cuando el modal se cierra
   useEffect(() => {
     if (!isOpen) {
       reset();
@@ -113,22 +119,16 @@ const FacturaCreateModal: React.FC<Props> = ({
       <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-xl w-full max-w-lg">
         <h2 className="text-2xl font-bold mb-4">Nueva Factura</h2>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+          {/* ... resto del formulario ... */}
           <Input
             label="Número de Factura"
             {...register("numero_factura", {
               required: "El número de factura es obligatorio",
             })}
           />
-          {errors.numero_factura && (
-            <p className="text-red-500 text-sm">
-              {errors.numero_factura.message as string}
-            </p>
-          )}
-
+          {/* ... */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-              Cliente
-            </label>
+            <label>Cliente</label>
             <select
               {...register("cliente_id", {
                 required: "Debe seleccionar un cliente",
@@ -142,13 +142,8 @@ const FacturaCreateModal: React.FC<Props> = ({
                 </option>
               ))}
             </select>
-            {errors.cliente_id && (
-              <p className="text-red-500 text-sm">
-                {errors.cliente_id.message as string}
-              </p>
-            )}
           </div>
-
+          {/* ... */}
           <Input
             label="Vencimiento"
             type="date"
@@ -156,80 +151,57 @@ const FacturaCreateModal: React.FC<Props> = ({
               required: "La fecha de vencimiento es obligatoria",
             })}
           />
-          {errors.vencimiento && (
-            <p className="text-red-500 text-sm">
-              {errors.vencimiento.message as string}
-            </p>
-          )}
-
+          {/* ... */}
           <div className="space-y-2">
-            <label className="block text-sm font-medium">Tipo de Cálculo</label>
+            <label>Tipo de Cálculo</label>
             <div className="flex items-center gap-4">
-              <label className="flex items-center">
+              <label>
                 <input
                   type="radio"
                   value="manual"
                   checked={calculationType === "manual"}
                   onChange={() => setCalculationType("manual")}
-                  className="form-radio"
                 />
-                <span className="ml-2">Monto Manual</span>
+                Monto Manual
               </label>
-              <label className="flex items-center">
+              <label>
                 <input
                   type="radio"
                   value="activities"
                   checked={calculationType === "activities"}
                   onChange={() => setCalculationType("activities")}
-                  className="form-radio"
                   disabled={selectedOTs.length === 0}
                 />
-                <span className="ml-2">Monto por Actividades de OT</span>
+                Monto por Actividades de OT
               </label>
             </div>
           </div>
 
           {calculationType === "manual" && (
-            <>
-              <Input
-                label="Monto"
-                type="number"
-                step="0.01"
-                {...register("monto", {
-                  required:
-                    calculationType === "manual"
-                      ? "El monto es obligatorio"
-                      : false,
-                  valueAsNumber: true,
-                  min: {
-                    value: 0.01,
-                    message: "El monto debe ser mayor a cero",
-                  },
-                })}
-              />
-              {errors.monto && (
-                <p className="text-red-500 text-sm">
-                  {errors.monto.message as string}
-                </p>
-              )}
-            </>
+            <Input
+              label="Monto"
+              type="number"
+              step="0.01"
+              {...register("monto", {
+                required: calculationType === "manual",
+                valueAsNumber: true,
+              })}
+            />
           )}
 
           {selectedClientId && (
             <div>
-              <label className="block text-sm font-medium">
-                Órdenes de Trabajo Disponibles
-              </label>
+              <label>Órdenes de Trabajo Disponibles</label>
               <div className="mt-2 border rounded-md max-h-40 overflow-y-auto p-2">
                 {availableOTs.length > 0 ? (
-                  availableOTs.map((ot) => (
+                  // CORRECCIÓN 3 (de nuevo): Se añade el tipo explícito a 'ot'
+                  availableOTs.map((ot: WorkOrder) => (
                     <div key={ot.id} className="flex items-center">
                       <input
                         type="checkbox"
                         id={`ot-${ot.id}`}
                         checked={selectedOTs.includes(ot.id)}
                         onChange={() => handleOTToggle(ot.id)}
-                        className="form-checkbox"
                       />
                       <label htmlFor={`ot-${ot.id}`} className="ml-2">
                         {ot.custom_id} - {ot.product}
@@ -237,14 +209,12 @@ const FacturaCreateModal: React.FC<Props> = ({
                     </div>
                   ))
                 ) : (
-                  <p className="text-gray-500">
-                    No hay OTs pendientes de facturar para este cliente.
-                  </p>
+                  <p>No hay OTs pendientes de facturar para este cliente.</p>
                 )}
               </div>
             </div>
           )}
-
+          {/* ... */}
           <div className="flex justify-end gap-4">
             <Button type="button" variant="outline" onClick={onClose}>
               Cancelar

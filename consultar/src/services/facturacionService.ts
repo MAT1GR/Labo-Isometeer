@@ -26,6 +26,17 @@ export interface Factura {
   ots?: WorkOrder[];
 }
 
+// Interfaz para los datos de creación de facturas
+export interface FacturaCreateData {
+  numero_factura: string;
+  monto: number;
+  vencimiento: string;
+  cliente_id: number;
+  ot_ids: number[];
+  // Este campo era requerido por tu función pero no estaba en el formulario
+  calculation_type: "manual" | "activities";
+}
+
 class FacturacionService {
   async getFacturas(): Promise<Factura[]> {
     const response = await axiosInstance.get("/facturacion");
@@ -37,14 +48,10 @@ class FacturacionService {
     return response.data;
   }
 
-  async createFactura(data: {
-    numero_factura: string;
-    monto?: number;
-    vencimiento: string;
-    cliente_id: number;
-    ot_ids?: number[];
-    calculation_type: "manual" | "activities";
-  }): Promise<{ id: number }> {
+  // Ahora la función usa la interfaz que exportamos
+  async createFactura(
+    data: Partial<FacturaCreateData>
+  ): Promise<{ id: number }> {
     const response = await axiosInstance.post("/facturacion", data);
     return response.data;
   }

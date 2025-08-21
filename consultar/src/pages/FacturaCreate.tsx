@@ -6,21 +6,17 @@ import { useNavigate } from "react-router-dom";
 import useSWR from "swr";
 import { clientService, Client } from "../services/clientService";
 import { otService, WorkOrder } from "../services/otService";
-import { facturacionService } from "../services/facturacionService";
+// Se importa la nueva interfaz junto con el servicio
+import {
+  facturacionService,
+  FacturaCreateData,
+} from "../services/facturacionService";
 import Card from "../components/ui/Card";
 import Input from "../components/ui/Input";
 import Button from "../components/ui/Button";
 import { Checkbox } from "../components/ui/Checkbox";
 import { ArrowLeft } from "lucide-react";
 import ClienteSelect from "../components/ui/ClienteSelect";
-
-interface FacturaFormData {
-  numero_factura: string;
-  monto: number;
-  vencimiento: string;
-  cliente_id: number;
-  ot_ids: number[];
-}
 
 const FacturaCreate: React.FC = () => {
   const navigate = useNavigate();
@@ -32,7 +28,7 @@ const FacturaCreate: React.FC = () => {
   );
   const { data: ots } = useSWR<WorkOrder[]>(
     selectedClientId ? `/ot/cliente/${selectedClientId}` : null,
-    () => otService.getOtsByClientId(selectedClientId!)
+    () => otService.getOTsByClientId(selectedClientId!)
   );
 
   const {
@@ -41,14 +37,18 @@ const FacturaCreate: React.FC = () => {
     control,
     setValue,
     formState: { errors, isSubmitting },
-  } = useForm<FacturaFormData>({
+    // Se usa la interfaz importada
+  } = useForm<FacturaCreateData>({
     defaultValues: {
       vencimiento: new Date().toISOString().split("T")[0],
       ot_ids: [],
+      // Añadimos el valor por defecto para el campo que faltaba
+      calculation_type: "manual",
     },
   });
 
-  const onSubmit = async (data: FacturaFormData) => {
+  // El tipo de 'data' ahora es FacturaCreateData
+  const onSubmit = async (data: FacturaCreateData) => {
     try {
       const result = await facturacionService.createFactura({
         ...data,
@@ -89,7 +89,7 @@ const FacturaCreate: React.FC = () => {
                     const id = Number(value);
                     field.onChange(id);
                     setSelectedClientId(id);
-                    setValue("ot_ids", []); // Limpiar OTs al cambiar de cliente
+                    setValue("ot_ids", []);
                   }}
                 />
               )}
@@ -133,7 +133,8 @@ const FacturaCreate: React.FC = () => {
               </p>
               <div className="space-y-3 max-h-60 overflow-y-auto p-4 border rounded-md bg-gray-50 dark:bg-gray-700/50">
                 {ots && ots.length > 0 ? (
-                  ots.map((ot) => (
+                  // Se añade el tipo explícito 'WorkOrder' para 'ot'
+                  ots.map((ot: WorkOrder) => (
                     <Controller
                       key={ot.id}
                       name="ot_ids"
