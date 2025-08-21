@@ -3,11 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
-import {
-  facturacionService,
-  Factura,
-  Cobro,
-} from "../services/facturacionService";
+import { facturacionService, Factura } from "../services/facturacionService";
 import { formatCurrency, formatDateTime } from "../lib/utils";
 import Card from "../components/ui/Card";
 import Button from "../components/ui/Button";
@@ -15,10 +11,93 @@ import Input from "../components/ui/Input";
 import {
   ArrowLeft,
   Banknote,
-  Calendar,
-  CreditCard,
+  ChevronDown,
+  FileText,
   PlusCircle,
 } from "lucide-react";
+import { cn } from "../lib/utils";
+// CORRECCIÓN: Importamos los tipos WorkOrder y Activity
+import { WorkOrder, Activity } from "../services/otService";
+
+// Componente para el tag de estado
+const StatusTag: React.FC<{ status: string }> = ({ status }) => {
+  const statusStyles: { [key: string]: string } = {
+    pagada: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
+    vencida: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200",
+    pendiente:
+      "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200",
+  };
+  const style = statusStyles[status] || "bg-gray-100 text-gray-800";
+  return (
+    <span
+      className={`px-4 py-2 rounded-full text-sm font-semibold capitalize ${style}`}
+    >
+      {status}
+    </span>
+  );
+};
+
+// Componente para el acordeón de cada OT
+const OTAccordion: React.FC<{ ot: WorkOrder }> = ({ ot }) => {
+  const [isOpen, setIsOpen] = useState(false);
+
+  if (!ot.activities || ot.activities.length === 0) {
+    return (
+      <Link
+        to={`/ot/editar/${ot.id}`}
+        className="block p-3 rounded-lg bg-gray-50 dark:bg-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+      >
+        <p className="font-semibold text-blue-600 dark:text-blue-400">
+          {ot.custom_id}
+        </p>
+        <p className="text-sm text-gray-600 dark:text-gray-400">{ot.product}</p>
+      </Link>
+    );
+  }
+
+  return (
+    <div className="border rounded-lg bg-gray-50 dark:bg-gray-700/50 overflow-hidden">
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-full flex justify-between items-center p-3 text-left hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+      >
+        <div>
+          <p className="font-semibold text-blue-600 dark:text-blue-400">
+            {ot.custom_id}
+          </p>
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            {ot.product}
+          </p>
+        </div>
+        <ChevronDown
+          className={cn("h-5 w-5 transition-transform", isOpen && "rotate-180")}
+        />
+      </button>
+      <div
+        className={cn(
+          "transition-all duration-300 ease-in-out",
+          isOpen ? "max-h-96 opacity-100" : "max-h-0 opacity-0"
+        )}
+      >
+        <div className="border-t dark:border-gray-600 p-3">
+          <ul className="list-disc pl-5 text-sm space-y-1">
+            {/* CORRECCIÓN: Usamos el tipo 'Activity' importado */}
+            {ot.activities.map((act: Activity, index: number) => (
+              <li key={index} className="flex justify-between">
+                <span className="text-gray-700 dark:text-gray-300">
+                  {act.name}
+                </span>
+                <span className="font-mono text-gray-800 dark:text-gray-100">
+                  {formatCurrency(act.precio_sin_iva)}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 const FacturaDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -59,7 +138,7 @@ const FacturaDetail: React.FC = () => {
         });
         reset();
         setIsAddingCobro(false);
-        await loadFactura(); // <-- LÍNEA CLAVE: Recargar los datos de la factura
+        await loadFactura();
       } catch (error) {
         console.error("Error al crear el cobro:", error);
         alert("No se pudo registrar el cobro.");
@@ -105,21 +184,7 @@ const FacturaDetail: React.FC = () => {
               </p>
             </div>
             <div className="text-right mt-4 md:mt-0">
-              <span
-                className={`px-4 py-2 rounded-full text-sm font-semibold ${
-                  saldoRestante <= 0
-                    ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
-                    : new Date(factura.vencimiento) < new Date()
-                    ? "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200"
-                    : "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200"
-                }`}
-              >
-                {saldoRestante <= 0
-                  ? "Pagada"
-                  : new Date(factura.vencimiento) < new Date()
-                  ? "Vencida"
-                  : "Pendiente"}
-              </span>
+              <StatusTag status={factura.estado} />
             </div>
           </div>
 
@@ -275,25 +340,12 @@ const FacturaDetail: React.FC = () => {
 
         <Card>
           <div className="p-6">
-            <h2 className="text-xl font-bold mb-4 text-gray-800 dark:text-gray-100">
-              Órdenes de Trabajo Asociadas
+            <h2 className="text-xl font-bold mb-4 flex items-center gap-2 text-gray-800 dark:text-gray-100">
+              <FileText /> Órdenes de Trabajo Vinculadas
             </h2>
             <div className="space-y-2">
               {factura.ots && factura.ots.length > 0 ? (
-                factura.ots.map((ot) => (
-                  <Link
-                    key={ot.id}
-                    to={`/ot/editar/${ot.id}`}
-                    className="block p-3 rounded-lg bg-gray-50 dark:bg-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                  >
-                    <p className="font-semibold text-blue-600 dark:text-blue-400">
-                      {ot.custom_id}
-                    </p>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">
-                      {ot.product}
-                    </p>
-                  </Link>
-                ))
+                factura.ots.map((ot) => <OTAccordion key={ot.id} ot={ot} />)
               ) : (
                 <p className="text-gray-500 dark:text-gray-400 italic">
                   No hay OTs asociadas a esta factura.

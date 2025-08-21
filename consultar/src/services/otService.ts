@@ -3,8 +3,10 @@
 import axiosInstance from "../api/axiosInstance";
 import { Client } from "./clientService";
 import { User } from "./auth";
+import { ReactNode } from "react";
 
 export interface Activity {
+  name: ReactNode;
   id?: number;
   work_order_id: number;
   activity: string;
@@ -59,7 +61,7 @@ export interface OTFilters {
 }
 
 class OTService {
-  getOTs(arg0: { cliente_id: any; facturada: string; }) {
+  getOTs(arg0: { cliente_id: any; facturada: string }) {
     throw new Error("Method not implemented.");
   }
   /**
