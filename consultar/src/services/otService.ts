@@ -66,6 +66,9 @@ export interface OTFilters {
 }
 
 class OTService {
+  getUserSummary(id: number): any {
+    throw new Error("Method not implemented.");
+  }
   async getAllOTs(user: User | null, filters: OTFilters): Promise<WorkOrder[]> {
     if (!user) {
       return [];
