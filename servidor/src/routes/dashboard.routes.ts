@@ -123,6 +123,26 @@ router.get("/stats", (req: Request, res: Response) => {
       });
     };
 
+    const getUpcomingInvoices = () => {
+      return db
+        .prepare(
+          `
+        SELECT 
+          f.id, 
+          f.numero_factura, 
+          f.monto, 
+          f.vencimiento, 
+          c.name as cliente_name
+        FROM facturas f
+        JOIN clients c ON f.cliente_id = c.id
+        WHERE f.estado = 'pendiente' AND f.vencimiento >= date('now')
+        ORDER BY f.vencimiento ASC
+        LIMIT 5
+      `
+        )
+        .all();
+    };
+
     const statsData = {
       stats: {
         totalOT: getOtCount(),
@@ -146,6 +166,7 @@ router.get("/stats", (req: Request, res: Response) => {
         )
         .all(),
       monthlyRevenue: getChartData(),
+      upcomingInvoices: getUpcomingInvoices(),
     };
     res.status(200).json(statsData);
   } catch (error) {

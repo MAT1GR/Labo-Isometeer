@@ -15,6 +15,7 @@ import {
   ChevronRight,
   Activity,
   CheckCircle2,
+  CalendarClock,
 } from "lucide-react";
 import {
   AreaChart,
@@ -61,6 +62,13 @@ interface MonthlyRevenue {
   name: string;
   revenue: number;
 }
+interface UpcomingInvoice {
+  id: number;
+  numero_factura: string;
+  monto: number;
+  vencimiento: string;
+  cliente_name: string;
+}
 
 // --- VISTA PARA ADMINISTRADORES Y DIRECTORES ---
 const AdminDirectorDashboard: React.FC = () => {
@@ -71,6 +79,7 @@ const AdminDirectorDashboard: React.FC = () => {
     stats: DashboardStats;
     recentOrders: RecentOrder[];
     monthlyRevenue: MonthlyRevenue[];
+    upcomingInvoices: UpcomingInvoice[];
   }>(`/dashboard/stats?period=${period}`, fetcher, {
     keepPreviousData: true,
   });
@@ -187,8 +196,6 @@ const AdminDirectorDashboard: React.FC = () => {
                 {formatCurrency(stats?.totalRevenue || 0)}
               </p>
             </Card>
-            {/* --- TARJETA CLAVE --- */}
-            {/* Esta tarjeta muestra el contador de facturas vencidas. */}
             <Card
               className="cursor-pointer hover:shadow-lg transition-shadow"
               onClick={() => navigate("/facturacion?estado=vencida")}
@@ -304,6 +311,40 @@ const AdminDirectorDashboard: React.FC = () => {
               </div>
             </Card>
           </div>
+
+          {data?.upcomingInvoices && data.upcomingInvoices.length > 0 && (
+            <Card>
+              <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+                <CalendarClock /> Próximas Facturas a Vencer
+              </h2>
+              <div className="space-y-3">
+                {data.upcomingInvoices.map((factura) => (
+                  <div
+                    key={factura.id}
+                    className="flex flex-wrap justify-between items-center p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                    onClick={() => navigate(`/facturacion/${factura.id}`)}
+                  >
+                    <div className="mb-2 sm:mb-0">
+                      <p className="font-semibold text-sm">
+                        {factura.cliente_name}
+                      </p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                        Factura #{factura.numero_factura}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-bold text-sm">
+                        {formatCurrency(factura.monto)}
+                      </p>
+                      <p className="text-xs text-yellow-600 dark:text-yellow-400">
+                        Vence: {formatDate(factura.vencimiento)}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          )}
         </>
       )}
     </div>

@@ -5,6 +5,8 @@ import db from "../config/database";
 
 const router = Router();
 
+// ... (resto de las rutas GET que no se modifican)
+
 // [GET] /api/facturacion - OBTENER FACTURAS (AHORA CON FILTROS)
 router.get("/", (req, res) => {
   try {
@@ -63,8 +65,6 @@ router.get("/", (req, res) => {
   }
 });
 
-// ... (El resto del archivo permanece igual)
-// ... (El resto del archivo permanece igual)
 // [GET] /api/facturacion/:id - Obtener una factura por ID (VERSIÓN CORREGIDA)
 router.get("/:id", (req, res) => {
   try {
@@ -229,18 +229,40 @@ router.post("/", (req, res) => {
   }
 });
 
-// [POST] /api/facturacion/:id/cobros - Añadir un cobro (CON HORA CORREGIDA)
+// [POST] /api/facturacion/:id/cobros - AÑADIR UN COBRO (VERSIÓN FINAL)
 router.post("/:id/cobros", (req, res) => {
-  const { monto, medio_de_pago, fecha } = req.body;
+  const {
+    monto,
+    medio_de_pago,
+    fecha,
+    identificacion_cobro,
+    ingresos_brutos,
+    iva,
+    impuesto_ganancias,
+    retencion_suss,
+  } = req.body;
   const factura_id = req.params.id;
 
   try {
     const transaction = db.transaction(() => {
       const stmt = db.prepare(
-        "INSERT INTO cobros (factura_id, monto, medio_de_pago, fecha) VALUES (?, ?, ?, ?)"
+        `INSERT INTO cobros 
+          (factura_id, monto, medio_de_pago, fecha, identificacion_cobro, ingresos_brutos, iva, impuesto_ganancias, retencion_suss) 
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
       );
       const fechaParaGuardar = fecha || new Date().toISOString();
-      const info = stmt.run(factura_id, monto, medio_de_pago, fechaParaGuardar);
+
+      const info = stmt.run(
+        factura_id,
+        monto,
+        medio_de_pago,
+        fechaParaGuardar,
+        identificacion_cobro || null, // Aseguramos que se inserte NULL si es undefined
+        ingresos_brutos || null,
+        iva || null,
+        impuesto_ganancias || null,
+        retencion_suss || null
+      );
       const newCobroId = info.lastInsertRowid;
 
       const totalPagadoResult = db

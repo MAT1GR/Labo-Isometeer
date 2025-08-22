@@ -3,7 +3,13 @@
 import React, { useEffect, useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
-import { facturacionService, Factura } from "../services/facturacionService";
+// --- IMPORTAMOS LOS NUEVOS TIPOS ---
+import {
+  facturacionService,
+  Factura,
+  Cobro,
+  CreateCobroData,
+} from "../services/facturacionService";
 import { formatCurrency, formatDateTime } from "../lib/utils";
 import Card from "../components/ui/Card";
 import Button from "../components/ui/Button";
@@ -33,6 +39,96 @@ const StatusTag: React.FC<{ status: string }> = ({ status }) => {
     >
       {status}
     </span>
+  );
+};
+
+// Componente para mostrar detalles de un cobro
+const CobroDetail: React.FC<{ cobro: Cobro }> = ({ cobro }) => {
+  const [isOpen, setIsOpen] = useState(false);
+
+  // Esta validación ahora funcionará correctamente
+  const hasDetails =
+    cobro.identificacion_cobro ||
+    cobro.ingresos_brutos ||
+    cobro.iva ||
+    cobro.impuesto_ganancias ||
+    cobro.retencion_suss;
+
+  return (
+    <div className="border rounded-lg bg-gray-50 dark:bg-gray-700/50">
+      <div className="p-4 flex justify-between items-center">
+        <div>
+          <p className="font-bold text-lg text-gray-800 dark:text-gray-100">
+            {formatCurrency(cobro.monto)}
+          </p>
+          <p className="text-sm text-gray-500 dark:text-gray-400">
+            {cobro.medio_de_pago}
+          </p>
+        </div>
+        <div className="text-right">
+          <p className="text-sm text-gray-500 dark:text-gray-400">
+            {formatDateTime(cobro.fecha)}
+          </p>
+          {hasDetails && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setIsOpen(!isOpen)}
+              className="mt-1"
+            >
+              Ver detalles{" "}
+              <ChevronDown
+                className={cn(
+                  "ml-2 h-4 w-4 transition-transform",
+                  isOpen && "rotate-180"
+                )}
+              />
+            </Button>
+          )}
+        </div>
+      </div>
+      {hasDetails && (
+        <div
+          className={cn(
+            "transition-all duration-300 ease-in-out overflow-hidden",
+            isOpen ? "max-h-96" : "max-h-0"
+          )}
+        >
+          <div className="border-t dark:border-gray-600 p-4 grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+            {cobro.identificacion_cobro && (
+              <div>
+                <span className="font-semibold">ID Cobro:</span>{" "}
+                {cobro.identificacion_cobro}
+              </div>
+            )}
+            {cobro.ingresos_brutos != null && (
+              <div>
+                <span className="font-semibold">IIBB:</span>{" "}
+                {formatCurrency(cobro.ingresos_brutos)}
+              </div>
+            )}
+            {cobro.iva != null && (
+              <div>
+                <span className="font-semibold">IVA:</span>{" "}
+                {formatCurrency(cobro.iva)}
+              </div>
+            )}
+            {cobro.impuesto_ganancias != null && (
+              <div>
+                <span className="font-semibold">Ganancias:</span>{" "}
+                {formatCurrency(cobro.impuesto_ganancias)}
+              </div>
+            )}
+            {cobro.retencion_suss != null && (
+              <div>
+                <span className="font-semibold">SUSS:</span>{" "}
+                {formatCurrency(cobro.retencion_suss)}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
   );
 };
 
@@ -83,7 +179,6 @@ const OTAccordion: React.FC<{ ot: WorkOrder }> = ({ ot }) => {
             {ot.activities.map((act: Activity, index: number) => (
               <li key={index} className="flex justify-between">
                 <span className="text-gray-700 dark:text-gray-300">
-                  {/* Ahora 'act.name' es un string y no dará error */}
                   {act.name}
                 </span>
                 <span className="font-mono text-gray-800 dark:text-gray-100">
@@ -139,13 +234,25 @@ const FacturaDetail: React.FC = () => {
             ? data.otro_medio_de_pago
             : data.medio_de_pago;
 
-        const fechaConHora = new Date(data.fecha).toISOString();
-
-        await facturacionService.createCobro(Number(id), {
+        // --- CONSTRUIMOS EL OBJETO CON EL TIPO CORRECTO ---
+        const cobroData: CreateCobroData = {
           monto: Number(data.monto),
-          fecha: fechaConHora,
+          fecha: new Date(data.fecha).toISOString(),
           medio_de_pago: finalMedioDePago,
-        });
+          identificacion_cobro: data.identificacion_cobro || undefined,
+          ingresos_brutos: data.ingresos_brutos
+            ? Number(data.ingresos_brutos)
+            : undefined,
+          iva: data.iva ? Number(data.iva) : undefined,
+          impuesto_ganancias: data.impuesto_ganancias
+            ? Number(data.impuesto_ganancias)
+            : undefined,
+          retencion_suss: data.retencion_suss
+            ? Number(data.retencion_suss)
+            : undefined,
+        };
+
+        await facturacionService.createCobro(Number(id), cobroData);
 
         reset();
         setIsAddingCobro(false);
@@ -267,21 +374,23 @@ const FacturaDetail: React.FC = () => {
                     <h3 className="font-semibold text-gray-800 dark:text-gray-100">
                       Nuevo Cobro
                     </h3>
-                    <Input
-                      label="Monto"
-                      type="number"
-                      step="0.01"
-                      {...register("monto", {
-                        required: true,
-                        max: saldoRestante,
-                      })}
-                    />
-                    <Input
-                      label="Fecha"
-                      type="date"
-                      defaultValue={new Date().toISOString().split("T")[0]}
-                      {...register("fecha", { required: true })}
-                    />
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <Input
+                        label="Monto"
+                        type="number"
+                        step="0.01"
+                        {...register("monto", {
+                          required: true,
+                          max: saldoRestante,
+                        })}
+                      />
+                      <Input
+                        label="Fecha"
+                        type="date"
+                        defaultValue={new Date().toISOString().split("T")[0]}
+                        {...register("fecha", { required: true })}
+                      />
+                    </div>
                     <div>
                       <label className="text-sm font-medium dark:text-gray-300">
                         Medio de Pago
@@ -321,9 +430,45 @@ const FacturaDetail: React.FC = () => {
                       )}
                     </div>
 
-                    <div className="flex gap-4">
+                    <div className="border-t pt-4 space-y-4">
+                      <h4 className="text-sm font-semibold text-gray-600 dark:text-gray-300">
+                        Detalles Adicionales (Opcional)
+                      </h4>
+                      <Input
+                        label="Identificación del Cobro"
+                        {...register("identificacion_cobro")}
+                      />
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <Input
+                          label="Ingresos Brutos"
+                          type="number"
+                          step="0.01"
+                          {...register("ingresos_brutos")}
+                        />
+                        <Input
+                          label="IVA"
+                          type="number"
+                          step="0.01"
+                          {...register("iva")}
+                        />
+                        <Input
+                          label="Ganancias"
+                          type="number"
+                          step="0.01"
+                          {...register("impuesto_ganancias")}
+                        />
+                        <Input
+                          label="Retención SUSS"
+                          type="number"
+                          step="0.01"
+                          {...register("retencion_suss")}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex gap-4 pt-4 border-t">
                       <Button type="submit" disabled={isSubmitting}>
-                        {isSubmitting ? "Guardando..." : "Guardar"}
+                        {isSubmitting ? "Guardando..." : "Guardar Cobro"}
                       </Button>
                       <Button
                         variant="outline"
@@ -344,22 +489,7 @@ const FacturaDetail: React.FC = () => {
             <div className="space-y-4">
               {factura.cobros && factura.cobros.length > 0 ? (
                 factura.cobros.map((cobro) => (
-                  <div
-                    key={cobro.id}
-                    className="p-4 rounded-lg bg-gray-50 dark:bg-gray-700/50 flex justify-between items-center"
-                  >
-                    <div>
-                      <p className="font-bold text-lg text-gray-800 dark:text-gray-100">
-                        {formatCurrency(cobro.monto)}
-                      </p>
-                      <p className="text-sm text-gray-500 dark:text-gray-400">
-                        {cobro.medio_de_pago}
-                      </p>
-                    </div>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">
-                      {formatDateTime(cobro.fecha)}
-                    </p>
-                  </div>
+                  <CobroDetail key={cobro.id} cobro={cobro} />
                 ))
               ) : (
                 <p className="text-gray-500 dark:text-gray-400 italic">

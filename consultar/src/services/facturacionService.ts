@@ -10,6 +10,12 @@ export interface Cobro {
   medio_de_pago: string;
   fecha: string;
   created_at: string;
+  // --- CAMPOS NUEVOS OPCIONALES ---
+  identificacion_cobro?: string;
+  ingresos_brutos?: number;
+  iva?: number;
+  impuesto_ganancias?: number;
+  retencion_suss?: number;
 }
 
 export interface Factura {
@@ -38,11 +44,21 @@ export interface FacturaCreateData {
   calculation_type: "manual" | "activities";
 }
 
+// --- INTERFAZ PARA LOS DATOS DE UN NUEVO COBRO ---
+export interface CreateCobroData {
+  monto: number;
+  medio_de_pago: string;
+  fecha: string;
+  identificacion_cobro?: string;
+  ingresos_brutos?: number;
+  iva?: number;
+  impuesto_ganancias?: number;
+  retencion_suss?: number;
+}
+
 class FacturacionService {
-  // --- FUNCIÓN CORREGIDA PARA QUE LOS FILTROS FUNCIONEN ---
   async getFacturas(filters: any = {}): Promise<Factura[]> {
     const queryParams = new URLSearchParams();
-    // Añadimos cada filtro a la URL si tiene un valor
     Object.keys(filters).forEach((key) => {
       if (filters[key]) {
         queryParams.append(key, filters[key]);
@@ -66,10 +82,8 @@ class FacturacionService {
     return response.data;
   }
 
-  async createCobro(
-    facturaId: number,
-    data: { monto: number; medio_de_pago: string; fecha: string }
-  ): Promise<Cobro> {
+  // --- MÉTODO ACTUALIZADO PARA USAR LA NUEVA INTERFAZ ---
+  async createCobro(facturaId: number, data: CreateCobroData): Promise<Cobro> {
     const response = await axiosInstance.post(
       `/facturacion/${facturaId}/cobros`,
       data
