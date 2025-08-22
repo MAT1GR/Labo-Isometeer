@@ -412,9 +412,9 @@ export const exportOtToPdfInternal = async (otData: WorkOrder) => {
       startY: (jspdfDoc as any).lastAutoTable.finalY + 5,
       head: [["Actividad", "Asignado a", "Estado"]],
       body: otData.activities.map((act) => [
-        act.activity,
+        act.activity || "N/A",
         act.assigned_users?.map((u) => u.name).join(", ") || "Sin asignar",
-        act.status,
+        act.status || "N/A",
       ]),
       theme: "striped",
       headStyles: { fillColor: [107, 114, 128] },

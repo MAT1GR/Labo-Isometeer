@@ -270,7 +270,7 @@ const OTCreate: React.FC = () => {
 
   useEffect(() => {
     const date = watchedIdFields[0];
-    const activities = watchedActivities as { activity: string }[];
+    const activities = watchedActivities as unknown as { activity: string }[];
     if (date && activities) {
       const estimatedDate = calculateEstimatedDeliveryDate(activities, date);
       setValue("estimated_delivery_date", estimatedDate);

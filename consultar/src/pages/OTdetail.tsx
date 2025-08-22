@@ -2,13 +2,7 @@
 
 import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
-import {
-  useForm,
-  useWatch,
-  useFieldArray,
-  Controller,
-  useForm as useModalForm,
-} from "react-hook-form";
+import { useForm, useWatch, useFieldArray, Controller } from "react-hook-form";
 import { otService, WorkOrder, Activity } from "../services/otService";
 import { authService, User } from "../services/auth";
 import { contractService, Contract } from "../services/contractService";
@@ -29,7 +23,6 @@ import {
   Download,
   Clock,
   CalendarCheck,
-  Lock,
   Archive,
   UserSquare,
   Package,
@@ -37,6 +30,7 @@ import {
   BookText,
   FileText,
   Plus,
+  Lock,
 } from "lucide-react";
 import { mutate } from "swr";
 import {
@@ -76,7 +70,7 @@ const CreateFacturaModal: React.FC<CreateFacturaModalProps> = ({
     handleSubmit,
     setValue,
     formState: { isSubmitting },
-  } = useModalForm<FacturaFormData>();
+  } = useForm<FacturaFormData>();
 
   useEffect(() => {
     if (isOpen && otData?.activities) {
@@ -97,6 +91,7 @@ const CreateFacturaModal: React.FC<CreateFacturaModalProps> = ({
         monto: Number(data.monto),
         cliente_id: otData.client_id,
         ot_ids: [otData.id],
+        calculation_type: "manual",
       });
       onFacturaCreated();
     } catch (error) {
@@ -409,38 +404,44 @@ const OTDetail: React.FC = () => {
             </Button>
           </div>
         </div>
-        <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm flex flex-wrap justify-center items-center gap-4">
-          {canAuthorizeOT() && !otData.authorized && (
-            <Button
-              type="button"
-              onClick={handleAuthorize}
-              className="bg-green-600 hover:bg-green-700"
-            >
-              <CheckSquare className="mr-2 h-5 w-5" /> Autorizar OT
-            </Button>
-          )}
-          {canAuthorizeOT() &&
-            otData.authorized &&
-            otData.status === "pendiente" && (
+
+        {/* --- CORRECCIÓN: Esta barra de acciones ahora se oculta para los empleados --- */}
+        {!isEmployee && (
+          <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm flex flex-wrap justify-center items-center gap-4">
+            {canAuthorizeOT() && !otData.authorized && (
               <Button
                 type="button"
-                onClick={handleDeauthorize}
-                variant="danger"
+                onClick={handleAuthorize}
+                className="bg-green-600 hover:bg-green-700"
               >
-                <XSquare className="mr-2 h-5 w-5" /> Desautorizar OT
+                <CheckSquare className="mr-2 h-5 w-5" /> Autorizar OT
               </Button>
             )}
-          {user?.role === "director" && otData.status === "finalizada" && (
-            <Button
-              type="button"
-              onClick={handleCloseOT}
-              className="bg-purple-600 hover:bg-purple-700"
-            >
-              <Archive className="mr-2 h-5 w-5" /> Cerrar OT
-            </Button>
-          )}
-        </div>
-        {!isFormEditable && (
+            {canAuthorizeOT() &&
+              otData.authorized &&
+              otData.status === "pendiente" && (
+                <Button
+                  type="button"
+                  onClick={handleDeauthorize}
+                  variant="danger"
+                >
+                  <XSquare className="mr-2 h-5 w-5" /> Desautorizar OT
+                </Button>
+              )}
+            {user?.role === "director" && otData.status === "finalizada" && (
+              <Button
+                type="button"
+                onClick={handleCloseOT}
+                className="bg-purple-600 hover:bg-purple-700"
+              >
+                <Archive className="mr-2 h-5 w-5" /> Cerrar OT
+              </Button>
+            )}
+          </div>
+        )}
+
+        {/* --- CORRECCIÓN: Este aviso ahora se oculta para los empleados --- */}
+        {!isFormEditable && !isEmployee && (
           <div className="bg-yellow-50 dark:bg-yellow-900/30 border-l-4 border-yellow-400 p-4 rounded-md">
             <div className="flex items-center">
               <div className="flex-shrink-0">
@@ -456,9 +457,105 @@ const OTDetail: React.FC = () => {
           </div>
         )}
 
+        {/* --- SECCIÓN DE TAREAS ASIGNADAS CON NUEVA ESTÉTICA (INTEGRADA) --- */}
+        {isEmployee && (
+          <Card>
+            <div className="p-6">
+              <h2 className="text-xl font-semibold text-blue-800 dark:text-blue-300 mb-4 flex items-center gap-2">
+                <ClipboardList size={20} /> Mis Tareas en esta OT
+              </h2>
+              {myActivities.length > 0 ? (
+                <div className="space-y-4">
+                  {myActivities.map((activity) => {
+                    const statusColor =
+                      activity.status === "finalizada"
+                        ? "border-green-500"
+                        : activity.status === "en_progreso"
+                        ? "border-blue-500"
+                        : "border-yellow-500";
+                    return (
+                      <div
+                        key={activity.id}
+                        className={`bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm border-l-4 ${statusColor} flex flex-col md:flex-row md:items-center justify-between gap-4`}
+                      >
+                        <div className="flex-1">
+                          <p className="font-bold text-lg text-gray-800 dark:text-gray-100">
+                            {activity.activity}
+                          </p>
+                          <div className="flex items-center gap-6 text-xs mt-2 text-gray-500 dark:text-gray-400">
+                            <div className="flex items-center gap-2">
+                              <Clock className="h-4 w-4" />
+                              <span>
+                                Inicio:{" "}
+                                <strong>
+                                  {formatDateTime(activity.started_at) || "N/A"}
+                                </strong>
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <CalendarCheck className="h-4 w-4" />
+                              <span>
+                                Fin:{" "}
+                                <strong>
+                                  {formatDateTime(activity.completed_at) ||
+                                    "N/A"}
+                                </strong>
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-4">
+                          <span
+                            className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full capitalize ${
+                              activity.status === "finalizada"
+                                ? "bg-green-100 text-green-800"
+                                : activity.status === "en_progreso"
+                                ? "bg-blue-100 text-blue-800"
+                                : "bg-yellow-100 text-yellow-800"
+                            }`}
+                          >
+                            {activity.status?.replace("_", " ")}
+                          </span>
+                          {otData.authorized &&
+                            activity.status === "pendiente" && (
+                              <Button
+                                type="button"
+                                size="sm"
+                                onClick={() =>
+                                  handleStartActivity(activity.id!)
+                                }
+                              >
+                                <Play className="h-4 w-4" />
+                              </Button>
+                            )}
+                          {otData.authorized &&
+                            activity.status === "en_progreso" && (
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="danger"
+                                onClick={() => handleStopActivity(activity.id!)}
+                              >
+                                <StopCircle className="h-4 w-4" />
+                              </Button>
+                            )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className="text-gray-500 dark:text-gray-400 italic text-center py-4">
+                  No tienes tareas asignadas en esta OT.
+                </p>
+              )}
+            </div>
+          </Card>
+        )}
+
         <div className="space-y-6">
           <Card>
-            <fieldset disabled={!isFormEditable}>
+            <fieldset disabled={!isFormEditable} className="p-6">
               <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                 <Input label="Fecha" type="date" {...register("date")} />
                 <div>
@@ -502,7 +599,7 @@ const OTDetail: React.FC = () => {
           </Card>
 
           <Card>
-            <fieldset disabled={!isFormEditable}>
+            <fieldset disabled={!isFormEditable} className="p-6">
               <h2 className="text-lg font-semibold text-blue-700 dark:text-blue-400 col-span-full mb-4 flex items-center gap-2">
                 <UserSquare size={20} /> Información del Cliente
               </h2>
@@ -535,7 +632,7 @@ const OTDetail: React.FC = () => {
           </Card>
 
           <Card>
-            <fieldset disabled={!isFormEditable}>
+            <fieldset disabled={!isFormEditable} className="p-6">
               <h2 className="text-lg font-semibold text-blue-700 dark:text-blue-400 col-span-full mb-4 flex items-center gap-2">
                 <Package size={20} /> Producto
               </h2>
@@ -565,197 +662,206 @@ const OTDetail: React.FC = () => {
 
           {!isEmployee && (
             <Card>
-              <div className="flex justify-between items-center mb-4">
-                <h2 className="text-lg font-semibold text-blue-700 dark:text-blue-400 flex items-center gap-2">
-                  <ClipboardList size={20} /> Actividades y Asignaciones
-                </h2>
-                {isFormEditable && (
-                  <Button
-                    type="button"
-                    size="sm"
-                    onClick={() => append({ activity: "", assigned_to: [] })}
-                  >
-                    <PlusCircle className="h-4 w-4 mr-2" /> Agregar Actividad
-                  </Button>
-                )}
-              </div>
-              <div className="space-y-4">
-                {fields.map((field, index) => (
-                  <div
-                    key={field.id}
-                    className="bg-gray-50 dark:bg-gray-700/50 p-4 rounded-md space-y-4"
-                  >
-                    <div className="grid grid-cols-1 md:grid-cols-[1fr,2fr,auto] gap-4 items-start">
-                      <div>
-                        <label className="text-sm font-medium mb-1 dark:text-gray-300">
-                          Actividad
-                        </label>
-                        <select
-                          {...register(`activities.${index}.activity`)}
-                          className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
-                          disabled={!isFormEditable}
-                        >
-                          <option value="">Seleccionar...</option>
-                          {getAvailableActivities(index).map((opt) => (
-                            <option key={opt.id} value={opt.activity}>
-                              {opt.activity}
-                            </option>
-                          ))}
-                        </select>
+              <div className="p-6">
+                <div className="flex justify-between items-center mb-4">
+                  <h2 className="text-lg font-semibold text-blue-700 dark:text-blue-400 flex items-center gap-2">
+                    <ClipboardList size={20} /> Actividades y Asignaciones
+                  </h2>
+                  {isFormEditable && (
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={() => append({ activity: "", assigned_to: [] })}
+                    >
+                      <PlusCircle className="h-4 w-4 mr-2" /> Agregar Actividad
+                    </Button>
+                  )}
+                </div>
+                <div className="space-y-4">
+                  {fields.map((field, index) => (
+                    <div
+                      key={field.id}
+                      className="bg-gray-50 dark:bg-gray-700/50 p-4 rounded-md space-y-4"
+                    >
+                      <div className="grid grid-cols-1 md:grid-cols-[1fr,2fr,auto] gap-4 items-start">
+                        <div>
+                          <label className="text-sm font-medium mb-1 dark:text-gray-300">
+                            Actividad
+                          </label>
+                          <select
+                            {...register(`activities.${index}.activity`)}
+                            className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
+                            disabled={!isFormEditable}
+                          >
+                            <option value="">Seleccionar...</option>
+                            {getAvailableActivities(index).map((opt) => (
+                              <option key={opt.id} value={opt.activity}>
+                                {opt.activity}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium mb-1 dark:text-gray-300">
+                            Asignar a
+                          </label>
+                          <Controller
+                            control={control}
+                            name={`activities.${index}.assigned_to` as any}
+                            render={({ field }) => (
+                              <MultiUserSelect
+                                users={users}
+                                selectedUserIds={field.value || []}
+                                onChange={field.onChange}
+                                disabled={!isFormEditable}
+                              />
+                            )}
+                          />
+                        </div>
+                        {isFormEditable && (
+                          <div className="self-end">
+                            <Button
+                              type="button"
+                              variant="danger"
+                              size="sm"
+                              onClick={() => remove(index)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        )}
                       </div>
-                      <div>
-                        <label className="text-sm font-medium mb-1 dark:text-gray-300">
-                          Asignar a
-                        </label>
-                        <Controller
-                          control={control}
-                          name={`activities.${index}.assigned_to` as any}
-                          render={({ field }) => (
-                            <MultiUserSelect
-                              users={users}
-                              selectedUserIds={field.value || []}
-                              onChange={field.onChange}
-                              disabled={!isFormEditable}
-                            />
-                          )}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <Input
+                          label="Norma"
+                          {...register(`activities.${index}.norma`)}
+                          disabled={!isFormEditable}
+                          placeholder="Ej: IEC 60601"
+                        />
+                        <Input
+                          label="Precio (Sin IVA)"
+                          type="number"
+                          step="0.01"
+                          {...register(`activities.${index}.precio_sin_iva`, {
+                            valueAsNumber: true,
+                          })}
+                          disabled={!isFormEditable}
+                          placeholder="Ej: 15000"
                         />
                       </div>
-                      {isFormEditable && (
-                        <div className="self-end">
-                          <Button
-                            type="button"
-                            variant="danger"
-                            size="sm"
-                            onClick={() => remove(index)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </Card>
+          )}
+
+          {/* --- SECCIÓN DE FACTURAS OCULTA PARA EMPLEADOS --- */}
+          {!isEmployee && (
+            <Card>
+              <div className="p-6">
+                <div className="flex justify-between items-center mb-4">
+                  <h2 className="text-lg font-semibold text-blue-700 dark:text-blue-400 flex items-center gap-2">
+                    <FileText size={20} /> Facturas Vinculadas
+                  </h2>
+                  {canViewAdminContent() && (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setCreateFacturaModalOpen(true)}
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Crear Factura
+                    </Button>
+                  )}
+                </div>
+                {isFormEditable ? (
+                  <div>
+                    <label className="text-sm font-medium dark:text-gray-300">
+                      Modificar facturas vinculadas
+                    </label>
+                    <Controller
+                      name="factura_ids"
+                      control={control}
+                      render={({ field }) => (
+                        <Select
+                          isMulti
+                          options={facturaOptions}
+                          value={facturaOptions.filter((option) =>
+                            field.value?.includes(option.value)
+                          )}
+                          onChange={(selectedOptions) =>
+                            field.onChange(
+                              selectedOptions.map((option) => option.value)
+                            )
+                          }
+                          className="react-select-container mt-1"
+                          classNamePrefix="react-select"
+                          placeholder="Buscar y seleccionar facturas..."
+                        />
                       )}
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <Input
-                        label="Norma"
-                        {...register(`activities.${index}.norma`)}
-                        disabled={!isFormEditable}
-                        placeholder="Ej: IEC 60601"
-                      />
-                      <Input
-                        label="Precio (Sin IVA)"
-                        type="number"
-                        step="0.01"
-                        {...register(`activities.${index}.precio_sin_iva`, {
-                          valueAsNumber: true,
-                        })}
-                        disabled={!isFormEditable}
-                        placeholder="Ej: 15000"
-                      />
-                    </div>
+                    />
                   </div>
-                ))}
+                ) : (
+                  <div>
+                    {otData?.facturas && otData.facturas.length > 0 ? (
+                      <ul className="space-y-2 list-disc list-inside">
+                        {otData.facturas.map((factura: Factura) => (
+                          <li key={factura.id}>
+                            <Link
+                              to={`/facturacion/${factura.id}`}
+                              className="text-blue-600 hover:underline hover:text-blue-800 dark:hover:text-blue-400 transition-colors"
+                            >
+                              {factura.numero_factura} - (
+                              {formatCurrency(factura.monto)})
+                            </Link>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="text-gray-500 italic">
+                        No hay facturas vinculadas a esta Orden de Trabajo.
+                      </p>
+                    )}
+                  </div>
+                )}
               </div>
             </Card>
           )}
 
           <Card>
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-lg font-semibold text-blue-700 dark:text-blue-400 flex items-center gap-2">
-                <FileText size={20} /> Facturas Vinculadas
+            <div className="p-6">
+              <h2 className="text-lg font-semibold text-blue-700 dark:text-blue-400 col-span-full mb-4 flex items-center gap-2">
+                <BookText size={20} /> Observaciones
               </h2>
-              {canViewAdminContent() && (
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setCreateFacturaModalOpen(true)}
-                >
-                  <Plus className="h-4 w-4 mr-2" />
-                  Crear Factura
-                </Button>
-              )}
-            </div>
-            {isFormEditable ? (
               <div>
                 <label className="text-sm font-medium dark:text-gray-300">
-                  Modificar facturas vinculadas
+                  Observaciones Generales (visibles para el cliente)
                 </label>
-                <Controller
-                  name="factura_ids"
-                  control={control}
-                  render={({ field }) => (
-                    <Select
-                      isMulti
-                      options={facturaOptions}
-                      value={facturaOptions.filter((option) =>
-                        field.value?.includes(option.value)
-                      )}
-                      onChange={(selectedOptions) =>
-                        field.onChange(
-                          selectedOptions.map((option) => option.value)
-                        )
-                      }
-                      className="react-select-container mt-1"
-                      classNamePrefix="react-select"
-                      placeholder="Buscar y seleccionar facturas..."
-                    />
-                  )}
-                />
+                <textarea
+                  {...register("observations")}
+                  disabled={!isFormEditable}
+                  className="w-full mt-1 p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 disabled:bg-gray-100 dark:disabled:bg-gray-800"
+                  rows={4}
+                ></textarea>
               </div>
-            ) : (
-              <div>
-                {otData?.facturas && otData.facturas.length > 0 ? (
-                  <ul className="space-y-2 list-disc list-inside">
-                    {otData.facturas.map((factura) => (
-                      <li key={factura.id}>
-                        <Link
-                          to={`/facturacion/${factura.id}`}
-                          className="text-blue-600 hover:underline hover:text-blue-800 dark:hover:text-blue-400 transition-colors"
-                        >
-                          {factura.numero_factura} - (
-                          {formatCurrency(factura.monto)})
-                        </Link>
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="text-gray-500 italic">
-                    No hay facturas vinculadas a esta Orden de Trabajo.
-                  </p>
-                )}
+              <div className="mt-4">
+                <label className="text-sm font-medium dark:text-gray-300">
+                  Observaciones del Colaborador (uso interno)
+                </label>
+                <textarea
+                  {...register("collaborator_observations")}
+                  disabled={!canViewAdminContent() && !isEmployee}
+                  className="w-full mt-1 p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 disabled:bg-gray-100 dark:disabled:bg-gray-800"
+                  rows={4}
+                  placeholder={
+                    isEmployee
+                      ? "Añade tus observaciones aquí..."
+                      : "Campo de uso exclusivo para el empleado asignado."
+                  }
+                ></textarea>
               </div>
-            )}
-          </Card>
-
-          <Card>
-            <h2 className="text-lg font-semibold text-blue-700 dark:text-blue-400 col-span-full mb-4 flex items-center gap-2">
-              <BookText size={20} /> Observaciones
-            </h2>
-            <div>
-              <label className="text-sm font-medium dark:text-gray-300">
-                Observaciones Generales (visibles para el cliente)
-              </label>
-              <textarea
-                {...register("observations")}
-                disabled={!isFormEditable}
-                className="w-full mt-1 p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 disabled:bg-gray-100 dark:disabled:bg-gray-800"
-                rows={4}
-              ></textarea>
-            </div>
-            <div className="mt-4">
-              <label className="text-sm font-medium dark:text-gray-300">
-                Observaciones del Colaborador (uso interno)
-              </label>
-              <textarea
-                {...register("collaborator_observations")}
-                disabled={!canViewAdminContent() && !isEmployee}
-                className="w-full mt-1 p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 disabled:bg-gray-100 dark:disabled:bg-gray-800"
-                rows={4}
-                placeholder={
-                  isEmployee
-                    ? "Añade tus observaciones aquí..."
-                    : "Campo de uso exclusivo para el empleado asignado."
-                }
-              ></textarea>
             </div>
           </Card>
         </div>

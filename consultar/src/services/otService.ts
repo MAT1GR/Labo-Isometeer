@@ -1,20 +1,23 @@
-// RUTA: /consultar/src/services/otService.ts
+// RUTA: /cliente/src/services/otService.ts
 
 import axiosInstance from "../api/axiosInstance";
 import { Client } from "./clientService";
 import { User } from "./auth";
+import { Factura } from "./facturacionService";
 
-// --- INTERFAZ CORREGIDA ---
-// Se simplificó para tener una única propiedad 'name' de tipo string,
-// eliminando la duplicidad y el tipo conflictivo 'ReactNode'.
 export interface Activity {
   id?: number;
   work_order_id?: number;
-  name: string; // Anteriormente 'activity: string' y 'name: ReactNode'
+  activity: string;
+  name: string; // Se mantiene 'name' para consistencia interna
   norma?: string;
   precio_sin_iva?: number;
   status?: "pendiente" | "en_progreso" | "finalizada";
   assigned_users?: { id: number; name: string }[];
+  assigned_to?: number[];
+  // --- PROPIEDADES AÑADIDAS ---
+  started_at?: string; // Para mostrar la fecha de inicio
+  completed_at?: string; // Para mostrar la fecha de fin
 }
 
 export interface WorkOrder {
@@ -50,6 +53,8 @@ export interface WorkOrder {
   facturada?: boolean;
   client_name?: string;
   assigned_to_name?: string;
+  facturas?: Factura[];
+  factura_ids?: number[];
 }
 
 export interface OTFilters {
@@ -61,9 +66,6 @@ export interface OTFilters {
 }
 
 class OTService {
-  // Este método no estaba implementado, se elimina para evitar confusiones.
-  // getOTs(arg0: { cliente_id: any; facturada: string }) { ... }
-
   async getAllOTs(user: User | null, filters: OTFilters): Promise<WorkOrder[]> {
     if (!user) {
       return [];
@@ -154,6 +156,18 @@ class OTService {
 
   async deauthorizeOT(id: number): Promise<void> {
     await axiosInstance.put(`/ots/${id}/deauthorize`);
+  }
+
+  async closeOT(id: number, userId: number): Promise<void> {
+    await axiosInstance.put(`/ots/${id}/close`, { userId });
+  }
+
+  async startActivity(activityId: number): Promise<void> {
+    await axiosInstance.put(`/ots/activities/${activityId}/start`);
+  }
+
+  async stopActivity(activityId: number): Promise<void> {
+    await axiosInstance.put(`/ots/activities/${activityId}/stop`);
   }
 }
 
