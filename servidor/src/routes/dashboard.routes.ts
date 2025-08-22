@@ -10,25 +10,27 @@ router.get("/stats", (req: Request, res: Response) => {
   try {
     const { period = "week" } = req.query;
 
-    let dateFilterClause = "";
+    let woDateFilterClause = "";
+    let cobrosDateFilterClause = "";
 
     switch (period) {
       case "year":
-        dateFilterClause = ` WHERE strftime('%Y', wo.date) = strftime('%Y', 'now')`;
+        woDateFilterClause = ` WHERE strftime('%Y', wo.date) = strftime('%Y', 'now')`;
+        cobrosDateFilterClause = ` WHERE strftime('%Y', fecha) = strftime('%Y', 'now')`;
         break;
       case "month":
-        dateFilterClause = ` WHERE strftime('%Y-%m', wo.date) = strftime('%Y-%m', 'now')`;
+        woDateFilterClause = ` WHERE strftime('%Y-%m', wo.date) = strftime('%Y-%m', 'now')`;
+        cobrosDateFilterClause = ` WHERE strftime('%Y-%m', fecha) = strftime('%Y-%m', 'now')`;
         break;
       case "week":
       default:
-        dateFilterClause = ` WHERE wo.date >= date('now', '-6 days')`;
+        woDateFilterClause = ` WHERE wo.date >= date('now', '-6 days')`;
+        cobrosDateFilterClause = ` WHERE fecha >= date('now', '-6 days')`;
         break;
     }
 
-    const getCount = (table: string, customWhere: string = "1 = 1") => {
-      const finalWhere =
-        dateFilterClause.replace(/wo\./g, "") + ` AND ${customWhere}`;
-      const query = `SELECT COUNT(*) as count FROM ${table} AS wo ${finalWhere}`;
+    const getOtCount = (customWhere: string = "1 = 1") => {
+      const query = `SELECT COUNT(*) as count FROM work_orders as wo ${woDateFilterClause} AND ${customWhere}`;
       return (db.prepare(query).get() as { count: number }).count;
     };
 
@@ -39,22 +41,21 @@ router.get("/stats", (req: Request, res: Response) => {
         }
       ).count;
 
-    const getTotalPoints = () =>
+    const getOverdueInvoices = () =>
       (
-        db.prepare(`SELECT SUM(points) as total FROM users`).get() as {
-          total: number;
+        db
+          .prepare(
+            `SELECT COUNT(*) as count FROM facturas WHERE estado = 'vencida'`
+          )
+          .get() as {
+          count: number;
         }
-      ).total || 0;
+      ).count || 0;
 
     const getTotalRevenue = () => {
       const result = db
         .prepare(
-          `
-                SELECT SUM(wa.precio_sin_iva) as total 
-                FROM work_order_activities wa
-                JOIN work_orders wo ON wa.work_order_id = wo.id
-                ${dateFilterClause} AND wo.status = 'cerrada'
-             `
+          `SELECT SUM(monto) as total FROM cobros ${cobrosDateFilterClause}`
         )
         .get() as { total: number | null };
       return result.total || 0;
@@ -66,14 +67,14 @@ router.get("/stats", (req: Request, res: Response) => {
 
       switch (period) {
         case "year":
-          groupByClause = "strftime('%Y-%m', wo.date)";
+          groupByClause = "strftime('%Y-%m', fecha)";
           break;
         case "month":
-          groupByClause = "strftime('%Y-%m-%d', wo.date)";
+          groupByClause = "strftime('%Y-%m-%d', fecha)";
           break;
         case "week":
         default:
-          groupByClause = "strftime('%Y-%m-%d', wo.date)";
+          groupByClause = "strftime('%Y-%m-%d', fecha)";
           break;
       }
 
@@ -82,10 +83,9 @@ router.get("/stats", (req: Request, res: Response) => {
           `
                 SELECT
                     ${groupByClause} as ${chartDataKey},
-                    SUM(wa.precio_sin_iva) as revenue
-                FROM work_order_activities wa
-                JOIN work_orders wo ON wa.work_order_id = wo.id
-                ${dateFilterClause} AND wa.precio_sin_iva > 0 AND wo.status = 'cerrada'
+                    SUM(monto) as revenue
+                FROM cobros
+                ${cobrosDateFilterClause}
                 GROUP BY ${chartDataKey}
                 ORDER BY ${chartDataKey}
             `
@@ -109,7 +109,7 @@ router.get("/stats", (req: Request, res: Response) => {
 
       return result.map((item) => {
         let name = "";
-        const dateValue = item.period;
+        const dateValue = item.period as string;
         const dateObj = new Date(dateValue + "T12:00:00");
         if (period === "year") {
           name = monthNames[dateObj.getMonth()];
@@ -125,22 +125,15 @@ router.get("/stats", (req: Request, res: Response) => {
 
     const statsData = {
       stats: {
-        totalOT: getCount("work_orders"),
+        totalOT: getOtCount(),
         totalClients: getTotalClients(),
-        pendingOT: getCount(
-          "work_orders",
-          "status IN ('pendiente', 'autorizada')"
-        ),
-        inProgressOT: getCount(
-          "work_orders",
-          "status IN ('en_progreso', 'pausada')"
-        ),
-        completedOT: getCount("work_orders", "status = 'finalizada'"),
-        billedOT: getCount("work_orders", "status = 'facturada'"),
+        pendingOT: getOtCount("status IN ('pendiente', 'autorizada')"),
+        inProgressOT: getOtCount("status IN ('en_progreso', 'pausada')"),
+        completedOT: getOtCount("status = 'finalizada'"),
+        billedOT: getOtCount("status = 'facturada'"),
         totalRevenue: getTotalRevenue(),
-        paidInvoices: getCount("work_orders", "status = 'cerrada'"),
-        totalPoints: getTotalPoints(),
-        overdueInvoices: 0,
+        paidInvoices: getOtCount("status = 'cerrada'"),
+        overdueInvoices: getOverdueInvoices(),
       },
       recentOrders: db
         .prepare(

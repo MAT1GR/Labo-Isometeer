@@ -1,7 +1,7 @@
 // RUTA: consultar/src/pages/Facturacion.tsx
 
-import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import React, { useState, useEffect } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
 import useSWR from "swr";
 import { facturacionService, Factura } from "../services/facturacionService";
 import { formatCurrency, formatDateTime } from "../lib/utils";
@@ -13,8 +13,30 @@ import { cn } from "../lib/utils";
 
 const Facturacion: React.FC = () => {
   const navigate = useNavigate();
-  const [filters, setFilters] = useState<any>({});
-  const [showFilters, setShowFilters] = useState(false);
+  const location = useLocation();
+
+  // Función para obtener los filtros iniciales de la URL
+  const getFiltersFromURL = React.useCallback(() => {
+    const params = new URLSearchParams(location.search);
+    const initialFilters: any = {};
+    if (params.get("estado")) {
+      initialFilters.estado = params.get("estado");
+    }
+    // Aquí se podrían añadir más filtros desde la URL si es necesario
+    return initialFilters;
+  }, [location.search]);
+
+  const [filters, setFilters] = useState<any>(getFiltersFromURL());
+  const [showFilters, setShowFilters] = useState(
+    Object.keys(getFiltersFromURL()).length > 0
+  );
+
+  // Efecto para actualizar los filtros si la URL cambia
+  useEffect(() => {
+    const newFilters = getFiltersFromURL();
+    setFilters(newFilters);
+    setShowFilters(Object.keys(newFilters).length > 0);
+  }, [location.search, getFiltersFromURL]);
 
   const { data: facturas, error } = useSWR<Factura[]>(
     ["/facturacion", filters],
@@ -27,6 +49,8 @@ const Facturacion: React.FC = () => {
 
   const handleResetFilters = () => {
     setFilters({});
+    // Limpiamos la URL al resetear
+    navigate(location.pathname, { replace: true });
   };
 
   if (error) return <div>Error al cargar facturas...</div>;
@@ -51,7 +75,6 @@ const Facturacion: React.FC = () => {
         </div>
       </div>
 
-      {/* --- CORRECCIÓN: Se elimina 'overflow-hidden' para permitir que el menú se despliegue libremente --- */}
       <div
         className={cn(
           "transition-all duration-300 ease-in-out",

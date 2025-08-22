@@ -8,34 +8,29 @@ import Button from "../components/ui/Button";
 import {
   FileText,
   Users,
-  Smile,
-  BarChart3,
-  ListTodo,
   TrendingUp,
   PieChart as PieIcon,
-  Loader,
   AlertCircle,
   Clock,
   ChevronRight,
   Activity,
   CheckCircle2,
-  Award,
 } from "lucide-react";
 import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  LabelList,
-  PieChart,
-  Pie,
-  Cell,
   AreaChart,
   Area,
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  LabelList,
   Legend,
+  Pie,
+  PieChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
 } from "recharts";
 import { otService, UserSummaryItem } from "../services/otService";
 import useSWR from "swr";
@@ -49,7 +44,6 @@ interface DashboardStats {
   totalClients: number;
   totalRevenue: number;
   paidInvoices: number;
-  totalPoints: number;
   overdueInvoices: number;
   pendingOT: number;
   inProgressOT: number;
@@ -70,17 +64,17 @@ interface MonthlyRevenue {
 
 // --- VISTA PARA ADMINISTRADORES Y DIRECTORES ---
 const AdminDirectorDashboard: React.FC = () => {
-  const [period, setPeriod] = useState("week"); // State for the filter
+  const [period, setPeriod] = useState("week");
+  const navigate = useNavigate();
 
   const { data, error, isLoading } = useSWR<{
     stats: DashboardStats;
     recentOrders: RecentOrder[];
     monthlyRevenue: MonthlyRevenue[];
   }>(`/dashboard/stats?period=${period}`, fetcher, {
-    keepPreviousData: true, // Evita parpadeos al cambiar de filtro
+    keepPreviousData: true,
   });
 
-  // Hooks always called before this conditional return
   if (error)
     return (
       <p>
@@ -128,13 +122,6 @@ const AdminDirectorDashboard: React.FC = () => {
       </Button>
     </div>
   );
-
-  const periodTitle =
-    period === "week"
-      ? "esta semana"
-      : period === "month"
-      ? "este mes"
-      : "este año";
 
   const RADIAN = Math.PI / 180;
   const renderCustomizedLabel = ({
@@ -200,12 +187,17 @@ const AdminDirectorDashboard: React.FC = () => {
                 {formatCurrency(stats?.totalRevenue || 0)}
               </p>
             </Card>
-            <Card>
+            {/* --- TARJETA CLAVE --- */}
+            {/* Esta tarjeta muestra el contador de facturas vencidas. */}
+            <Card
+              className="cursor-pointer hover:shadow-lg transition-shadow"
+              onClick={() => navigate("/facturacion?estado=vencida")}
+            >
               <div className="flex justify-between items-center">
-                <p className="text-sm font-medium">Puntos Acumulados</p>
-                <Award className="h-6 w-6 text-yellow-500" />
+                <p className="text-sm font-medium">Facturas Vencidas</p>
+                <AlertCircle className="h-6 w-6 text-red-500" />
               </div>
-              <p className="text-3xl font-bold">{stats?.totalPoints}</p>
+              <p className="text-3xl font-bold">{stats?.overdueInvoices}</p>
             </Card>
           </div>
 
