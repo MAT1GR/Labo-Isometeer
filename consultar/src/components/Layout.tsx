@@ -44,6 +44,12 @@ const SidebarNavigation: React.FC = () => {
       roles: ["director", "administracion", "administrador"],
     },
     {
+      icon: Receipt, // O el ícono que prefieras
+      label: "Presupuestos",
+      path: "/presupuestos",
+      roles: ["administracion", "administrador", "director"],
+    },
+    {
       icon: Receipt,
       label: "Facturación",
       path: "/facturacion",

@@ -92,7 +92,6 @@ const runMigration = () => {
 // Ejecutar la lógica de migración antes de cualquier otra cosa
 runMigration();
 
-// --- CREACIÓN DE TABLAS (SI NO EXISTEN) ---
 db.exec(`
   CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT, 
@@ -232,13 +231,25 @@ db.exec(`
   );
   
   CREATE TABLE IF NOT EXISTS ot_facturas (
-            ot_id INTEGER NOT NULL,
-            factura_id INTEGER NOT NULL,
-            PRIMARY KEY (ot_id, factura_id),
-            FOREIGN KEY (ot_id) REFERENCES ordenes_trabajo(id) ON DELETE CASCADE,
-            FOREIGN KEY (factura_id) REFERENCES facturas(id) ON DELETE CASCADE
-        )
+    ot_id INTEGER NOT NULL,
+    factura_id INTEGER NOT NULL,
+    PRIMARY KEY (ot_id, factura_id),
+    FOREIGN KEY (ot_id) REFERENCES work_orders(id) ON DELETE CASCADE,
+    FOREIGN KEY (factura_id) REFERENCES facturas(id) ON DELETE CASCADE
+  );
 
+  CREATE TABLE IF NOT EXISTS presupuestos (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    cliente_id INTEGER NOT NULL,
+    producto TEXT NOT NULL,
+    tipo_servicio TEXT NOT NULL,
+    norma TEXT,
+    entrega_dias INTEGER NOT NULL,
+    precio REAL NOT NULL,
+    autorizado BOOLEAN NOT NULL DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (cliente_id) REFERENCES clients(id) ON DELETE CASCADE
+  );
 `);
 
 // --- DATOS INICIALES ---

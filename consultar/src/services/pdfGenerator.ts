@@ -8,6 +8,7 @@ import { formatDate, formatCurrency } from "../lib/utils";
 import { PDFDocument } from "pdf-lib";
 import axiosInstance from "../api/axiosInstance";
 import logo from "/logo.png";
+import { Presupuesto } from "./presupuestoService";
 
 // Helper para construir la URL base para archivos estáticos
 const staticBaseUrl = axiosInstance.defaults.baseURL?.replace("/api", "") || "";
@@ -518,4 +519,64 @@ export const exportOtPdfEtiqueta = async (otData: WorkOrder) => {
   const finalPdfDoc = await PDFDocument.load(pdfBytes);
   const finalPdfBytes = await finalPdfDoc.save();
   savePdf(finalPdfBytes, `Etiqueta-${otData.custom_id || otData.id}.pdf`);
+};
+
+const addPresupuestoFooter = (doc: jsPDF) => {
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const legendText = `Laboratorio Consultar es un laboratorio ACREDITADO de calibraciones (OAA Nº LC047) y el alcance puede verse en el siguiente link: Descargar Alcance LC 047. Para la calibración de magnitudes/rangos no acreditados se entrega, bajo solicitud, documentación que respalda la trazabilidad extendida. De requerir rangos específicos de calibración por favor indicarlo previo a la contratación del trabajo, de lo contrario serán aplicados los criterios de definición de puntos de calibración que determine el Laboratorio.`;
+
+  const textLines = doc.splitTextToSize(legendText, 180);
+  const textHeight = textLines.length * 4;
+  const rectY = pageHeight - 28;
+
+  doc.setFillColor(243, 244, 246); // Un color de fondo gris claro
+  doc.rect(10, rectY, 190, textHeight + 6, "F");
+
+  doc.setFontSize(8);
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(55, 65, 81);
+  doc.text(textLines, 105, rectY + 5, { align: "center" });
+  doc.setTextColor(0, 0, 0);
+};
+
+export const exportPresupuestoPdf = async (
+  presupuestoData: Presupuesto,
+  clientName: string
+) => {
+  const doc = new jsPDF();
+
+  // Encabezado similar a las OTs
+  doc.addImage(logo, "PNG", 14, 8, 32, 24);
+  doc.setFontSize(18);
+  doc.text("Laboratorio Consultar", 105, 15, { align: "center" });
+  doc.setFontSize(16);
+  doc.text(`Presupuesto #${presupuestoData.id}`, 105, 22, { align: "center" });
+  doc.setFontSize(12);
+  doc.text(
+    `Fecha de Emisión: ${formatDate(presupuestoData.created_at)}`,
+    105,
+    30,
+    { align: "center" }
+  );
+
+  // Tabla con los datos del presupuesto
+  autoTable(doc, {
+    startY: 45,
+    head: [["Detalles del Presupuesto", ""]],
+    body: [
+      ["Cliente", clientName],
+      ["Producto", presupuestoData.producto],
+      ["Tipo de Servicio", presupuestoData.tipo_servicio],
+      ["Norma de Referencia", presupuestoData.norma || "N/A"],
+      ["Plazo de Entrega Estimado", `${presupuestoData.entrega_dias} días`],
+      ["Precio (Sin IVA)", formatCurrency(presupuestoData.precio)],
+    ],
+    theme: "grid",
+    headStyles: { fillColor: [37, 99, 235] },
+    columnStyles: { 0: { fontStyle: "bold" } },
+  });
+
+  addPresupuestoFooter(doc);
+
+  doc.save(`Presupuesto-${presupuestoData.id}.pdf`);
 };

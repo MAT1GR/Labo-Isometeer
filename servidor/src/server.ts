@@ -16,6 +16,7 @@ import adminRoutes from "./routes/admin.routes";
 import notificationRoutes, {
   sendNotificationToUser,
 } from "./routes/notifications.routes";
+import presupuestoRoutes from "./routes/presupuestos.routes";
 
 const app = express();
 const port = 4000;
@@ -109,6 +110,8 @@ app.use("/api/admin", adminRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/facturacion", facturacionRoutes);
 app.use("/api/work-orders", workOrderRoutes);
+app.use("/api/presupuestos", presupuestoRoutes);
+app.use("/api/auth", authRoutes);
 
 app.listen(port, () => {
   console.log(`🚀 Servidor corriendo en http://localhost:${port}`);
