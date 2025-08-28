@@ -28,6 +28,9 @@ export interface Client {
 }
 
 class ClientService {
+  getAll() {
+    throw new Error("Method not implemented.");
+  }
   async getAllClients(): Promise<Client[]> {
     const response = await axiosInstance.get("/clients");
     return response.data;

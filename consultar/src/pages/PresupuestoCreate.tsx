@@ -1,7 +1,8 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { presupuestoService } from "../services/presupuestoService";
+import { clientService, Client } from "../services/clientService";
 import Button from "../components/ui/Button";
 import Input from "../components/ui/Input";
 import ClienteSelect from "../components/ui/ClienteSelect";
@@ -24,6 +25,25 @@ const PresupuestoCreate: React.FC = () => {
   } = useForm<FormData>();
   const navigate = useNavigate();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [clients, setClients] = useState<Client[]>([]);
+  // --- 1. AÑADIR ESTADO PARA EL CLIENTE SELECCIONADO ---
+  const [selectedClientId, setSelectedClientId] = useState<number | undefined>(
+    undefined
+  );
+
+  useEffect(() => {
+    const fetchClients = async () => {
+      try {
+        const data = await clientService.getAllClients();
+        setClients(data);
+      } catch (error) {
+        console.error("Error al cargar los clientes:", error);
+        alert("No se pudieron cargar los clientes.");
+      }
+    };
+
+    fetchClients();
+  }, []);
 
   const onSubmit = async (data: FormData) => {
     setIsSubmitting(true);
@@ -45,11 +65,16 @@ const PresupuestoCreate: React.FC = () => {
         <div>
           <label className="block text-sm font-medium">Cliente</label>
           <ClienteSelect
+            // --- 2. ACTUALIZAR AMBOS ESTADOS AL CAMBIAR ---
             onChange={(selectedId: number | undefined) => {
-              if (selectedId !== undefined) setValue("cliente_id", selectedId);
+              if (selectedId !== undefined) {
+                setValue("cliente_id", selectedId, { shouldValidate: true });
+                setSelectedClientId(selectedId);
+              }
             }}
-            clients={[]}
-            selectedClientId={undefined}
+            clients={clients}
+            // --- 3. PASAR EL ESTADO AL COMPONENTE ---
+            selectedClientId={selectedClientId}
           />
           {errors.cliente_id && (
             <p className="text-red-500 text-xs mt-1">
@@ -57,6 +82,8 @@ const PresupuestoCreate: React.FC = () => {
             </p>
           )}
         </div>
+
+        {/* ... (el resto de tus inputs no cambia) ... */}
 
         <div>
           <label className="block text-sm font-medium">Producto</label>
