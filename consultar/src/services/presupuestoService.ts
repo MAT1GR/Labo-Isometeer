@@ -14,7 +14,7 @@ export interface Presupuesto {
 }
 
 export const presupuestoService = {
-  getAll: async (): Promise<Presupuesto[]> => {
+  getAll: async (filters: any): Promise<Presupuesto[]> => {
     const response = await axiosInstance.get("/presupuestos");
     return response.data;
   },

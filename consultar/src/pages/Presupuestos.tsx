@@ -1,54 +1,86 @@
-import React, { useEffect, useState } from "react";
+// RUTA: consultar/src/pages/Presupuestos.tsx
+
+import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import useSWR from "swr";
 import {
   presupuestoService,
   Presupuesto,
 } from "../services/presupuestoService";
-import Button  from "../components/ui/Button";
-import Card  from "../components/ui/Card";
+import Button from "../components/ui/Button";
+import Card from "../components/ui/Card";
 import { formatDate, formatCurrency } from "../lib/utils";
-import { PlusCircle, AlertTriangle } from "lucide-react";
+import { PlusCircle, AlertTriangle, Filter } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
+import PresupuestoFilters from "../components/PresupuestoFilters";
+import { cn } from "../lib/utils";
 
 const Presupuestos: React.FC = () => {
-  const [presupuestos, setPresupuestos] = useState<Presupuesto[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
   const { user } = useAuth();
+  const [filters, setFilters] = useState<any>({});
+  const [showFilters, setShowFilters] = useState(false);
 
   const canCreate =
     user?.role === "administracion" ||
     user?.role === "director" ||
     user?.role === "administrador";
 
-  useEffect(() => {
-    const fetchPresupuestos = async () => {
-      try {
-        const data = await presupuestoService.getAll();
-        setPresupuestos(data);
-      } catch (err) {
-        setError("No se pudieron cargar los presupuestos.");
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchPresupuestos();
-  }, []);
+  const { data: presupuestos, error } = useSWR<Presupuesto[]>(
+    ["/presupuestos", filters],
+    () => presupuestoService.getAll(filters)
+  );
 
-  if (loading) return <div>Cargando presupuestos...</div>;
-  if (error) return <div className="text-red-500">{error}</div>;
+  const handleFilterChange = (name: string, value: any) => {
+    setFilters((prev: any) => ({ ...prev, [name]: value || undefined }));
+  };
+
+  const handleResetFilters = () => {
+    setFilters({});
+  };
+
+  if (error)
+    return (
+      <div className="text-red-500">
+        No se pudieron cargar los presupuestos.
+      </div>
+    );
+  if (!presupuestos) return <div>Cargando presupuestos...</div>;
 
   return (
     <div>
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold">Presupuestos</h1>
-        {canCreate && (
-          <Button onClick={() => navigate("/presupuestos/crear")}>
-            <PlusCircle className="mr-2 h-4 w-4" />
-            Crear Presupuesto
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            onClick={() => setShowFilters(!showFilters)}
+          >
+            <Filter className="mr-2 h-4 w-4" />
+            Filtrar
           </Button>
+          {canCreate && (
+            <Button onClick={() => navigate("/presupuestos/crear")}>
+              <PlusCircle className="mr-2 h-4 w-4" />
+              Crear Presupuesto
+            </Button>
+          )}
+        </div>
+      </div>
+
+      <div
+        className={cn(
+          "transition-all duration-300 ease-in-out",
+          showFilters
+            ? "max-h-96 opacity-100 mb-6 visible"
+            : "max-h-0 opacity-0 invisible"
         )}
+      >
+        <PresupuestoFilters
+          filters={filters}
+          onFilterChange={handleFilterChange}
+          onResetFilters={handleResetFilters}
+        />
       </div>
 
       {presupuestos.length > 0 ? (
@@ -88,7 +120,9 @@ const Presupuestos: React.FC = () => {
           ))}
         </div>
       ) : (
-        <p>No hay presupuestos para mostrar.</p>
+        <Card className="text-center p-4">
+          No se encontraron presupuestos con los filtros seleccionados.
+        </Card>
       )}
     </div>
   );

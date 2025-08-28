@@ -19,10 +19,13 @@ const Facturacion: React.FC = () => {
   const getFiltersFromURL = React.useCallback(() => {
     const params = new URLSearchParams(location.search);
     const initialFilters: any = {};
-    if (params.get("estado")) {
-      initialFilters.estado = params.get("estado");
-    }
-    // Aquí se podrían añadir más filtros desde la URL si es necesario
+    if (params.get("estado")) initialFilters.estado = params.get("estado");
+    if (params.get("cliente_id"))
+      initialFilters.cliente_id = params.get("cliente_id");
+    if (params.get("fecha_desde"))
+      initialFilters.fecha_desde = params.get("fecha_desde");
+    if (params.get("fecha_hasta"))
+      initialFilters.fecha_hasta = params.get("fecha_hasta");
     return initialFilters;
   }, [location.search]);
 
@@ -44,7 +47,23 @@ const Facturacion: React.FC = () => {
   );
 
   const handleFilterChange = (name: string, value: any) => {
-    setFilters((prev: any) => ({ ...prev, [name]: value || undefined }));
+    const newFilters = { ...filters, [name]: value };
+
+    // Limpia los filtros vacíos o nulos para no ensuciar la URL
+    Object.keys(newFilters).forEach((key) => {
+      if (
+        newFilters[key] === undefined ||
+        newFilters[key] === null ||
+        newFilters[key] === ""
+      ) {
+        delete newFilters[key];
+      }
+    });
+
+    setFilters(newFilters);
+
+    const params = new URLSearchParams(newFilters);
+    navigate(`${location.pathname}?${params.toString()}`, { replace: true });
   };
 
   const handleResetFilters = () => {
