@@ -42,7 +42,7 @@ const router = createBrowserRouter([
       { path: "/clientes/:id", element: <ClienteDetail /> },
       { path: "/ot", element: <OT /> },
       { path: "/ot/crear", element: <OTCreate /> },
-      { path: "/ot/:id", element: <OTdetail /> },
+      { path: "/ot/editar/:id", element: <OTdetail /> },
       { path: "/usuarios", element: <Usuarios /> },
       { path: "/perfil", element: <Perfil /> },
       { path: "/facturacion", element: <Facturacion /> },
@@ -50,8 +50,6 @@ const router = createBrowserRouter([
       { path: "/admin/contratos", element: <Contratos /> },
       { path: "/admin/puntajes", element: <Actividades /> },
       { path: "/admin/favicon", element: <AdminFavicon /> },
-
-      // --- 2. AÑADE LAS NUEVAS RUTAS AQUÍ ---
       { path: "/presupuestos", element: <Presupuestos /> },
       { path: "/presupuestos/crear", element: <PresupuestoCreate /> },
       { path: "/presupuestos/:id", element: <PresupuestoDetail /> },
