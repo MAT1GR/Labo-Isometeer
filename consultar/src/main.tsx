@@ -25,6 +25,7 @@ import AdminFavicon from "./pages/AdminFavicon.tsx";
 import Facturacion from "./pages/Facturacion.tsx";
 import FacturaDetail from "./pages/FacturaDetail.tsx";
 import FacturaCreate from "./pages/FacturaCreate.tsx";
+import UserChart from "./pages/UserChart.tsx";
 
 // --- 1. IMPORTA LAS NUEVAS PÁGINAS ---
 import Presupuestos from "./pages/Presupuestos.tsx";
@@ -36,7 +37,6 @@ const router = createBrowserRouter([
     path: "/",
     element: <App />,
     children: [
-      // ... (otras rutas como Dashboard, Clientes, etc.)
       { path: "/", element: <Dashboard /> },
       { path: "/clientes", element: <Clientes /> },
       { path: "/clientes/crear", element: <ClienteCreate /> },
@@ -56,6 +56,8 @@ const router = createBrowserRouter([
       { path: "/presupuestos", element: <Presupuestos /> },
       { path: "/presupuestos/crear", element: <PresupuestoCreate /> },
       { path: "/presupuestos/:id", element: <PresupuestoDetail /> },
+      { path: "/presupuestos/editar/:id", element: <PresupuestoDetail /> },
+      { path: "/usuarios/grafico", element: <UserChart /> },
     ],
   },
   {
