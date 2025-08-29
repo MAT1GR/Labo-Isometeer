@@ -40,6 +40,8 @@ const Login: React.FC = () => {
 
     try {
       await login(data.email, data.password);
+      // Mensaje en consola al iniciar sesión
+      console.log("Usuario logueado con éxito:", data.email);
       navigate("/");
     } catch (err: any) {
       setError(err.message || "Error al iniciar sesión");
