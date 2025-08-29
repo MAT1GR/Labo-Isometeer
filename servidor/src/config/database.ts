@@ -74,6 +74,41 @@ const runMigration = () => {
       db.exec("ALTER TABLE facturas ADD COLUMN iva REAL;");
       console.log("[MIGRATION] 'iva' column added successfully.");
     }
+
+    // Migración para añadir las columnas 'tipo' y 'observaciones'
+    const tableInfoTipo = db
+      .prepare(
+        `SELECT sql FROM sqlite_master WHERE type='table' AND name='facturas'`
+      )
+      .get() as { sql: string | null };
+
+    if (
+      tableInfoTipo &&
+      tableInfoTipo.sql &&
+      !tableInfoTipo.sql.includes("tipo TEXT")
+    ) {
+      console.log("[MIGRATION] Adding 'tipo' column to 'facturas' table.");
+      db.exec(
+        "ALTER TABLE facturas ADD COLUMN tipo TEXT CHECK(tipo IN ('A', 'B', 'C', 'E', 'T', 'M'));"
+      );
+      console.log("[MIGRATION] 'tipo' column added successfully.");
+    }
+    const tableInfoObservaciones = db
+      .prepare(
+        `SELECT sql FROM sqlite_master WHERE type='table' AND name='facturas'`
+      )
+      .get() as { sql: string | null };
+    if (
+      tableInfoObservaciones &&
+      tableInfoObservaciones.sql &&
+      !tableInfoObservaciones.sql.includes("observaciones TEXT")
+    ) {
+      console.log(
+        "[MIGRATION] Adding 'observaciones' column to 'facturas' table."
+      );
+      db.exec("ALTER TABLE facturas ADD COLUMN observaciones TEXT;");
+      console.log("[MIGRATION] 'observaciones' column added successfully.");
+    }
   } catch (error: any) {
     // Si la tabla 'facturas' no existe, no hace nada, ya que se creará más abajo.
     if (
@@ -184,6 +219,8 @@ db.exec(`
     vencimiento TEXT NOT NULL,
     estado TEXT NOT NULL DEFAULT 'pendiente' CHECK(estado IN ('pendiente', 'pagada', 'vencida')),
     cliente_id INTEGER,
+    tipo TEXT CHECK(tipo IN ('A', 'B', 'C', 'E', 'T', 'M')),
+    observaciones TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (cliente_id) REFERENCES clients(id) ON DELETE SET NULL
   );

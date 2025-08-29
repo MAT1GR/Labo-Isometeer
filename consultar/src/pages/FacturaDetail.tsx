@@ -292,6 +292,9 @@ const FacturaDetail: React.FC = () => {
                 Factura #{factura.numero_factura}
               </h1>
               <p className="text-gray-600 dark:text-gray-400">
+                Tipo: {factura.tipo}
+              </p>
+              <p className="text-gray-600 dark:text-gray-400">
                 Cliente:{" "}
                 <Link
                   to={`/clientes/editar/${factura.cliente_id}`}
@@ -350,6 +353,16 @@ const FacturaDetail: React.FC = () => {
               </p>
             </div>
           </div>
+          {factura.observaciones && (
+            <div className="mt-6 border-t pt-6 dark:border-gray-700">
+              <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">
+                Observaciones
+              </h3>
+              <p className="text-gray-800 dark:text-gray-100 mt-1">
+                {factura.observaciones}
+              </p>
+            </div>
+          )}
         </div>
       </Card>
 

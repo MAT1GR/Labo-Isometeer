@@ -20,7 +20,7 @@ router.get("/", (req, res) => {
     const { cliente_id, fecha_desde, fecha_hasta, estado } = req.query;
     let baseQuery = `
       SELECT 
-        f.id, f.numero_factura, f.monto, f.iva, f.vencimiento, f.estado, f.cliente_id, f.created_at,
+        f.id, f.numero_factura, f.monto, f.iva, f.vencimiento, f.estado, f.cliente_id, f.created_at, f.tipo, f.observaciones,
         c.name as cliente_name,
         (SELECT SUM(monto) FROM cobros WHERE factura_id = f.id) as pagado,
         GROUP_CONCAT(ot.custom_id) as ots_asociadas
@@ -145,6 +145,8 @@ router.post("/", (req, res) => {
     cliente_id,
     ot_ids = [],
     calculation_type = "manual",
+    tipo,
+    observaciones,
   } = req.body;
 
   if (!numero_factura || !vencimiento || !cliente_id) {
@@ -197,14 +199,16 @@ router.post("/", (req, res) => {
       const montoFinal = montoNeto + totalIva;
 
       const insertFacturaStmt = db.prepare(
-        "INSERT INTO facturas (numero_factura, monto, iva, vencimiento, estado, cliente_id) VALUES (?, ?, ?, ?, 'pendiente', ?)"
+        "INSERT INTO facturas (numero_factura, monto, iva, vencimiento, estado, cliente_id, tipo, observaciones) VALUES (?, ?, ?, ?, 'pendiente', ?, ?, ?)"
       );
       const info = insertFacturaStmt.run(
         numero_factura,
         montoFinal,
         totalIva,
         vencimiento,
-        cliente_id
+        cliente_id,
+        tipo,
+        observaciones
       );
       const facturaId = info.lastInsertRowid;
 

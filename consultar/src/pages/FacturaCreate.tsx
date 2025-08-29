@@ -37,10 +37,11 @@ const FacturaCreate: React.FC = () => {
       vencimiento: new Date().toISOString().split("T")[0],
       ot_ids: [],
       calculation_type: "manual",
+      tipo: "A",
     },
   });
 
-  const selectedOts = watch("ot_ids", []);
+  const selectedOts = watch("ot_ids") || [];
   const { data: clients } = useSWR<Client[]>(
     "/clients",
     clientService.getAllClients
@@ -116,6 +117,31 @@ const FacturaCreate: React.FC = () => {
               })}
               error={errors.numero_factura?.message}
             />
+            <div>
+              <label
+                htmlFor="tipo"
+                className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+              >
+                Tipo de Factura
+              </label>
+              <select
+                id="tipo"
+                {...register("tipo", { required: "Este campo es obligatorio" })}
+                className="w-full p-2 border rounded-md dark:bg-gray-800 dark:border-gray-600 focus:border-indigo-500 focus:ring-indigo-500"
+              >
+                <option value="A">A</option>
+                <option value="B">B</option>
+                <option value="C">C</option>
+                <option value="E">E</option>
+                <option value="T">T</option>
+                <option value="M">M</option>
+              </select>
+              {errors.tipo && (
+                <p className="mt-2 text-sm text-red-600">
+                  {errors.tipo.message}
+                </p>
+              )}
+            </div>
             <Input
               label="Fecha de Vencimiento"
               type="date"
@@ -124,25 +150,39 @@ const FacturaCreate: React.FC = () => {
               })}
               error={errors.vencimiento?.message}
             />
-            {/* --- CAMBIO: INPUT DE MONTO AHORA AQUÍ --- */}
-            <Input
-              label="Monto Total (ARS)"
-              type="number"
-              step="0.01"
-              {...register("monto", {
-                required: !isMontoDisabled && "El monto es obligatorio",
-                valueAsNumber: true,
-                min: { value: 0.01, message: "El monto debe ser positivo." },
-              })}
-              error={errors.monto?.message}
-              disabled={isMontoDisabled}
-              // --- CAMBIO: Estilos para deshabilitado con transición ---
-              className={cn(
-                "transition-all duration-300",
-                isMontoDisabled &&
-                  "bg-gray-100 dark:bg-gray-800 cursor-not-allowed opacity-70"
-              )}
-            />
+            <div className="md:col-span-2">
+              <Input
+                label="Monto Total (ARS)"
+                type="number"
+                step="0.01"
+                {...register("monto", {
+                  required: !isMontoDisabled && "El monto es obligatorio",
+                  valueAsNumber: true,
+                  min: { value: 0.01, message: "El monto debe ser positivo." },
+                })}
+                error={errors.monto?.message}
+                disabled={isMontoDisabled}
+                className={cn(
+                  "transition-all duration-300",
+                  isMontoDisabled &&
+                    "bg-gray-100 dark:bg-gray-800 cursor-not-allowed opacity-70"
+                )}
+              />
+            </div>
+            <div className="md:col-span-2">
+              <label
+                htmlFor="observaciones"
+                className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+              >
+                Observaciones
+              </label>
+              <textarea
+                id="observaciones"
+                {...register("observaciones")}
+                rows={3}
+                className="w-full p-2 border rounded-md dark:bg-gray-800 dark:border-gray-600 focus:border-indigo-500 focus:ring-indigo-500"
+              />
+            </div>
           </div>
 
           {/* SECCIÓN 2: TIPO DE CÁLCULO */}

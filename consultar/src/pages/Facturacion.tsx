@@ -130,6 +130,12 @@ const Facturacion: React.FC = () => {
                   scope="col"
                   className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider"
                 >
+                  Tipo
+                </th>
+                <th
+                  scope="col"
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider"
+                >
                   Monto Total
                 </th>
                 <th
@@ -176,6 +182,9 @@ const Facturacion: React.FC = () => {
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">
                         {factura.cliente_name}
                       </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">
+                        {factura.tipo}
+                      </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-500 dark:text-gray-300">
                         {formatCurrency(factura.monto)}
                       </td>
@@ -200,7 +209,7 @@ const Facturacion: React.FC = () => {
               ) : (
                 <tr>
                   <td
-                    colSpan={6}
+                    colSpan={7}
                     className="px-6 py-4 text-center text-sm text-gray-500 dark:text-gray-400"
                   >
                     No se encontraron facturas con los filtros seleccionados.
