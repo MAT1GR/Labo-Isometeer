@@ -59,6 +59,7 @@ const FacturaFilters: React.FC<FacturaFiltersProps> = ({
             <option value="pendiente">Pendiente</option>
             <option value="pagada">Pagada</option>
             <option value="vencida">Vencida</option>
+            <option value="archivada">Archivada</option> {/* Nuevo estado */}
           </select>
         </div>
       </div>

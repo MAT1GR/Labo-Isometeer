@@ -5,20 +5,18 @@ import db from "../config/database";
 
 const router = Router();
 
-// [GET] /api/facturacion - OBTENER FACTURAS (AHORA CON FILTROS)
+// [GET] /api/facturacion - OBTENER FACTURAS (AHORA CON FILTROS Y ESTADO DE ARCHIVO)
 router.get("/", (req, res) => {
   try {
-    // Actualiza las facturas vencidas antes de cualquier consulta
     const today = new Date().toISOString().split("T")[0];
     db.prepare(
       `UPDATE facturas SET estado = 'vencida' WHERE vencimiento < ? AND estado = 'pendiente'`
     ).run(today);
 
-    // Lógica de filtros
     const { cliente_id, fecha_desde, fecha_hasta, estado } = req.query;
     let baseQuery = `
       SELECT 
-        f.id, f.numero_factura, f.monto, f.iva, f.vencimiento, f.estado, f.cliente_id, f.created_at, f.tipo, f.observaciones,
+        f.id, f.numero_factura, f.monto, f.iva, f.vencimiento, f.estado, f.cliente_id, f.created_at, f.tipo, f.observaciones, f.motivo_archivo,
         c.name as cliente_name,
         (SELECT SUM(monto) FROM cobros WHERE factura_id = f.id) as pagado,
         GROUP_CONCAT(ot.custom_id) as ots_asociadas
@@ -31,6 +29,16 @@ router.get("/", (req, res) => {
     const whereClauses: string[] = [];
     const params: any[] = [];
 
+    // Si no se especifica un estado, no se incluyen las archivadas.
+    // Si el estado es 'archivada', solo se muestran esas.
+    // En cualquier otro caso, el filtro por estado funcionará como siempre.
+    if (!estado) {
+      whereClauses.push("f.estado != 'archivada'");
+    } else {
+      whereClauses.push("f.estado = ?");
+      params.push(estado);
+    }
+
     if (cliente_id) {
       whereClauses.push("f.cliente_id = ?");
       params.push(cliente_id);
@@ -40,13 +48,8 @@ router.get("/", (req, res) => {
       params.push(fecha_desde);
     }
     if (fecha_hasta) {
-      // Añadimos la hora final del día para incluir todos los registros de esa fecha
       whereClauses.push("f.created_at <= ?");
       params.push(`${fecha_hasta}T23:59:59`);
-    }
-    if (estado) {
-      whereClauses.push("f.estado = ?");
-      params.push(estado);
     }
 
     if (whereClauses.length > 0) {
@@ -60,6 +63,20 @@ router.get("/", (req, res) => {
   } catch (error) {
     console.error("Error al obtener las facturas:", error);
     res.status(500).json({ error: "Error al obtener las facturas." });
+  }
+});
+// [PATCH] /api/facturacion/:id/archive - Archivar una factura con motivo
+router.patch("/:id/archive", (req, res) => {
+  try {
+    const facturaId = req.params.id;
+    const { motivo_archivo } = req.body;
+    db.prepare(
+      `UPDATE facturas SET estado = 'archivada', motivo_archivo = ? WHERE id = ?`
+    ).run(motivo_archivo, facturaId);
+    res.status(200).json({ message: "Factura archivada con éxito." });
+  } catch (error) {
+    console.error("Error al archivar la factura:", error);
+    res.status(500).json({ error: "Error interno al archivar la factura." });
   }
 });
 
@@ -311,6 +328,19 @@ router.get("/cliente/:id", (req, res) => {
     res
       .status(500)
       .json({ error: "Error al obtener las facturas del cliente." });
+  }
+});
+
+// [PATCH] /api/facturacion/:id/archive - Archivar una factura
+router.patch("/:id/archive", (req, res) => {
+  try {
+    const facturaId = req.params.id;
+    // Asume que la solicitud de archivo significa que el valor se debe establecer en 1 (true)
+    db.prepare(`UPDATE facturas SET archivada = 1 WHERE id = ?`).run(facturaId);
+    res.status(200).json({ message: "Factura archivada con éxito." });
+  } catch (error) {
+    console.error("Error al archivar la factura:", error);
+    res.status(500).json({ error: "Error interno al archivar la factura." });
   }
 });
 

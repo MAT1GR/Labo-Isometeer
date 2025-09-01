@@ -217,7 +217,7 @@ db.exec(`
     monto REAL NOT NULL,
     iva REAL,
     vencimiento TEXT NOT NULL,
-    estado TEXT NOT NULL DEFAULT 'pendiente' CHECK(estado IN ('pendiente', 'pagada', 'vencida', 'anulada')),
+    estado TEXT NOT NULL DEFAULT 'pendiente' CHECK(estado IN ('pendiente', 'pagada', 'vencida', 'archivada')),
     cliente_id INTEGER,
     tipo TEXT CHECK(tipo IN ('A', 'B', 'C', 'E', 'ND', 'NC')),
     observaciones TEXT,

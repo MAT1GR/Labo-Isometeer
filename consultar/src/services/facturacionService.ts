@@ -9,7 +9,7 @@ export interface Factura {
   monto: number;
   iva: number;
   vencimiento: string;
-  estado: "pendiente" | "pagada" | "vencida";
+  estado: "pendiente" | "pagada" | "vencida" | "archivada";
   cliente_id: number;
   cliente_name: string;
   created_at: string;
@@ -17,8 +17,8 @@ export interface Factura {
   cobros?: Cobro[];
   tipo: "A" | "B" | "C" | "E" | "ND" | "NC";
   observaciones: string;
+  motivo_archivo?: string;
 }
-
 export interface Cobro {
   id: number;
   factura_id: number;
@@ -86,5 +86,10 @@ export const facturacionService = {
   getFacturasByClienteId: async (clienteId: number): Promise<Factura[]> => {
     const { data } = await apiClient.get(`/facturacion/cliente/${clienteId}`);
     return data;
+  },
+
+  // Nuevo método para archivar una factura
+  archiveFactura: async (id: number, motivo_archivo: string): Promise<void> => {
+    await apiClient.patch(`/facturacion/${id}/archive`, { motivo_archivo });
   },
 };

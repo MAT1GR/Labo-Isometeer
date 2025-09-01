@@ -1,3 +1,5 @@
+// RUTA: consultar/src/components/ui/ConfirmationModal.tsx
+
 import React, { Fragment } from "react";
 import { Dialog, Transition } from "@headlessui/react";
 import Button from "./Button";
@@ -13,6 +15,7 @@ interface ConfirmationModalProps {
   cancelText?: string;
   onSave?: () => void;
   saveText?: string;
+  children?: React.ReactNode;
 }
 
 const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
@@ -25,6 +28,7 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
   cancelText = "Cancelar",
   onSave,
   saveText = "Guardar y Salir",
+  children, // Aseguramos que se reciba la prop
 }) => {
   return (
     <Transition appear show={isOpen} as={Fragment}>
@@ -52,10 +56,8 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
               leaveFrom="opacity-100 scale-100"
               leaveTo="opacity-0 scale-95"
             >
-              {/* Contenedor del Modal: Ahora más ancho (max-w-2xl) */}
               <Dialog.Panel className="w-full max-w-2xl transform overflow-hidden rounded-xl bg-white dark:bg-gray-800 text-left align-middle shadow-2xl transition-all">
                 <div className="md:flex">
-                  {/* Panel Lateral del Ícono: con más padding */}
                   <div className="flex flex-shrink-0 items-center justify-center bg-red-500 p-6 md:p-0 md:w-1/3">
                     <AlertTriangle
                       className="h-24 w-24 text-white"
@@ -63,7 +65,6 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
                     />
                   </div>
 
-                  {/* Panel Principal del Contenido: con más padding */}
                   <div className="flex-grow p-8">
                     <Dialog.Title
                       as="h3"
@@ -75,9 +76,9 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
                       <p className="text-lg text-gray-600 dark:text-gray-300">
                         {message}
                       </p>
+                      {children} {/* Renderizamos los elementos hijos aquí */}
                     </div>
 
-                    {/* Botones con más espacio superior y entre ellos */}
                     <div className="mt-10 flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-4 space-y-4 space-y-reverse sm:space-y-0">
                       <Button
                         variant="outline"
