@@ -217,9 +217,9 @@ db.exec(`
     monto REAL NOT NULL,
     iva REAL,
     vencimiento TEXT NOT NULL,
-    estado TEXT NOT NULL DEFAULT 'pendiente' CHECK(estado IN ('pendiente', 'pagada', 'vencida')),
+    estado TEXT NOT NULL DEFAULT 'pendiente' CHECK(estado IN ('pendiente', 'pagada', 'vencida', 'anulada')),
     cliente_id INTEGER,
-    tipo TEXT CHECK(tipo IN ('A', 'B', 'C', 'E', 'T', 'M')),
+    tipo TEXT CHECK(tipo IN ('A', 'B', 'C', 'E', 'ND', 'NC')),
     observaciones TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (cliente_id) REFERENCES clients(id) ON DELETE SET NULL
