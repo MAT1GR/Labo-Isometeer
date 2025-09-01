@@ -5,8 +5,6 @@ import db from "../config/database";
 
 const router = Router();
 
-// ... (resto de las rutas GET que no se modifican)
-
 // [GET] /api/facturacion - OBTENER FACTURAS (AHORA CON FILTROS)
 router.get("/", (req, res) => {
   try {

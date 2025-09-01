@@ -224,7 +224,7 @@ const OTCreate: React.FC = () => {
   }, []);
 
   const fetchClientFacturas = async (clientId: number) => {
-    const facturas = await facturacionService.getFacturasByCliente(clientId);
+    const facturas = await facturacionService.getFacturasByClienteId(clientId);
     setFacturasCliente(facturas);
   };
 

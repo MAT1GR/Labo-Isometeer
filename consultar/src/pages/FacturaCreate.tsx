@@ -133,8 +133,8 @@ const FacturaCreate: React.FC = () => {
                 <option value="B">B</option>
                 <option value="C">C</option>
                 <option value="E">E</option>
-                <option value="T">T</option>
-                <option value="M">M</option>
+                <option value="ND">ND</option>
+                <option value="NC">NC</option>
               </select>
               {errors.tipo && (
                 <p className="mt-2 text-sm text-red-600">

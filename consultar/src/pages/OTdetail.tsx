@@ -226,7 +226,7 @@ const OTDetail: React.FC = () => {
         setActivityOptions(activityList);
 
         if (ot.client_id) {
-          const facturas = await facturacionService.getFacturasByCliente(
+          const facturas = await facturacionService.getFacturasByClienteId(
             ot.client_id
           );
           setFacturasCliente(facturas);

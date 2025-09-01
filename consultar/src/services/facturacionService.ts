@@ -15,7 +15,7 @@ export interface Factura {
   created_at: string;
   ots?: WorkOrder[];
   cobros?: Cobro[];
-  tipo: "A" | "B" | "C" | "E" | "T" | "M";
+  tipo: "A" | "B" | "C" | "E" | "ND" | "NC";
   observaciones: string;
 }
 
@@ -50,7 +50,7 @@ export interface FacturaCreateData {
   cliente_id: number;
   ot_ids?: number[];
   calculation_type: "manual" | "activities";
-  tipo: "A" | "B" | "C" | "E" | "T" | "M";
+  tipo: "A" | "B" | "C" | "E" | "ND" | "NC";
   observaciones?: string;
 }
 
