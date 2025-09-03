@@ -1,6 +1,6 @@
 // consultar/src/pages/Facturacion.tsx
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import useSWR from "swr";
 import { facturacionService, Factura } from "../services/facturacionService";
@@ -11,13 +11,13 @@ import { PlusCircle, Filter, Archive, Info } from "lucide-react";
 import FacturaFilters from "../components/FacturaFilters";
 import { cn } from "../lib/utils";
 import ConfirmationModal from "../components/ui/ConfirmationModal";
-import Modal from "../components/ui/Modal"; // <--- Asegúrate de que esta importación sea correcta
+import Modal from "../components/ui/Modal";
 
 const Facturacion: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const getFiltersFromURL = React.useCallback(() => {
+  const getFiltersFromURL = useCallback(() => {
     const params = new URLSearchParams(location.search);
     const initialFilters: any = {};
     if (params.get("estado")) initialFilters.estado = params.get("estado");
@@ -327,17 +327,13 @@ const Facturacion: React.FC = () => {
         />
       </ConfirmationModal>
 
-      {/* Modal para ver el motivo del archivo (ahora usa el componente Modal mejorado) */}
       <Modal
         isOpen={showReasonModal}
         onClose={() => setShowReasonModal(false)}
         title="Motivo de Archivo"
-        // Puedes agregar un className si quieres un ancho específico, por ejemplo:
-        // className="max-w-xl"
       >
-        <p className="whitespace-pre-wrap text-gray-700 dark:text-gray-300">
-          {currentReason}
-        </p>
+        {/* Pasamos el texto directamente, sin envolverlo en ninguna etiqueta. */}
+        {currentReason}
       </Modal>
     </div>
   );

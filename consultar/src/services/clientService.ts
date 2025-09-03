@@ -66,6 +66,14 @@ class ClientService {
     });
     return response.data;
   }
+
+  // NUEVO MÉTODO AGREGADO
+  async getMonthlyUserProduction() {
+    const response = await axiosInstance.get(
+      "/statistics/user-production-monthly"
+    );
+    return response.data;
+  }
 }
 
 export const clientService = new ClientService();

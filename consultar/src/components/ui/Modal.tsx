@@ -17,7 +17,7 @@ const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children }) => {
     <AnimatePresence>
       {isOpen && (
         <motion.div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm"
+          className="fixed inset-1 z-50 flex items-center justify-center p-4 backdrop-blur-sm"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
@@ -46,7 +46,6 @@ const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children }) => {
                 <X className="h-5 w-5" />
               </button>
             </div>
-
             {/* Modal Body */}
             <div className="py-4 text-gray-700 dark:text-gray-300">
               {children}
