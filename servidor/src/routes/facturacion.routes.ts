@@ -467,4 +467,39 @@ router.patch("/:facturaId/cobros/:cobroId", (req, res) => {
   }
 });
 
+// [PATCH] /api/facturacion/:id - Editar campos de una factura
+router.patch("/:id", (req, res) => {
+  try {
+    const facturaId = req.params.id;
+    const { observaciones } = req.body;
+
+    if (observaciones === undefined) {
+      return res
+        .status(400)
+        .json({ error: "No se proporcionaron campos para actualizar." });
+    }
+
+    const stmt = db.prepare(
+      `UPDATE facturas SET observaciones = ? WHERE id = ?`
+    );
+    const result = stmt.run(observaciones, facturaId);
+
+    if (result.changes === 0) {
+      return res
+        .status(404)
+        .json({ error: "Factura no encontrada o no se realizaron cambios." });
+    }
+
+    const updatedFactura = db
+      .prepare("SELECT * FROM facturas WHERE id = ?")
+      .get(facturaId);
+    res.status(200).json(updatedFactura);
+  } catch (error: any) {
+    console.error("Error al editar la factura:", error);
+    res
+      .status(500)
+      .json({ error: error.message || "Error interno al editar la factura." });
+  }
+});
+
 export default router;

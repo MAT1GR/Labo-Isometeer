@@ -1,6 +1,6 @@
-// RUTA: /consultar/src/pages/FacturaDetail.tsx
+// RUTA: consultar/src/pages/FacturaDetail.tsx
 
-import React, { useEffect, useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
 // --- IMPORTAMOS LOS NUEVOS TIPOS ---
@@ -10,6 +10,7 @@ import {
   Cobro,
   CreateCobroData,
   CobroUpdateData, // Importamos el nuevo tipo
+  FacturaUpdateData, // Importamos el nuevo tipo
 } from "../services/facturacionService";
 import { formatCurrency, formatDateTime } from "../lib/utils";
 import Card from "../components/ui/Card";
@@ -23,6 +24,7 @@ import {
   PlusCircle,
   Edit, // Añadimos el icono de edición
   Trash2, // Añadimos el icono de borrado
+  Save, // Añadimos el icono de guardar
 } from "lucide-react";
 import { cn } from "../lib/utils";
 import { WorkOrder, Activity } from "../services/otService";
@@ -212,6 +214,8 @@ const FacturaDetail: React.FC = () => {
   const [isAddingCobro, setIsAddingCobro] = useState(false);
   const [isEditingCobro, setIsEditingCobro] = useState<Cobro | null>(null);
   const [cobroToDelete, setCobroToDelete] = useState<Cobro | null>(null);
+  // Nuevo estado para la edición de observaciones
+  const [isEditingObservations, setIsEditingObservations] = useState(false);
 
   const {
     register,
@@ -316,6 +320,23 @@ const FacturaDetail: React.FC = () => {
     setValue("retencion_suss", cobro.retencion_suss || "");
   };
 
+  const handleSaveObservations = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!factura || !id) return;
+    try {
+      const form = e.target as HTMLFormElement;
+      const observaciones = (form.observaciones as HTMLTextAreaElement).value;
+      await facturacionService.updateFactura(Number(id), {
+        observaciones: observaciones,
+      });
+      setIsEditingObservations(false);
+      await loadFactura();
+    } catch (error) {
+      console.error("Error al guardar las observaciones:", error);
+      alert("No se pudieron guardar las observaciones.");
+    }
+  };
+
   if (error) return <div className="p-4 text-red-500">{error}</div>;
   if (!factura) return <div className="p-4">Cargando...</div>;
 
@@ -405,16 +426,60 @@ const FacturaDetail: React.FC = () => {
               </p>
             </div>
           </div>
-          {factura.observaciones && (
-            <div className="mt-6 border-t pt-6 dark:border-gray-700">
+
+          <div className="mt-6 border-t pt-6 dark:border-gray-700">
+            <div className="flex justify-between items-center mb-2">
               <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">
                 Observaciones
               </h3>
-              <p className="text-gray-800 dark:text-gray-100 mt-1">
-                {factura.observaciones}
-              </p>
+              {!isEditingObservations ? (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setIsEditingObservations(true)}
+                  className="text-gray-500 hover:text-blue-500"
+                >
+                  <Edit className="h-4 w-4" />
+                </Button>
+              ) : (
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setIsEditingObservations(false)}
+                    className="text-gray-500 hover:text-red-500"
+                  >
+                    Cancelar
+                  </Button>
+                  <Button
+                    type="submit"
+                    size="sm"
+                    form="observations-form"
+                    className="bg-green-500 hover:bg-green-600"
+                  >
+                    <Save className="h-4 w-4 mr-1" />
+                    Guardar
+                  </Button>
+                </div>
+              )}
             </div>
-          )}
+            {!isEditingObservations ? (
+              <p className="text-gray-800 dark:text-gray-100 mt-1 whitespace-pre-wrap">
+                {factura.observaciones || "Sin observaciones."}
+              </p>
+            ) : (
+              <form id="observations-form" onSubmit={handleSaveObservations}>
+                <textarea
+                  id="observaciones"
+                  name="observaciones"
+                  defaultValue={factura.observaciones || ""}
+                  rows={4}
+                  className="w-full p-2 border rounded-md dark:bg-gray-800 dark:border-gray-600 focus:border-indigo-500 focus:ring-indigo-500"
+                />
+              </form>
+            )}
+          </div>
         </div>
       </Card>
 

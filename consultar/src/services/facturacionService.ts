@@ -1,5 +1,6 @@
 // RUTA: consultar/src/services/facturacionService.ts
 
+import axiosInstance from "../api/axiosInstance";
 import apiClient from "../api/axiosInstance";
 import { WorkOrder } from "./otService";
 
@@ -59,6 +60,15 @@ export interface CobroUpdateData extends Partial<CreateCobroData> {
   // Aquí no hay campos adicionales, ya que son los mismos que CreateCobroData
 }
 
+export interface FacturaUpdateData {
+  numero_factura: string;
+  monto: number;
+  vencimiento: string;
+  cliente_id: number;
+  tipo: string;
+  observaciones?: string; // Hacemos el campo opcional
+}
+
 export const facturacionService = {
   getFacturas: async (filters: any): Promise<Factura[]> => {
     const { data } = await apiClient.get("/facturacion", { params: filters });
@@ -113,5 +123,10 @@ export const facturacionService = {
 
   deleteCobro: async (facturaId: number, cobroId: number): Promise<void> => {
     await apiClient.delete(`/facturacion/${facturaId}/cobros/${cobroId}`);
+  },
+
+  updateFactura: async (id: number, data: Partial<FacturaUpdateData>) => {
+    const response = await axiosInstance.patch(`/facturacion/${id}`, data);
+    return response.data;
   },
 };
