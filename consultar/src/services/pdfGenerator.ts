@@ -340,7 +340,7 @@ export const exportOtPdfRemito = async (otData: WorkOrder) => {
   );
   copiedPages.forEach((page) => finalPdfDoc.addPage(page));
 
-  await appendContractToPdf(finalPdfDoc, otData.contract_type);
+  // await appendContractToPdf(finalPdfDoc, otData.contract_type);
 
   const finalPdfBytes = await finalPdfDoc.save();
   savePdf(finalPdfBytes, `Remito-${otData.custom_id || otData.id}.pdf`);
@@ -432,7 +432,7 @@ export const exportOtToPdfInternal = async (otData: WorkOrder) => {
   );
   copiedPages.forEach((page) => finalPdfDoc.addPage(page));
 
-  await appendContractToPdf(finalPdfDoc, otData.contract_type);
+  // await appendContractToPdf(finalPdfDoc, otData.contract_type);
 
   const finalPdfBytes = await finalPdfDoc.save();
   savePdf(finalPdfBytes, `OT-Interna-${otData.custom_id || otData.id}.pdf`);

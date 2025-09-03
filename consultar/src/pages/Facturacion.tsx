@@ -258,7 +258,7 @@ const Facturacion: React.FC = () => {
                         className="px-6 py-4 whitespace-nowrap text-center text-sm"
                       >
                         <span
-                          className={`px-2.5 py-0.5 text-xs font-semibold rounded-full capitalize ${
+                          className={`px-2.5 py-0.5 text-sm font-semibold rounded-full uppercase ${
                             statusStyles[factura.estado] || "bg-gray-200"
                           }`}
                         >

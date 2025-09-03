@@ -257,7 +257,7 @@ const OT: React.FC = () => {
                     </td>
                     <td className="px-6 py-4">
                       <span
-                        className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(
+                        className={`px-2 inline-flex text-sm leading-5 font-semibold rounded-full uppercase ${getStatusColor(
                           ot.status
                         )}`}
                       >

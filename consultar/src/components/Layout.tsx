@@ -208,7 +208,7 @@ const SidebarNavigation: React.FC = () => {
 
 const Layout: React.FC = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const location = useLocation(); // <--- 1. OBTENER LA UBICACIÓN ACTUAL
+  const location = useLocation();
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
@@ -218,7 +218,6 @@ const Layout: React.FC = () => {
           className="relative z-50 lg:hidden"
           onClose={setSidebarOpen}
         >
-          {/* ... (código del Dialog y Transition sin cambios) ... */}
           <Transition.Child
             as={Fragment}
             enter="transition-opacity ease-linear duration-300"
@@ -286,14 +285,11 @@ const Layout: React.FC = () => {
         </div>
 
         <main className="flex-1 py-10">
-          {/* --- 2. APLICAR LA ANIMACIÓN AQUÍ --- */}
-          {/* Usamos la ruta (pathname) como `key` para forzar la re-renderización y la animación en cada cambio de página */}
           <div
             key={location.pathname}
             className="px-4 sm:px-6 lg:px-8 animate-fade-in"
           >
-            <Outlet />{" "}
-            {/* Reemplazamos `children` por `Outlet` para que funcione con las rutas anidadas */}
+            <Outlet />
           </div>
         </main>
       </div>
