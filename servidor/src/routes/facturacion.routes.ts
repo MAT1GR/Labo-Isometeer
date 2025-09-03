@@ -105,7 +105,7 @@ router.get("/:id", (req, res) => {
         `
       SELECT ot.id, ot.custom_id, ot.product 
       FROM work_orders ot
-      JOIN factura_ots fo ON ot.id = fo.ot_id
+      JOIN factura_ots fo ON ot.id = fo.factura_id
       WHERE fo.factura_id = ?
     `
       )
@@ -341,6 +341,129 @@ router.patch("/:id/archive", (req, res) => {
   } catch (error) {
     console.error("Error al archivar la factura:", error);
     res.status(500).json({ error: "Error interno al archivar la factura." });
+  }
+});
+
+// --- NUEVOS ENDPOINTS PARA GESTIÓN DE COBROS ---
+
+// [DELETE] /api/facturacion/:facturaId/cobros/:cobroId - Eliminar un cobro
+router.delete("/:facturaId/cobros/:cobroId", (req, res) => {
+  try {
+    const { facturaId, cobroId } = req.params;
+
+    const transaction = db.transaction(() => {
+      // 1. Eliminar el cobro de la tabla 'cobros'
+      const deleteStmt = db.prepare(
+        "DELETE FROM cobros WHERE id = ? AND factura_id = ?"
+      );
+      const result = deleteStmt.run(cobroId, facturaId);
+
+      if (result.changes === 0) {
+        throw new Error("Cobro no encontrado o ya eliminado.");
+      }
+
+      // 2. Recalcular el total pagado y actualizar el estado de la factura
+      const totalPagadoResult = db
+        .prepare("SELECT SUM(monto) as total FROM cobros WHERE factura_id = ?")
+        .get(facturaId) as { total: number };
+      const totalPagado = totalPagadoResult.total || 0;
+
+      const facturaResult = db
+        .prepare("SELECT monto FROM facturas WHERE id = ?")
+        .get(facturaId) as { monto: number };
+      const montoFactura = facturaResult.monto;
+
+      const newEstado = totalPagado >= montoFactura ? "pagada" : "pendiente";
+      db.prepare("UPDATE facturas SET estado = ? WHERE id = ?").run(
+        newEstado,
+        facturaId
+      );
+    });
+
+    transaction();
+    res.status(200).json({ message: "Cobro eliminado con éxito." });
+  } catch (error: any) {
+    console.error("Error al eliminar el cobro:", error);
+    res
+      .status(500)
+      .json({ error: error.message || "Error interno al eliminar el cobro." });
+  }
+});
+
+// [PATCH] /api/facturacion/:facturaId/cobros/:cobroId - Editar un cobro
+router.patch("/:facturaId/cobros/:cobroId", (req, res) => {
+  const { facturaId, cobroId } = req.params;
+  const {
+    monto,
+    medio_de_pago,
+    fecha,
+    identificacion_cobro,
+    ingresos_brutos,
+    iva,
+    impuesto_ganancias,
+    retencion_suss,
+  } = req.body;
+
+  try {
+    const transaction = db.transaction(() => {
+      const updateStmt = db.prepare(
+        `UPDATE cobros SET 
+           monto = ?, 
+           medio_de_pago = ?, 
+           fecha = ?, 
+           identificacion_cobro = ?, 
+           ingresos_brutos = ?, 
+           iva = ?, 
+           impuesto_ganancias = ?, 
+           retencion_suss = ? 
+         WHERE id = ? AND factura_id = ?`
+      );
+
+      const result = updateStmt.run(
+        monto,
+        medio_de_pago,
+        fecha,
+        identificacion_cobro || null,
+        ingresos_brutos || null,
+        iva || null,
+        impuesto_ganancias || null,
+        retencion_suss || null,
+        cobroId,
+        facturaId
+      );
+
+      if (result.changes === 0) {
+        throw new Error("Cobro no encontrado o no se realizaron cambios.");
+      }
+
+      // Recalcular el total pagado y actualizar el estado de la factura
+      const totalPagadoResult = db
+        .prepare("SELECT SUM(monto) as total FROM cobros WHERE factura_id = ?")
+        .get(facturaId) as { total: number };
+      const totalPagado = totalPagadoResult.total || 0;
+
+      const facturaResult = db
+        .prepare("SELECT monto FROM facturas WHERE id = ?")
+        .get(facturaId) as { monto: number };
+      const montoFactura = facturaResult.monto;
+
+      const newEstado = totalPagado >= montoFactura ? "pagada" : "pendiente";
+      db.prepare("UPDATE facturas SET estado = ? WHERE id = ?").run(
+        newEstado,
+        facturaId
+      );
+    });
+
+    transaction();
+    const updatedCobro = db
+      .prepare("SELECT * FROM cobros WHERE id = ?")
+      .get(cobroId);
+    res.status(200).json(updatedCobro);
+  } catch (error: any) {
+    console.error("Error al editar el cobro:", error);
+    res
+      .status(500)
+      .json({ error: error.message || "Error interno al editar el cobro." });
   }
 });
 

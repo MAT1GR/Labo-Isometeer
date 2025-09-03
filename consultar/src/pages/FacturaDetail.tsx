@@ -9,6 +9,7 @@ import {
   Factura,
   Cobro,
   CreateCobroData,
+  CobroUpdateData, // Importamos el nuevo tipo
 } from "../services/facturacionService";
 import { formatCurrency, formatDateTime } from "../lib/utils";
 import Card from "../components/ui/Card";
@@ -20,9 +21,12 @@ import {
   ChevronDown,
   FileText,
   PlusCircle,
+  Edit, // Añadimos el icono de edición
+  Trash2, // Añadimos el icono de borrado
 } from "lucide-react";
 import { cn } from "../lib/utils";
 import { WorkOrder, Activity } from "../services/otService";
+import ConfirmationModal from "../components/ui/ConfirmationModal";
 
 // Componente para el tag de estado
 const StatusTag: React.FC<{ status: string }> = ({ status }) => {
@@ -43,7 +47,11 @@ const StatusTag: React.FC<{ status: string }> = ({ status }) => {
 };
 
 // Componente para mostrar detalles de un cobro
-const CobroDetail: React.FC<{ cobro: Cobro }> = ({ cobro }) => {
+const CobroDetail: React.FC<{
+  cobro: Cobro;
+  onEdit: (cobro: Cobro) => void;
+  onDelete: (cobro: Cobro) => void;
+}> = ({ cobro, onEdit, onDelete }) => {
   const [isOpen, setIsOpen] = useState(false);
 
   // Esta validación ahora funcionará correctamente
@@ -65,10 +73,13 @@ const CobroDetail: React.FC<{ cobro: Cobro }> = ({ cobro }) => {
             {cobro.medio_de_pago}
           </p>
         </div>
-        <div className="text-right">
-          <p className="text-sm text-gray-500 dark:text-gray-400">
-            {formatDateTime(cobro.fecha)}
-          </p>
+        <div className="flex items-center gap-2">
+          <Button variant="ghost" size="icon" onClick={() => onEdit(cobro)}>
+            <Edit className="h-4 w-4" />
+          </Button>
+          <Button variant="ghost" size="icon" onClick={() => onDelete(cobro)}>
+            <Trash2 className="h-4 w-4 text-red-500" />
+          </Button>
           {hasDetails && (
             <Button
               variant="ghost"
@@ -199,12 +210,15 @@ const FacturaDetail: React.FC = () => {
   const [factura, setFactura] = useState<Factura | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isAddingCobro, setIsAddingCobro] = useState(false);
+  const [isEditingCobro, setIsEditingCobro] = useState<Cobro | null>(null);
+  const [cobroToDelete, setCobroToDelete] = useState<Cobro | null>(null);
 
   const {
     register,
     handleSubmit,
     reset,
     watch,
+    setValue,
     formState: { isSubmitting },
   } = useForm();
 
@@ -234,7 +248,6 @@ const FacturaDetail: React.FC = () => {
             ? data.otro_medio_de_pago
             : data.medio_de_pago;
 
-        // --- CONSTRUIMOS EL OBJETO CON EL TIPO CORRECTO ---
         const cobroData: CreateCobroData = {
           monto: Number(data.monto),
           fecha: new Date(data.fecha).toISOString(),
@@ -252,16 +265,55 @@ const FacturaDetail: React.FC = () => {
             : undefined,
         };
 
-        await facturacionService.createCobro(Number(id), cobroData);
+        if (isEditingCobro) {
+          // Lógica para editar un cobro
+          await facturacionService.updateCobro(
+            Number(id),
+            isEditingCobro.id,
+            cobroData
+          );
+          setIsEditingCobro(null);
+        } else {
+          // Lógica para crear un nuevo cobro
+          await facturacionService.createCobro(Number(id), cobroData);
+          setIsAddingCobro(false);
+        }
 
         reset();
-        setIsAddingCobro(false);
-        await loadFactura();
+        await loadFactura(); // Recarga la factura para ver los cambios
       } catch (error) {
-        console.error("Error al crear el cobro:", error);
-        alert("No se pudo registrar el cobro.");
+        console.error("Error al guardar el cobro:", error);
+        alert("No se pudo registrar/actualizar el cobro.");
       }
     }
+  };
+
+  const handleDeleteCobro = async () => {
+    if (!cobroToDelete || !id) return;
+    try {
+      await facturacionService.deleteCobro(Number(id), cobroToDelete.id);
+      setCobroToDelete(null);
+      await loadFactura(); // Recarga la factura
+    } catch (error) {
+      console.error("Error al eliminar el cobro:", error);
+      alert("No se pudo eliminar el cobro.");
+    }
+  };
+
+  const handleEditCobro = (cobro: Cobro) => {
+    setIsEditingCobro(cobro);
+    setIsAddingCobro(true);
+    setValue("monto", cobro.monto);
+    setValue("fecha", cobro.fecha.split("T")[0]);
+    setValue("medio_de_pago", cobro.medio_de_pago);
+    if (cobro.medio_de_pago === "Otro") {
+      setValue("otro_medio_de_pago", cobro.medio_de_pago);
+    }
+    setValue("identificacion_cobro", cobro.identificacion_cobro || "");
+    setValue("ingresos_brutos", cobro.ingresos_brutos || "");
+    setValue("iva", cobro.iva || "");
+    setValue("impuesto_ganancias", cobro.impuesto_ganancias || "");
+    setValue("retencion_suss", cobro.retencion_suss || "");
   };
 
   if (error) return <div className="p-4 text-red-500">{error}</div>;
@@ -372,7 +424,7 @@ const FacturaDetail: React.FC = () => {
             <h2 className="text-xl font-bold mb-4 flex items-center gap-2 text-gray-800 dark:text-gray-100">
               <Banknote /> Historial de Cobros
             </h2>
-            {saldoRestante > 0 && (
+            {saldoRestante > 0 && !isEditingCobro && (
               <div className="mb-6">
                 {!isAddingCobro ? (
                   <Button onClick={() => setIsAddingCobro(true)}>
@@ -498,11 +550,128 @@ const FacturaDetail: React.FC = () => {
                 )}
               </div>
             )}
-
+            {isEditingCobro && (
+              <div className="mb-6">
+                <form
+                  onSubmit={handleSubmit(handleCobroSubmit)}
+                  className="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg space-y-4"
+                >
+                  <h3 className="font-semibold text-gray-800 dark:text-gray-100">
+                    Editar Cobro
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <Input
+                      label="Monto"
+                      type="number"
+                      step="0.01"
+                      {...register("monto", { required: true })}
+                    />
+                    <Input
+                      label="Fecha"
+                      type="date"
+                      {...register("fecha", { required: true })}
+                    />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium dark:text-gray-300">
+                      Medio de Pago
+                    </label>
+                    <select
+                      {...register("medio_de_pago", { required: true })}
+                      className="w-full mt-1 p-2 border rounded-md dark:bg-gray-800 dark:border-gray-600"
+                    >
+                      <option value="Efectivo">Efectivo</option>
+                      <option value="Transferencia">Transferencia</option>
+                      <option value="Tarjeta de Crédito">
+                        Tarjeta de Crédito
+                      </option>
+                      <option value="Tarjeta de Débito">
+                        Tarjeta de Débito
+                      </option>
+                      <option value="Otro">Otro</option>
+                    </select>
+                  </div>
+                  <div
+                    className={cn(
+                      "transition-all duration-300 ease-in-out overflow-hidden",
+                      medioDePago === "Otro"
+                        ? "max-h-40 opacity-100"
+                        : "max-h-0 opacity-0"
+                    )}
+                  >
+                    {medioDePago === "Otro" && (
+                      <Input
+                        label="Especificar otro medio de pago"
+                        {...register("otro_medio_de_pago", {
+                          required: medioDePago === "Otro",
+                        })}
+                        className="mt-2"
+                      />
+                    )}
+                  </div>
+                  <div className="border-t pt-4 space-y-4">
+                    <h4 className="text-sm font-semibold text-gray-600 dark:text-gray-300">
+                      Detalles Adicionales (Opcional)
+                    </h4>
+                    <Input
+                      label="Identificación del Cobro"
+                      {...register("identificacion_cobro")}
+                    />
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      <Input
+                        label="Ingresos Brutos"
+                        type="number"
+                        step="0.01"
+                        {...register("ingresos_brutos")}
+                      />
+                      <Input
+                        label="IVA"
+                        type="number"
+                        step="0.01"
+                        {...register("iva")}
+                      />
+                      <Input
+                        label="Ganancias"
+                        type="number"
+                        step="0.01"
+                        {...register("impuesto_ganancias")}
+                      />
+                      <Input
+                        label="Retención SUSS"
+                        type="number"
+                        step="0.01"
+                        {...register("retencion_suss")}
+                      />
+                    </div>
+                  </div>
+                  <div className="flex gap-4 pt-4 border-t">
+                    <Button type="submit" disabled={isSubmitting}>
+                      {isSubmitting ? "Actualizando..." : "Actualizar Cobro"}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      type="button"
+                      onClick={() => {
+                        setIsEditingCobro(null);
+                        setIsAddingCobro(false);
+                        reset();
+                      }}
+                    >
+                      Cancelar
+                    </Button>
+                  </div>
+                </form>
+              </div>
+            )}
             <div className="space-y-4">
               {factura.cobros && factura.cobros.length > 0 ? (
                 factura.cobros.map((cobro) => (
-                  <CobroDetail key={cobro.id} cobro={cobro} />
+                  <CobroDetail
+                    key={cobro.id}
+                    cobro={cobro}
+                    onEdit={handleEditCobro}
+                    onDelete={() => setCobroToDelete(cobro)}
+                  />
                 ))
               ) : (
                 <p className="text-gray-500 dark:text-gray-400 italic">
@@ -530,6 +699,17 @@ const FacturaDetail: React.FC = () => {
           </div>
         </Card>
       </div>
+
+      <ConfirmationModal
+        isOpen={!!cobroToDelete}
+        title="Confirmar eliminación de cobro"
+        message={`¿Estás seguro de que deseas eliminar el cobro de ${formatCurrency(
+          cobroToDelete?.monto || 0
+        )}? Esta acción es irreversible.`}
+        onConfirm={handleDeleteCobro}
+        onClose={() => setCobroToDelete(null)}
+        confirmText="Eliminar"
+      />
     </div>
   );
 };

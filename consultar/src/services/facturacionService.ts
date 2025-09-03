@@ -54,6 +54,11 @@ export interface FacturaCreateData {
   observaciones?: string;
 }
 
+// Nuevo tipo para los datos de edición de cobro
+export interface CobroUpdateData extends Partial<CreateCobroData> {
+  // Aquí no hay campos adicionales, ya que son los mismos que CreateCobroData
+}
+
 export const facturacionService = {
   getFacturas: async (filters: any): Promise<Factura[]> => {
     const { data } = await apiClient.get("/facturacion", { params: filters });
@@ -91,5 +96,22 @@ export const facturacionService = {
   // Nuevo método para archivar una factura
   archiveFactura: async (id: number, motivo_archivo: string): Promise<void> => {
     await apiClient.patch(`/facturacion/${id}/archive`, { motivo_archivo });
+  },
+
+  // NUEVOS MÉTODOS PARA EDITAR Y ELIMINAR COBROS
+  updateCobro: async (
+    facturaId: number,
+    cobroId: number,
+    cobroData: CobroUpdateData
+  ): Promise<Cobro> => {
+    const { data } = await apiClient.patch(
+      `/facturacion/${facturaId}/cobros/${cobroId}`,
+      cobroData
+    );
+    return data;
+  },
+
+  deleteCobro: async (facturaId: number, cobroId: number): Promise<void> => {
+    await apiClient.delete(`/facturacion/${facturaId}/cobros/${cobroId}`);
   },
 };

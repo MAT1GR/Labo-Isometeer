@@ -1,3 +1,5 @@
+// RUTA: servidor/src/config/database.ts
+
 import Database from "better-sqlite3";
 import bcrypt from "bcryptjs";
 
@@ -7,7 +9,7 @@ db.pragma("foreign_keys = ON");
 // --- MIGRACIÓN AUTOMÁTICA DE LA TABLA 'facturas' ---
 const runMigration = () => {
   try {
-    // Revisa la estructura actual de la tabla 'facturas'
+    // ... Código de migración existente para 'facturas' ...
     const tableInfo = db
       .prepare(
         `SELECT sql FROM sqlite_master WHERE type='table' AND name='facturas'`
@@ -109,6 +111,43 @@ const runMigration = () => {
       db.exec("ALTER TABLE facturas ADD COLUMN observaciones TEXT;");
       console.log("[MIGRATION] 'observaciones' column added successfully.");
     }
+
+    // --- NUEVA MIGRACIÓN para la tabla 'cobros' ---
+    const cobrosTableInfo = db.prepare(`PRAGMA table_info(cobros)`).all() as {
+      name: string;
+    }[];
+    const columnNames = cobrosTableInfo.map((col) => col.name);
+
+    if (!columnNames.includes("identificacion_cobro")) {
+      console.log(
+        "[MIGRATION] Adding 'identificacion_cobro' column to 'cobros' table."
+      );
+      db.exec("ALTER TABLE cobros ADD COLUMN identificacion_cobro TEXT;");
+    }
+    if (!columnNames.includes("ingresos_brutos")) {
+      console.log(
+        "[MIGRATION] Adding 'ingresos_brutos' column to 'cobros' table."
+      );
+      db.exec("ALTER TABLE cobros ADD COLUMN ingresos_brutos REAL;");
+    }
+    if (!columnNames.includes("iva")) {
+      console.log("[MIGRATION] Adding 'iva' column to 'cobros' table.");
+      db.exec("ALTER TABLE cobros ADD COLUMN iva REAL;");
+    }
+    if (!columnNames.includes("impuesto_ganancias")) {
+      console.log(
+        "[MIGRATION] Adding 'impuesto_ganancias' column to 'cobros' table."
+      );
+      db.exec("ALTER TABLE cobros ADD COLUMN impuesto_ganancias REAL;");
+    }
+    if (!columnNames.includes("retencion_suss")) {
+      console.log(
+        "[MIGRATION] Adding 'retencion_suss' column to 'cobros' table."
+      );
+      db.exec("ALTER TABLE cobros ADD COLUMN retencion_suss REAL;");
+    }
+    console.log("[MIGRATION] 'cobros' table migration finished.");
+    // --- FIN DE LA NUEVA MIGRACIÓN ---
   } catch (error: any) {
     // Si la tabla 'facturas' no existe, no hace nada, ya que se creará más abajo.
     if (
@@ -241,6 +280,11 @@ db.exec(`
     medio_de_pago TEXT NOT NULL,
     fecha TEXT NOT NULL,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    identificacion_cobro TEXT,
+    ingresos_brutos REAL,
+    iva REAL,
+    impuesto_ganancias REAL,
+    retencion_suss REAL,
     FOREIGN KEY (factura_id) REFERENCES facturas(id) ON DELETE CASCADE
   );
 
