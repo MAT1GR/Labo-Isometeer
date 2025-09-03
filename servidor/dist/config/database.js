@@ -47,10 +47,43 @@ const runMigration = () => {
                 console.log("[MIGRATION] Paso 4/4: Tabla antigua eliminada. ¡Migración completada!");
             })();
         }
+        // Migración para añadir la columna 'iva'
+        const tableInfoIva = db
+            .prepare(`SELECT sql FROM sqlite_master WHERE type='table' AND name='facturas'`)
+            .get();
+        if (tableInfoIva &&
+            tableInfoIva.sql &&
+            !tableInfoIva.sql.includes("iva REAL")) {
+            console.log("[MIGRATION] Adding 'iva' column to 'facturas' table.");
+            db.exec("ALTER TABLE facturas ADD COLUMN iva REAL;");
+            console.log("[MIGRATION] 'iva' column added successfully.");
+        }
+        // Migración para añadir las columnas 'tipo' y 'observaciones'
+        const tableInfoTipo = db
+            .prepare(`SELECT sql FROM sqlite_master WHERE type='table' AND name='facturas'`)
+            .get();
+        if (tableInfoTipo &&
+            tableInfoTipo.sql &&
+            !tableInfoTipo.sql.includes("tipo TEXT")) {
+            console.log("[MIGRATION] Adding 'tipo' column to 'facturas' table.");
+            db.exec("ALTER TABLE facturas ADD COLUMN tipo TEXT CHECK(tipo IN ('A', 'B', 'C', 'E', 'T', 'M'));");
+            console.log("[MIGRATION] 'tipo' column added successfully.");
+        }
+        const tableInfoObservaciones = db
+            .prepare(`SELECT sql FROM sqlite_master WHERE type='table' AND name='facturas'`)
+            .get();
+        if (tableInfoObservaciones &&
+            tableInfoObservaciones.sql &&
+            !tableInfoObservaciones.sql.includes("observaciones TEXT")) {
+            console.log("[MIGRATION] Adding 'observaciones' column to 'facturas' table.");
+            db.exec("ALTER TABLE facturas ADD COLUMN observaciones TEXT;");
+            console.log("[MIGRATION] 'observaciones' column added successfully.");
+        }
     }
     catch (error) {
         // Si la tabla 'facturas' no existe, no hace nada, ya que se creará más abajo.
-        if (!error.message.includes("no such table")) {
+        if (!error.message.includes("no such table") &&
+            !error.message.includes("duplicate column name")) {
             console.error("[MIGRATION_ERROR] No se pudo migrar la base de datos:", error);
             throw error; // Detiene el servidor si hay un error inesperado en la migración
         }
@@ -58,7 +91,6 @@ const runMigration = () => {
 };
 // Ejecutar la lógica de migración antes de cualquier otra cosa
 runMigration();
-// --- CREACIÓN DE TABLAS (SI NO EXISTEN) ---
 db.exec(`
   CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT, 
@@ -147,10 +179,14 @@ db.exec(`
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     numero_factura TEXT NOT NULL,
     monto REAL NOT NULL,
+    iva REAL,
     vencimiento TEXT NOT NULL,
-    estado TEXT NOT NULL DEFAULT 'pendiente' CHECK(estado IN ('pendiente', 'pagada', 'vencida')),
+    estado TEXT NOT NULL DEFAULT 'pendiente' CHECK(estado IN ('pendiente', 'pagada', 'vencida', 'archivada')),
     cliente_id INTEGER,
+    tipo TEXT CHECK(tipo IN ('A', 'B', 'C', 'E', 'ND', 'NC')),
+    observaciones TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    motivo_archivo TEXT,
     FOREIGN KEY (cliente_id) REFERENCES clients(id) ON DELETE SET NULL
   );
 
@@ -197,13 +233,25 @@ db.exec(`
   );
   
   CREATE TABLE IF NOT EXISTS ot_facturas (
-            ot_id INTEGER NOT NULL,
-            factura_id INTEGER NOT NULL,
-            PRIMARY KEY (ot_id, factura_id),
-            FOREIGN KEY (ot_id) REFERENCES ordenes_trabajo(id) ON DELETE CASCADE,
-            FOREIGN KEY (factura_id) REFERENCES facturas(id) ON DELETE CASCADE
-        )
+    ot_id INTEGER NOT NULL,
+    factura_id INTEGER NOT NULL,
+    PRIMARY KEY (ot_id, factura_id),
+    FOREIGN KEY (ot_id) REFERENCES work_orders(id) ON DELETE CASCADE,
+    FOREIGN KEY (factura_id) REFERENCES facturas(id) ON DELETE CASCADE
+  );
 
+  CREATE TABLE IF NOT EXISTS presupuestos (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    cliente_id INTEGER NOT NULL,
+    producto TEXT NOT NULL,
+    tipo_servicio TEXT NOT NULL,
+    norma TEXT,
+    entrega_dias INTEGER NOT NULL,
+    precio REAL NOT NULL,
+    autorizado BOOLEAN NOT NULL DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (cliente_id) REFERENCES clients(id) ON DELETE CASCADE
+  );
 `);
 // --- DATOS INICIALES ---
 const seedContracts = () => {

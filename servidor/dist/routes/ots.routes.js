@@ -225,9 +225,7 @@ router.get("/:id", (req, res) => {
         WHERE fo.ot_id = ?
       `)
                 .all(req.params.id);
-            res
-                .status(200)
-                .json(Object.assign(Object.assign({}, ot), { activities,
+            res.status(200).json(Object.assign(Object.assign({}, ot), { activities,
                 facturas, factura_ids: facturas.map((f) => f.id) }));
         }
         else {

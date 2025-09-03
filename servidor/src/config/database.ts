@@ -222,6 +222,7 @@ db.exec(`
     tipo TEXT CHECK(tipo IN ('A', 'B', 'C', 'E', 'ND', 'NC')),
     observaciones TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    motivo_archivo TEXT,
     FOREIGN KEY (cliente_id) REFERENCES clients(id) ON DELETE SET NULL
   );
 

@@ -53,8 +53,13 @@ const contracts_routes_1 = __importDefault(require("./routes/contracts.routes"))
 const statistics_routes_1 = __importDefault(require("./routes/statistics.routes"));
 const admin_routes_1 = __importDefault(require("./routes/admin.routes"));
 const notifications_routes_1 = __importStar(require("./routes/notifications.routes"));
+const presupuestos_routes_1 = __importDefault(require("./routes/presupuestos.routes"));
 const app = (0, express_1.default)();
-const port = 4000;
+// 🔹 Cambiá esta variable según entorno
+const PROD = true; // poner en true cuando quieras producción
+const host = PROD ? "192.168.0.150" : "localhost";
+// const host = PROD ? "192.168.100.12" : "localhost";
+const port = PROD ? 6001 : 4000;
 const uploadsDir = path_1.default.join(__dirname, "../uploads");
 if (!fs_1.default.existsSync(uploadsDir)) {
     fs_1.default.mkdirSync(uploadsDir);
@@ -73,25 +78,20 @@ exports.setClients = setClients;
 // --- FUNCIÓN PARA MARCAR FACTURAS COMO VENCIDAS ---
 const checkOverdueInvoices = () => {
     try {
-        // Obtiene la fecha de hoy en formato YYYY-MM-DD
         const today = new Date().toISOString().split("T")[0];
-        // 1. Busca facturas que estén 'pendientes' y cuya fecha de vencimiento sea anterior a hoy.
         const invoicesToUpdate = database_1.default
             .prepare("SELECT id, numero_factura FROM facturas WHERE vencimiento < ? AND estado = 'pendiente'")
             .all(today);
         if (invoicesToUpdate.length > 0) {
             console.log(`[INFO] Se encontraron ${invoicesToUpdate.length} facturas para actualizar a 'vencida'.`);
             const invoiceIds = invoicesToUpdate.map((inv) => inv.id);
-            // 2. Actualiza todas las facturas encontradas al estado 'vencida' en una sola operación.
             const updateStmt = database_1.default.prepare(`UPDATE facturas SET estado = 'vencida' WHERE id IN (${invoiceIds
                 .map(() => "?")
                 .join(",")})`);
             updateStmt.run(...invoiceIds);
-            // 3. Obtiene los usuarios de administración y dirección para notificarles.
             const usersToNotify = database_1.default
                 .prepare("SELECT id FROM users WHERE role IN ('administracion', 'director', 'administrador')")
                 .all();
-            // 4. Crea y envía una notificación para cada factura vencida a cada usuario relevante.
             for (const invoice of invoicesToUpdate) {
                 const message = `La factura N° ${invoice.numero_factura} ha vencido.`;
                 for (const user of usersToNotify) {
@@ -122,10 +122,10 @@ app.use("/api/admin", admin_routes_1.default);
 app.use("/api/notifications", notifications_routes_1.default);
 app.use("/api/facturacion", facturacion_routes_1.default);
 app.use("/api/work-orders", work_orders_routes_1.default);
-app.listen(port, () => {
-    console.log(`🚀 Servidor corriendo en http://localhost:${port}`);
-    // Ejecuta la verificación de facturas vencidas al iniciar el servidor.
+app.use("/api/presupuestos", presupuestos_routes_1.default);
+app.use("/api/auth", auth_routes_1.default);
+app.listen(port, host, () => {
+    console.log(`🚀 Servidor corriendo en http://${host}:${port}`);
     checkOverdueInvoices();
-    // Y luego, la ejecuta repetidamente cada hora.
     setInterval(checkOverdueInvoices, 1000 * 60 * 60);
 });

@@ -11,34 +11,34 @@ const router = (0, express_1.Router)();
 router.get("/stats", (req, res) => {
     try {
         const { period = "week" } = req.query;
-        let dateFilterClause = "";
+        let woDateFilterClause = "";
+        let cobrosDateFilterClause = "";
         switch (period) {
             case "year":
-                dateFilterClause = ` WHERE strftime('%Y', wo.date) = strftime('%Y', 'now')`;
+                woDateFilterClause = ` WHERE strftime('%Y', wo.date) = strftime('%Y', 'now')`;
+                cobrosDateFilterClause = ` WHERE strftime('%Y', fecha) = strftime('%Y', 'now')`;
                 break;
             case "month":
-                dateFilterClause = ` WHERE strftime('%Y-%m', wo.date) = strftime('%Y-%m', 'now')`;
+                woDateFilterClause = ` WHERE strftime('%Y-%m', wo.date) = strftime('%Y-%m', 'now')`;
+                cobrosDateFilterClause = ` WHERE strftime('%Y-%m', fecha) = strftime('%Y-%m', 'now')`;
                 break;
             case "week":
             default:
-                dateFilterClause = ` WHERE wo.date >= date('now', '-6 days')`;
+                woDateFilterClause = ` WHERE wo.date >= date('now', '-6 days')`;
+                cobrosDateFilterClause = ` WHERE fecha >= date('now', '-6 days')`;
                 break;
         }
-        const getCount = (table, customWhere = "1 = 1") => {
-            const finalWhere = dateFilterClause.replace(/wo\./g, "") + ` AND ${customWhere}`;
-            const query = `SELECT COUNT(*) as count FROM ${table} AS wo ${finalWhere}`;
+        const getOtCount = (customWhere = "1 = 1") => {
+            const query = `SELECT COUNT(*) as count FROM work_orders as wo ${woDateFilterClause} AND ${customWhere}`;
             return database_1.default.prepare(query).get().count;
         };
         const getTotalClients = () => database_1.default.prepare(`SELECT COUNT(*) as count FROM clients`).get().count;
-        const getTotalPoints = () => database_1.default.prepare(`SELECT SUM(points) as total FROM users`).get().total || 0;
+        const getOverdueInvoices = () => database_1.default
+            .prepare(`SELECT COUNT(*) as count FROM facturas WHERE estado = 'vencida'`)
+            .get().count || 0;
         const getTotalRevenue = () => {
             const result = database_1.default
-                .prepare(`
-                SELECT SUM(wa.precio_sin_iva) as total 
-                FROM work_order_activities wa
-                JOIN work_orders wo ON wa.work_order_id = wo.id
-                ${dateFilterClause} AND wo.status = 'cerrada'
-             `)
+                .prepare(`SELECT SUM(monto) as total FROM cobros ${cobrosDateFilterClause}`)
                 .get();
             return result.total || 0;
         };
@@ -47,24 +47,23 @@ router.get("/stats", (req, res) => {
             let chartDataKey = "period";
             switch (period) {
                 case "year":
-                    groupByClause = "strftime('%Y-%m', wo.date)";
+                    groupByClause = "strftime('%Y-%m', fecha)";
                     break;
                 case "month":
-                    groupByClause = "strftime('%Y-%m-%d', wo.date)";
+                    groupByClause = "strftime('%Y-%m-%d', fecha)";
                     break;
                 case "week":
                 default:
-                    groupByClause = "strftime('%Y-%m-%d', wo.date)";
+                    groupByClause = "strftime('%Y-%m-%d', fecha)";
                     break;
             }
             const result = database_1.default
                 .prepare(`
                 SELECT
                     ${groupByClause} as ${chartDataKey},
-                    SUM(wa.precio_sin_iva) as revenue
-                FROM work_order_activities wa
-                JOIN work_orders wo ON wa.work_order_id = wo.id
-                ${dateFilterClause} AND wa.precio_sin_iva > 0 AND wo.status = 'cerrada'
+                    SUM(monto) as revenue
+                FROM cobros
+                ${cobrosDateFilterClause}
                 GROUP BY ${chartDataKey}
                 ORDER BY ${chartDataKey}
             `)
@@ -99,18 +98,34 @@ router.get("/stats", (req, res) => {
                 };
             });
         };
+        const getUpcomingInvoices = () => {
+            return database_1.default
+                .prepare(`
+        SELECT 
+          f.id, 
+          f.numero_factura, 
+          f.monto, 
+          f.vencimiento, 
+          c.name as cliente_name
+        FROM facturas f
+        JOIN clients c ON f.cliente_id = c.id
+        WHERE f.estado = 'pendiente' AND f.vencimiento >= date('now')
+        ORDER BY f.vencimiento ASC
+        LIMIT 5
+      `)
+                .all();
+        };
         const statsData = {
             stats: {
-                totalOT: getCount("work_orders"),
+                totalOT: getOtCount(),
                 totalClients: getTotalClients(),
-                pendingOT: getCount("work_orders", "status IN ('pendiente', 'autorizada')"),
-                inProgressOT: getCount("work_orders", "status IN ('en_progreso', 'pausada')"),
-                completedOT: getCount("work_orders", "status = 'finalizada'"),
-                billedOT: getCount("work_orders", "status = 'facturada'"),
+                pendingOT: getOtCount("status IN ('pendiente', 'autorizada')"),
+                inProgressOT: getOtCount("status IN ('en_progreso', 'pausada')"),
+                completedOT: getOtCount("status = 'finalizada'"),
+                billedOT: getOtCount("status = 'facturada'"),
                 totalRevenue: getTotalRevenue(),
-                paidInvoices: getCount("work_orders", "status = 'cerrada'"),
-                totalPoints: getTotalPoints(),
-                overdueInvoices: 0,
+                paidInvoices: getOtCount("status = 'cerrada'"),
+                overdueInvoices: getOverdueInvoices(),
             },
             recentOrders: database_1.default
                 .prepare(`
@@ -121,6 +136,7 @@ router.get("/stats", (req, res) => {
             `)
                 .all(),
             monthlyRevenue: getChartData(),
+            upcomingInvoices: getUpcomingInvoices(),
         };
         res.status(200).json(statsData);
     }

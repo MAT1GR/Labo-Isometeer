@@ -33,6 +33,8 @@ router.post("/login", (req, res) => {
         if (!userDb || !bcryptjs_1.default.compareSync(password, userDb.password)) {
             return res.status(401).json({ error: "Credenciales inválidas." });
         }
+        // Mensaje en la consola del servidor
+        console.log(`El usuario ${userDb.email} ha iniciado sesión.`);
         const { password: _ } = userDb, userToSend = __rest(userDb, ["password"]);
         res.status(200).json(userToSend);
     }
