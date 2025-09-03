@@ -1,4 +1,4 @@
-// RUTA: consultar/src/pages/Facturacion.tsx
+// consultar/src/pages/Facturacion.tsx
 
 import React, { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
@@ -11,7 +11,7 @@ import { PlusCircle, Filter, Archive, Info } from "lucide-react";
 import FacturaFilters from "../components/FacturaFilters";
 import { cn } from "../lib/utils";
 import ConfirmationModal from "../components/ui/ConfirmationModal";
-import Modal from "../components/ui/Modal";
+import Modal from "../components/ui/Modal"; // <--- Asegúrate de que esta importación sea correcta
 
 const Facturacion: React.FC = () => {
   const navigate = useNavigate();
@@ -327,13 +327,17 @@ const Facturacion: React.FC = () => {
         />
       </ConfirmationModal>
 
-      {/* Modal para ver el motivo del archivo */}
+      {/* Modal para ver el motivo del archivo (ahora usa el componente Modal mejorado) */}
       <Modal
         isOpen={showReasonModal}
         onClose={() => setShowReasonModal(false)}
         title="Motivo de Archivo"
+        // Puedes agregar un className si quieres un ancho específico, por ejemplo:
+        // className="max-w-xl"
       >
-        <p className="whitespace-pre-wrap">{currentReason}</p>
+        <p className="whitespace-pre-wrap text-gray-700 dark:text-gray-300">
+          {currentReason}
+        </p>
       </Modal>
     </div>
   );
