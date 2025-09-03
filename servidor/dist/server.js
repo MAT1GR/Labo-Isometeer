@@ -59,7 +59,7 @@ const app = (0, express_1.default)();
 const PROD = true; // poner en true cuando quieras producción
 const host = PROD ? "192.168.0.150" : "localhost";
 // const host = PROD ? "192.168.100.12" : "localhost";
-const port = PROD ? 6001 : 4000;
+const port = PROD ? 6001 : 6002;
 const uploadsDir = path_1.default.join(__dirname, "../uploads");
 if (!fs_1.default.existsSync(uploadsDir)) {
     fs_1.default.mkdirSync(uploadsDir);

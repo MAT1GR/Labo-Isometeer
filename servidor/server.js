@@ -9,7 +9,7 @@ app.use(cors());
 app.use(express.json());
 
 // 🔹 Variable de entorno simple
-const PROD = false; // cambia a true cuando estés en producción
+const PROD = true; // cambia a true cuando estés en producción
 
 const host = PROD ? "192.168.0.150" : "localhost";
 const port = PROD ? 6001 : 6002;

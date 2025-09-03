@@ -123,6 +123,17 @@ router.get("/stats", (req: Request, res: Response) => {
       });
     };
 
+    const getTotalInvoices = () =>
+      (
+        db
+          .prepare(
+            `SELECT COUNT(*) as count FROM facturas WHERE estado != 'archivada'`
+          )
+          .get() as {
+          count: number;
+        }
+      ).count;
+
     const getUpcomingInvoices = () => {
       return db
         .prepare(
@@ -147,6 +158,7 @@ router.get("/stats", (req: Request, res: Response) => {
       stats: {
         totalOT: getOtCount(),
         totalClients: getTotalClients(),
+        totalInvoices: getTotalInvoices(),
         pendingOT: getOtCount("status IN ('pendiente', 'autorizada')"),
         inProgressOT: getOtCount("status IN ('en_progreso', 'pausada')"),
         completedOT: getOtCount("status = 'finalizada'"),
