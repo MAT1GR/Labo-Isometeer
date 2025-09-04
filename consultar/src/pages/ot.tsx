@@ -206,9 +206,6 @@ const OT: React.FC = () => {
                     Cliente
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">
-                    Producto
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">
                     Asignado a
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">
@@ -251,7 +248,6 @@ const OT: React.FC = () => {
                       {ot.custom_id || `Interno #${ot.id}`}
                     </td>
                     <td className="px-6 py-4">{ot.client_name}</td>
-                    <td className="px-6 py-4">{ot.product}</td>
                     <td className="px-6 py-4">
                       {ot.assigned_to_name || "Sin asignar"}
                     </td>

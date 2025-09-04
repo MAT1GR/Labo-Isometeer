@@ -48,8 +48,17 @@ const ClienteSelect: React.FC<ClienteSelectProps> = ({
       {({ open, close }) => {
         // Usa useEffect para enfocar el input cuando el popover se abre
         useEffect(() => {
-          if (open && inputRef.current) {
-            inputRef.current.focus();
+          if (open) {
+            // Se usa un timeout para asegurar que el foco se establezca *después*
+            // de que la transición de entrada del popover haya terminado.
+            const timer = setTimeout(() => {
+              inputRef.current?.focus();
+            }, 100); // Un pequeño retraso de 100ms es suficiente.
+
+            // Limpiamos el timer si el componente se desmonta antes de que se ejecute.
+            return () => {
+              clearTimeout(timer);
+            };
           }
         }, [open]);
 
