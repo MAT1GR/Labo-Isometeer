@@ -21,7 +21,7 @@ import presupuestoRoutes from "./routes/presupuestos.routes";
 const app = express();
 
 // 🔹 Cambiá esta variable según entorno
-const PROD = true; // poner en true cuando quieras producción
+const PROD = false; // poner en true cuando quieras producción
 
 const host = PROD ? "192.168.0.150" : "localhost";
 // const host = PROD ? "192.168.100.12" : "localhost";

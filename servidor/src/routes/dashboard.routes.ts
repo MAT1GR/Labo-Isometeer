@@ -5,6 +5,65 @@ import db from "../config/database";
 
 const router = Router();
 
+// [GET] /api/dashboard/administracion
+router.get("/administracion", (req: Request, res: Response) => {
+  try {
+    const weeklyFilter = `WHERE created_at >= date('now', '-6 days')`;
+
+    // --- Estadísticas Semanales ---
+    const weeklyOTs = (
+      db
+        .prepare(`SELECT COUNT(*) as count FROM work_orders ${weeklyFilter}`)
+        .get() as { count: number }
+    ).count;
+    const weeklyInvoices = (
+      db
+        .prepare(`SELECT COUNT(*) as count FROM facturas ${weeklyFilter}`)
+        .get() as { count: number }
+    ).count;
+    const weeklyRevenueResult = db
+      .prepare(
+        `SELECT SUM(monto) as total FROM cobros WHERE fecha >= date('now', '-6 days')`
+      )
+      .get() as { total: number | null };
+    const weeklyRevenue = weeklyRevenueResult.total || 0;
+
+    // --- Estadísticas Totales ---
+    const totalOTs = (
+      db.prepare(`SELECT COUNT(*) as count FROM work_orders`).get() as {
+        count: number;
+      }
+    ).count;
+    const totalInvoices = (
+      db.prepare(`SELECT COUNT(*) as count FROM facturas`).get() as {
+        count: number;
+      }
+    ).count;
+    const totalRevenueResult = db
+      .prepare(`SELECT SUM(monto) as total FROM cobros`)
+      .get() as { total: number | null };
+    const totalRevenue = totalRevenueResult.total || 0;
+
+    res.status(200).json({
+      weekly: {
+        ots: weeklyOTs,
+        invoices: weeklyInvoices,
+        revenue: weeklyRevenue,
+      },
+      totals: {
+        ots: totalOTs,
+        invoices: totalInvoices,
+        revenue: totalRevenue,
+      },
+    });
+  } catch (error) {
+    console.error("Error en /dashboard/administracion:", error);
+    res
+      .status(500)
+      .json({ error: "Error al obtener las estadísticas de administración." });
+  }
+});
+
 // [GET] /api/dashboard/stats
 router.get("/stats", (req: Request, res: Response) => {
   try {
@@ -138,11 +197,11 @@ router.get("/stats", (req: Request, res: Response) => {
       return db
         .prepare(
           `
-        SELECT 
-          f.id, 
-          f.numero_factura, 
-          f.monto, 
-          f.vencimiento, 
+        SELECT
+          f.id,
+          f.numero_factura,
+          f.monto,
+          f.vencimiento,
           c.name as cliente_name
         FROM facturas f
         JOIN clients c ON f.cliente_id = c.id
@@ -170,9 +229,9 @@ router.get("/stats", (req: Request, res: Response) => {
       recentOrders: db
         .prepare(
           `
-                SELECT ot.id, ot.product, ot.status, ot.date, c.name as client_name 
-                FROM work_orders ot 
-                JOIN clients c ON ot.client_id = c.id 
+                SELECT ot.id, ot.product, ot.status, ot.date, c.name as client_name
+                FROM work_orders ot
+                JOIN clients c ON ot.client_id = c.id
                 ORDER BY ot.created_at DESC LIMIT 5
             `
         )
