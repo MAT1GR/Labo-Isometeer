@@ -138,7 +138,9 @@ const CreateFacturaModal: React.FC<CreateFacturaModalProps> = ({
 };
 
 // Tipo para los datos de una actividad en el formulario de creación
-type ActivityFormData = Omit<Activity, "id" | "work_order_id" | "status">;
+type ActivityFormData = Omit<Activity, "id" | "work_order_id" | "status"> & {
+  currency?: string;
+};
 
 // Tipo principal para el formulario de creación de OT
 type OTCreateFormData = Omit<
@@ -175,6 +177,7 @@ const OTCreate: React.FC = () => {
           assigned_users: [],
           norma: "",
           precio_sin_iva: undefined,
+          currency: "ARS",
         },
       ],
       contract_type: "Contrato de Producción",
@@ -541,6 +544,7 @@ const OTCreate: React.FC = () => {
                     assigned_users: [],
                     norma: "",
                     precio_sin_iva: undefined,
+                    currency: "ARS",
                   })
                 }
               >
@@ -611,15 +615,25 @@ const OTCreate: React.FC = () => {
                       {...register(`activities.${index}.norma`)}
                       placeholder="Ej: IEC 60601"
                     />
-                    <Input
-                      label="Precio (Sin IVA)"
-                      type="number"
-                      step="0.01"
-                      {...register(`activities.${index}.precio_sin_iva`, {
-                        valueAsNumber: true,
-                      })}
-                      placeholder="Ej: 15000"
-                    />
+                    <div className="flex items-end gap-2">
+                      <Input
+                        label="Precio (Sin IVA)"
+                        type="number"
+                        step="0.01"
+                        {...register(`activities.${index}.precio_sin_iva`, {
+                          valueAsNumber: true,
+                        })}
+                        placeholder="Ej: 15000"
+                        className="w-full"
+                      />
+                      <select
+                        {...register(`activities.${index}.currency` as const)}
+                        className="p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 h-[42px]"
+                      >
+                        <option value="ARS">ARS</option>
+                        <option value="USD">USD</option>
+                      </select>
+                    </div>
                   </div>
                 </div>
               ))}

@@ -78,6 +78,50 @@ const generateCustomId = (
   return `${datePrefix}${sequentialNumber} ${typeInitial} ${client.code}`;
 };
 
+// Generar un ID de previsualización para una nueva OT
+router.get("/generate-id", (req, res) => {
+  const { date, type, client_id } = req.query;
+
+  if (!date || !type || !client_id) {
+    return res
+      .status(400)
+      .json({ message: "Faltan parámetros (date, type, client_id)" });
+  }
+
+  const typeMapping: { [key: string]: string } = {
+    Produccion: "P",
+    Calibracion: "CAL",
+    "Ensayo SE": "SE",
+    "Ensayo EE": "EE",
+    "Otros Servicios": "OS",
+  };
+
+  const typePrefix = typeMapping[type as string];
+  if (!typePrefix) {
+    return res.status(400).json({ message: "Tipo de OT no válido" });
+  }
+
+  const formattedDate = (date as string).replace(/-/g, ""); // Transforma '2025-09-05' a '20250905'
+
+  // Contar cuántas OTs del mismo tipo ya existen para la fecha dada
+  const sql = `SELECT COUNT(*) as count FROM work_orders WHERE type = ? AND date = ?`;
+
+  db.get(sql, [type, date], (err: { message: any }, row: { count: number }) => {
+    if (err) {
+      console.error("Error al generar ID de OT:", err.message);
+      return res.status(500).json({ error: err.message });
+    }
+
+    const nextSequence = row.count + 1;
+    const paddedSequence = String(nextSequence).padStart(2, "0"); // Asegura que tenga 2 dígitos, ej: 1 -> 01
+
+    // Construir el ID final
+    const previewId = `${typePrefix}-${client_id}-${formattedDate}-${paddedSequence}`;
+
+    res.json({ previewId });
+  });
+});
+
 // [GET] /api/ots
 router.get("/", (req: Request, res: Response) => {
   const {
