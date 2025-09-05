@@ -7,6 +7,48 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const database_1 = __importDefault(require("../config/database"));
 const router = (0, express_1.Router)();
+// [GET] /api/dashboard/administracion
+router.get("/administracion", (req, res) => {
+    try {
+        const weeklyFilter = `WHERE created_at >= date('now', '-6 days')`;
+        // --- Estadísticas Semanales ---
+        const weeklyOTs = database_1.default
+            .prepare(`SELECT COUNT(*) as count FROM work_orders ${weeklyFilter}`)
+            .get().count;
+        const weeklyInvoices = database_1.default
+            .prepare(`SELECT COUNT(*) as count FROM facturas ${weeklyFilter}`)
+            .get().count;
+        const weeklyRevenueResult = database_1.default
+            .prepare(`SELECT SUM(monto) as total FROM cobros WHERE fecha >= date('now', '-6 days')`)
+            .get();
+        const weeklyRevenue = weeklyRevenueResult.total || 0;
+        // --- Estadísticas Totales ---
+        const totalOTs = database_1.default.prepare(`SELECT COUNT(*) as count FROM work_orders`).get().count;
+        const totalInvoices = database_1.default.prepare(`SELECT COUNT(*) as count FROM facturas`).get().count;
+        const totalRevenueResult = database_1.default
+            .prepare(`SELECT SUM(monto) as total FROM cobros`)
+            .get();
+        const totalRevenue = totalRevenueResult.total || 0;
+        res.status(200).json({
+            weekly: {
+                ots: weeklyOTs,
+                invoices: weeklyInvoices,
+                revenue: weeklyRevenue,
+            },
+            totals: {
+                ots: totalOTs,
+                invoices: totalInvoices,
+                revenue: totalRevenue,
+            },
+        });
+    }
+    catch (error) {
+        console.error("Error en /dashboard/administracion:", error);
+        res
+            .status(500)
+            .json({ error: "Error al obtener las estadísticas de administración." });
+    }
+});
 // [GET] /api/dashboard/stats
 router.get("/stats", (req, res) => {
     try {
@@ -104,11 +146,11 @@ router.get("/stats", (req, res) => {
         const getUpcomingInvoices = () => {
             return database_1.default
                 .prepare(`
-        SELECT 
-          f.id, 
-          f.numero_factura, 
-          f.monto, 
-          f.vencimiento, 
+        SELECT
+          f.id,
+          f.numero_factura,
+          f.monto,
+          f.vencimiento,
           c.name as cliente_name
         FROM facturas f
         JOIN clients c ON f.cliente_id = c.id
@@ -133,9 +175,9 @@ router.get("/stats", (req, res) => {
             },
             recentOrders: database_1.default
                 .prepare(`
-                SELECT ot.id, ot.product, ot.status, ot.date, c.name as client_name 
-                FROM work_orders ot 
-                JOIN clients c ON ot.client_id = c.id 
+                SELECT ot.id, ot.product, ot.status, ot.date, c.name as client_name
+                FROM work_orders ot
+                JOIN clients c ON ot.client_id = c.id
                 ORDER BY ot.created_at DESC LIMIT 5
             `)
                 .all(),

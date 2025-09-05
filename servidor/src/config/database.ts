@@ -111,6 +111,23 @@ const runMigration = () => {
       db.exec("ALTER TABLE facturas ADD COLUMN observaciones TEXT;");
       console.log("[MIGRATION] 'observaciones' column added successfully.");
     }
+    // Migración para añadir la columna 'moneda'
+    const tableInfoMoneda = db
+      .prepare(
+        `SELECT sql FROM sqlite_master WHERE type='table' AND name='facturas'`
+      )
+      .get() as { sql: string | null };
+    if (
+      tableInfoMoneda &&
+      tableInfoMoneda.sql &&
+      !tableInfoMoneda.sql.includes("moneda TEXT")
+    ) {
+      console.log("[MIGRATION] Adding 'moneda' column to 'facturas' table.");
+      db.exec(
+        "ALTER TABLE facturas ADD COLUMN moneda TEXT NOT NULL DEFAULT 'ARS';"
+      );
+      console.log("[MIGRATION] 'moneda' column added successfully.");
+    }
 
     // --- NUEVA MIGRACIÓN para la tabla 'cobros' ---
     const cobrosTableInfo = db.prepare(`PRAGMA table_info(cobros)`).all() as {
@@ -262,6 +279,7 @@ db.exec(`
     observaciones TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     motivo_archivo TEXT,
+    moneda TEXT NOT NULL DEFAULT 'ARS' CHECK(moneda IN ('ARS', 'USD')),
     FOREIGN KEY (cliente_id) REFERENCES clients(id) ON DELETE SET NULL
   );
 

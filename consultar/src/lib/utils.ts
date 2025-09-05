@@ -1,85 +1,64 @@
-// RUTA: /cliente/src/lib/utils.ts
+// RUTA: consultar/src/lib/utils.ts (Corregido)
 
 import { type ClassValue, clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
-import { Activity } from "../services/otService"; // Importar el tipo Activity
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-export const formatDate = (dateString: string | null | undefined): string => {
-  if (!dateString) return "N/A";
-  const date = new Date(dateString);
-  // Ajustar por la zona horaria para evitar errores de un día
-  const userTimezoneOffset = date.getTimezoneOffset() * 60000;
-  return new Date(date.getTime() + userTimezoneOffset).toLocaleDateString(
-    "es-AR",
-    {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-    }
-  );
-};
-
-export const formatDateTime = (
-  dateString: string | null | undefined
-): string => {
-  if (!dateString) return "N/A";
-  const date = new Date(dateString);
-  return date.toLocaleString("es-AR", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-};
-
-export const formatCurrency = (amount: number | null | undefined): string => {
-  if (amount === null || amount === undefined) return "$0.00";
-  return amount.toLocaleString("es-AR", {
+export function formatCurrency(amount: number, currency: string = "ARS") {
+  const formatter = new Intl.NumberFormat("es-AR", {
     style: "currency",
-    currency: "ARS",
+    currency: currency,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
   });
-};
 
-// --- NUEVA FUNCIÓN MOVILIZADA AQUÍ ---
-export const calculateEstimatedDeliveryDate = (
-  activities: { activity: string }[] | undefined,
-  startDate: string
-): string => {
-  if (!activities || activities.length === 0 || !startDate) {
-    return "";
+  // Ajusta el formato de USD para mayor claridad
+  if (currency === "USD") {
+    return formatter.format(amount).replace("US$", "USD ");
   }
 
-  const activityDurations: { [key: string]: number } = {
-    Calibracion: 7,
-    Completo: 45,
-    Ampliado: 30,
-    Refurbished: 7,
-    Fabricacion: 45,
-    "Verificacion de identidad": 21,
-    Reducido: 21,
-    "Servicio tecnico": 7,
-    Capacitacion: 10,
-    Emision: 1,
-  };
+  return formatter.format(amount);
+}
 
-  const validActivities = activities.filter((act) => act && act.activity);
-  if (validActivities.length === 0) {
-    return "";
+export function formatDate(dateString: string) {
+  const date = new Date(dateString);
+  const day = String(date.getDate()).padStart(2, "0");
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const year = date.getFullYear();
+  return `${day}/${month}/${year}`;
+}
+
+export function formatDateTime(dateString: string) {
+  if (!dateString) return "N/A";
+  try {
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) {
+      return "Fecha inválida";
+    }
+    return new Intl.DateTimeFormat("es-AR", {
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).format(date);
+  } catch (error) {
+    console.error("Error formatting date:", dateString, error);
+    return "Fecha inválida";
   }
+}
 
-  const maxDuration = Math.max(
-    ...validActivities.map((act) => activityDurations[act.activity] || 0)
-  );
-
-  if (maxDuration === 0) return "";
-
-  const date = new Date(startDate + "T00:00:00");
-  date.setDate(date.getDate() + maxDuration);
-
-  return date.toISOString().split("T")[0]; // Devuelve en formato YYYY-MM-DD
-};
+/**
+ * Calcula una fecha futura sumando un número de días a la fecha actual.
+ * Devuelve la fecha en formato YYYY-MM-DD.
+ */
+export function calculateEstimatedDeliveryDate(days: number): string {
+  if (typeof days !== "number" || days < 0) {
+    // Devuelve la fecha de hoy si los días no son válidos
+    return new Date().toISOString().split("T")[0];
+  }
+  const date = new Date();
+  date.setDate(date.getDate() + days);
+  return date.toISOString().split("T")[0];
+}

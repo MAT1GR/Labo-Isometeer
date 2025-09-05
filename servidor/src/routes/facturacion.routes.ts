@@ -1,4 +1,4 @@
-// RUTA: /servidor/src/routes/facturacion.routes.ts
+// RUTA: /servidor/src/routes/facturacion.routes.ts (Corregido)
 
 import { Router } from "express";
 import db from "../config/database";
@@ -16,7 +16,7 @@ router.get("/", (req, res) => {
     const { cliente_id, fecha_desde, fecha_hasta, estado } = req.query;
     let baseQuery = `
       SELECT 
-        f.id, f.numero_factura, f.monto, f.iva, f.vencimiento, f.estado, f.cliente_id, f.created_at, f.tipo, f.observaciones, f.motivo_archivo,
+        f.id, f.numero_factura, f.monto, f.iva, f.vencimiento, f.estado, f.cliente_id, f.created_at, f.tipo, f.observaciones, f.motivo_archivo, f.moneda,
         c.name as cliente_name,
         (SELECT SUM(monto) FROM cobros WHERE factura_id = f.id) as pagado,
         GROUP_CONCAT(ot.custom_id) as ots_asociadas
@@ -29,9 +29,6 @@ router.get("/", (req, res) => {
     const whereClauses: string[] = [];
     const params: any[] = [];
 
-    // Si no se especifica un estado, no se incluyen las archivadas.
-    // Si el estado es 'archivada', solo se muestran esas.
-    // En cualquier otro caso, el filtro por estado funcionará como siempre.
     if (!estado) {
       whereClauses.push("f.estado != 'archivada'");
     } else {
@@ -65,6 +62,7 @@ router.get("/", (req, res) => {
     res.status(500).json({ error: "Error al obtener las facturas." });
   }
 });
+
 // [PATCH] /api/facturacion/:id/archive - Archivar una factura con motivo
 router.patch("/:id/archive", (req, res) => {
   try {
@@ -105,7 +103,7 @@ router.get("/:id", (req, res) => {
         `
       SELECT ot.id, ot.custom_id, ot.product 
       FROM work_orders ot
-      JOIN factura_ots fo ON ot.id = fo.factura_id
+      JOIN factura_ots fo ON ot.id = fo.ot_id
       WHERE fo.factura_id = ?
     `
       )
@@ -151,6 +149,7 @@ router.get("/:id", (req, res) => {
   }
 });
 
+// ... (resto del archivo sin cambios)
 // [POST] /api/facturacion - Crear una nueva factura
 router.post("/", (req, res) => {
   const {
@@ -162,6 +161,7 @@ router.post("/", (req, res) => {
     calculation_type = "manual",
     tipo,
     observaciones,
+    moneda,
   } = req.body;
 
   if (!numero_factura || !vencimiento || !cliente_id) {
@@ -214,7 +214,7 @@ router.post("/", (req, res) => {
       const montoFinal = montoNeto + totalIva;
 
       const insertFacturaStmt = db.prepare(
-        "INSERT INTO facturas (numero_factura, monto, iva, vencimiento, estado, cliente_id, tipo, observaciones) VALUES (?, ?, ?, ?, 'pendiente', ?, ?, ?)"
+        "INSERT INTO facturas (numero_factura, monto, iva, vencimiento, estado, cliente_id, tipo, observaciones, moneda) VALUES (?, ?, ?, ?, 'pendiente', ?, ?, ?, ?)"
       );
       const info = insertFacturaStmt.run(
         numero_factura,
@@ -223,7 +223,8 @@ router.post("/", (req, res) => {
         vencimiento,
         cliente_id,
         tipo,
-        observaciones
+        observaciones,
+        moneda
       );
       const facturaId = info.lastInsertRowid;
 

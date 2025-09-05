@@ -19,6 +19,7 @@ export interface Factura {
   tipo: "A" | "B" | "C" | "E" | "ND" | "NC";
   observaciones: string;
   motivo_archivo?: string;
+  moneda: string; // <-- Propiedad añadida
 }
 export interface Cobro {
   id: number;
@@ -53,6 +54,7 @@ export interface FacturaCreateData {
   calculation_type: "manual" | "activities";
   tipo: "A" | "B" | "C" | "E" | "ND" | "NC";
   observaciones?: string;
+  moneda: string; // <-- Propiedad añadida
 }
 
 // Nuevo tipo para los datos de edición de cobro

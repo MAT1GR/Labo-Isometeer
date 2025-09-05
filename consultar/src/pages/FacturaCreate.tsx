@@ -38,6 +38,7 @@ const FacturaCreate: React.FC = () => {
       ot_ids: [],
       calculation_type: "manual",
       tipo: "A",
+      moneda: "ARS",
     },
   });
 
@@ -76,6 +77,7 @@ const FacturaCreate: React.FC = () => {
 
   const availableOts = ots?.filter((ot) => !ot.facturada) || [];
   const isMontoDisabled = calculationType === "activities";
+  const moneda = watch("moneda");
 
   return (
     <div className="max-w-4xl mx-auto p-4">
@@ -150,9 +152,25 @@ const FacturaCreate: React.FC = () => {
               })}
               error={errors.vencimiento?.message}
             />
+            <div>
+              <label
+                htmlFor="moneda"
+                className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+              >
+                Moneda
+              </label>
+              <select
+                id="moneda"
+                {...register("moneda")}
+                className="w-full p-2 border rounded-md dark:bg-gray-800 dark:border-gray-600 focus:border-indigo-500 focus:ring-indigo-500"
+              >
+                <option value="ARS">ARS</option>
+                <option value="USD">USD</option>
+              </select>
+            </div>
             <div className="md:col-span-2">
               <Input
-                label="Monto Total (ARS)"
+                label={`Monto Total (${moneda})`}
                 type="number"
                 step="0.01"
                 {...register("monto", {

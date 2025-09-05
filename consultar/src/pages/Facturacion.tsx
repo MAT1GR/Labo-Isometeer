@@ -239,7 +239,7 @@ const Facturacion: React.FC = () => {
                         onClick={() => navigate(`/facturacion/${factura.id}`)}
                         className="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-500 dark:text-gray-300"
                       >
-                        {formatCurrency(factura.monto)}
+                        {formatCurrency(factura.monto, factura.moneda)}
                       </td>
                       <td
                         onClick={() => navigate(`/facturacion/${factura.id}`)}
