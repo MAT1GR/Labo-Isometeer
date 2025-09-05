@@ -1,45 +1,183 @@
-// RUTA: consultar/src/pages/OTCreate.tsx (Corregido)
+// RUTA: /consultar/src/pages/OTCreate.tsx
 
-import React, { useState, useEffect } from "react";
-import { useForm, useFieldArray, Controller } from "react-hook-form";
+import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import useSWR from "swr";
-import { clientService, Client } from "../services/clientService";
-import { otService, WorkOrderCreateData } from "../services/otService";
+import {
+  useForm,
+  useWatch,
+  useFieldArray,
+  Controller,
+  useForm as useModalForm,
+} from "react-hook-form";
+import { otService, WorkOrder, Activity } from "../services/otService";
+import { clientService, Client, Contact } from "../services/clientService";
+import { authService, User } from "../services/auth";
 import { contractService, Contract } from "../services/contractService";
+import { adminService, ActivityPoint } from "../services/adminService";
+import { facturacionService, Factura } from "../services/facturacionService";
 import { useAuth } from "../contexts/AuthContext";
-import Card from "../components/ui/Card";
 import Input from "../components/ui/Input";
 import Button from "../components/ui/Button";
-import { Checkbox } from "../components/ui/Checkbox";
+import {
+  Save,
+  PlusCircle,
+  Trash2,
+  Loader,
+  UserSquare,
+  Package,
+  ClipboardList,
+  BookText,
+  FileText,
+  Plus,
+} from "lucide-react";
+import axiosInstance from "../api/axiosInstance";
+import MultiUserSelect from "../components/ui/MultiUserSelect";
+import { calculateEstimatedDeliveryDate, formatCurrency } from "../lib/utils";
 import ClienteSelect from "../components/ui/ClienteSelect";
-import { ArrowLeft, Plus, Trash2 } from "lucide-react";
-import { calculateEstimatedDeliveryDate } from "../lib/utils";
+import Card from "../components/ui/Card";
 import NavigationPrompt from "../components/ui/NavigationPrompt";
+import Select from "react-select";
+
+// --- Interfaces de Tipos para los Formularios ---
+interface FacturaFormData {
+  numero_factura: string;
+  monto: number;
+  vencimiento: string;
+}
+
+interface CreateFacturaModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  clienteId: number;
+  clienteName: string;
+  suggestedAmount: number;
+  onFacturaCreated: (newFactura: { id: number }) => void;
+}
+
+// --- Componente para el Modal de Creación de Factura ---
+const CreateFacturaModal: React.FC<CreateFacturaModalProps> = ({
+  isOpen,
+  onClose,
+  clienteId,
+  clienteName,
+  suggestedAmount,
+  onFacturaCreated,
+}) => {
+  const {
+    register,
+    handleSubmit,
+    setValue,
+    formState: { isSubmitting },
+  } = useModalForm<FacturaFormData>();
+
+  useEffect(() => {
+    if (isOpen) {
+      setValue("monto", suggestedAmount >= 0 ? suggestedAmount : 0);
+      setValue("vencimiento", new Date().toISOString().split("T")[0]);
+    }
+  }, [isOpen, suggestedAmount, setValue]);
+
+  const onSubmit = async (data: FacturaFormData) => {
+    if (!clienteId) {
+      alert("Error: No se ha seleccionado un cliente.");
+      return;
+    }
+    try {
+      const newFactura = await facturacionService.createFactura({
+        ...data,
+        monto: Number(data.monto),
+        cliente_id: clienteId,
+      });
+      onFacturaCreated(newFactura);
+    } catch (error) {
+      console.error("Error al crear la factura", error);
+      alert("No se pudo crear la factura.");
+    }
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-60 flex justify-center items-center z-50">
+      <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-xl w-full max-w-md">
+        <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100 mb-4">
+          Crear Nueva Factura
+        </h2>
+        <p className="mb-6 text-sm text-gray-600 dark:text-gray-300">
+          Cliente: <span className="font-semibold">{clienteName}</span>
+        </p>
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+          <Input
+            label="Número de Factura"
+            {...register("numero_factura", { required: true })}
+            autoFocus
+          />
+          <Input
+            label="Monto (sugerido por actividades)"
+            type="number"
+            step="0.01"
+            {...register("monto", { required: true, valueAsNumber: true })}
+          />
+          <Input
+            label="Fecha de Vencimiento"
+            type="date"
+            {...register("vencimiento", { required: true })}
+          />
+          <div className="flex justify-end gap-4 pt-4">
+            <Button type="button" variant="outline" onClick={onClose}>
+              Cancelar
+            </Button>
+            <Button type="submit" disabled={isSubmitting}>
+              {isSubmitting ? "Creando..." : "Crear Factura"}
+            </Button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+// Tipo para los datos de una actividad en el formulario de creación
+type ActivityFormData = Omit<Activity, "id" | "work_order_id" | "status">;
+
+// Tipo principal para el formulario de creación de OT
+type OTCreateFormData = Omit<
+  WorkOrder,
+  | "id"
+  | "created_at"
+  | "updated_at"
+  | "client_name"
+  | "creator_name"
+  | "contact_name"
+  | "activities"
+> & {
+  activities: Partial<ActivityFormData>[];
+  factura_ids?: number[];
+};
 
 const OTCreate: React.FC = () => {
-  const navigate = useNavigate();
   const { user } = useAuth();
-  const [selectedClientId, setSelectedClientId] = useState<number | null>(null);
-  const [selectedClient, setSelectedClient] = useState<Client | null>(null);
-  const [selectedContactId, setSelectedContactId] = useState<number | null>(
-    null
-  );
-
+  const navigate = useNavigate();
   const {
     register,
     handleSubmit,
     control,
-    watch,
     setValue,
-    formState: { errors, isSubmitting, isDirty },
-  } = useForm<WorkOrderCreateData>({
+    getValues,
+    formState: { isSubmitting, isDirty },
+  } = useForm<OTCreateFormData>({
     defaultValues: {
       date: new Date().toISOString().split("T")[0],
-      activities: [],
-      authorized: false,
+      status: "pendiente",
+      activities: [
+        {
+          activity: "",
+          assigned_users: [],
+          norma: "",
+          precio_sin_iva: undefined,
+        },
+      ],
       contract_type: "Contrato de Producción",
-      moneda: "ARS",
     },
   });
 
@@ -48,413 +186,513 @@ const OTCreate: React.FC = () => {
     name: "activities",
   });
 
-  const { data: clients } = useSWR<Client[]>(
-    "/clients",
-    clientService.getAllClients
-  );
-  const { data: contracts } = useSWR<Contract[]>(
-    "/contracts",
-    contractService.getAllContracts
-  );
+  const [isSaving, setIsSaving] = useState(false);
+  const [clients, setClients] = useState<Client[]>([]);
+  const [contacts, setContacts] = useState<Contact[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
+  const [contracts, setContracts] = useState<Contract[]>([]);
+  const [activityOptions, setActivityOptions] = useState<ActivityPoint[]>([]);
+  const [facturasCliente, setFacturasCliente] = useState<Factura[]>([]);
+  const [idPreview, setIdPreview] = useState("Completar campos...");
+  const [isIdLoading, setIsIdLoading] = useState(false);
+  const [isCreateFacturaModalOpen, setCreateFacturaModalOpen] = useState(false);
 
-  const watchClientId = watch("client_id");
-  const activities = watch("activities");
-  const moneda = watch("moneda");
+  const watchedActivities = useWatch({ control, name: "activities" });
+  const watchedIdFields = useWatch({
+    control,
+    name: ["date", "type", "client_id"],
+  });
+  const otType = watchedIdFields[1] as string;
+  const selectedClientId = watchedIdFields[2] as number;
 
-  const isMonedaLocked = activities.some(
-    (act) => act.precio_sin_iva && Number(act.precio_sin_iva) > 0
-  );
+  const isLacreEnabled =
+    otType === "Ensayo SE" ||
+    otType === "Ensayo EE" ||
+    otType === "Otros Servicios";
 
   useEffect(() => {
-    if (watchClientId && clients) {
-      const client = clients.find((c) => c.id === watchClientId);
-      setSelectedClient(client || null);
-      // Reset contact when client changes
-      setSelectedContactId(null);
-      setValue("contact_id", undefined);
+    if (otType === "Calibracion") {
+      setValue("contract_type", "Contrato de Calibración");
+    } else if (otType === "Ensayo SE" || otType === "Ensayo EE") {
+      setValue("contract_type", "Contrato de Ensayo");
     } else {
-      setSelectedClient(null);
+      setValue("contract_type", "Contrato de Producción");
     }
-  }, [watchClientId, clients, setValue]);
+  }, [otType, setValue]);
 
-  const onSubmit = async (data: WorkOrderCreateData) => {
-    if (!user) {
-      alert("Debes estar logueado para crear una OT.");
-      return;
+  useEffect(() => {
+    const loadPrerequisites = async () => {
+      try {
+        const [clientList, userList, contractList, activityList] =
+          await Promise.all([
+            clientService.getAllClients(),
+            authService.getAllUsers(),
+            contractService.getAllContracts(),
+            adminService.getPuntajes(),
+          ]);
+        setClients(clientList);
+        setUsers(userList);
+        setContracts(contractList);
+        setActivityOptions(activityList);
+      } catch (error) {
+        console.error("Error cargando datos para el formulario:", error);
+      }
+    };
+    loadPrerequisites();
+  }, []);
+
+  const fetchClientFacturas = async (clientId: number) => {
+    const facturas = await facturacionService.getFacturasByClienteId(clientId);
+    setFacturasCliente(facturas);
+  };
+
+  useEffect(() => {
+    const fetchClientData = async () => {
+      if (selectedClientId) {
+        const client = await clientService.getClientById(
+          Number(selectedClientId)
+        );
+        setContacts(client.contacts);
+        setValue("contact_id", undefined);
+        fetchClientFacturas(Number(selectedClientId));
+      } else {
+        setContacts([]);
+        setFacturasCliente([]);
+      }
+    };
+    fetchClientData();
+  }, [selectedClientId, setValue]);
+
+  useEffect(() => {
+    const [date, type, clientId] = watchedIdFields;
+
+    if (date && type && clientId) {
+      setIsIdLoading(true);
+      const params = new URLSearchParams({
+        date: date as string,
+        type: type as string,
+        client_id: String(clientId),
+      });
+      axiosInstance
+        .get(`/ots/generate-id?${params.toString()}`)
+        .then((response) => {
+          const newId = response.data.previewId;
+          setIdPreview(newId);
+          setValue("custom_id", newId);
+        })
+        .finally(() => setIsIdLoading(false));
+    } else {
+      setIdPreview("Completar campos...");
     }
+  }, [watchedIdFields, setValue]);
+
+  useEffect(() => {
+    const date = watchedIdFields[0];
+    if (date && watchedActivities) {
+      // @ts-ignore - Assuming calculateEstimatedDeliveryDate is robust enough
+      const estimatedDate = calculateEstimatedDeliveryDate(
+        watchedActivities,
+        date as string
+      );
+      setValue("estimated_delivery_date", estimatedDate);
+    }
+  }, [watchedActivities, watchedIdFields, setValue]);
+
+  const onSubmit = async (data: OTCreateFormData) => {
+    if (!user) return;
+    setIsSaving(true);
     try {
-      const dataToSend = {
+      const dataToSubmit = {
         ...data,
-        client_id: selectedClientId!,
-        contact_id: selectedContactId ?? undefined,
+        client_id: Number(data.client_id),
+        contact_id: data.contact_id ? Number(data.contact_id) : undefined,
         created_by: user.id,
+        collaborator_observations: "",
+        // CORREGIDO: Asegurarse de que 'assigned_users' envía solo los IDs
+        activities: data.activities.map((act) => ({
+          ...act,
+          assigned_users: (act.assigned_users || []).map((u) =>
+            typeof u === "number" ? u : u.id
+          ),
+        })),
       };
-      const result = await otService.createOT(dataToSend);
-      alert(`¡OT ${result.custom_id} creada con éxito!`);
-      navigate(`/ots/${result.id}`);
+      const newOt = await otService.createOT(dataToSubmit as any);
+      navigate(`/ots/${newOt.id}`);
     } catch (error) {
-      console.error("Error al crear la OT:", error);
-      alert("No se pudo crear la OT. Revisa la consola para más detalles.");
+      alert("Hubo un error al crear la Orden de Trabajo.");
+      setIsSaving(false);
     }
   };
 
-  const handleAddActivity = () => {
-    append({ activity: "", norma: "", precio_sin_iva: 0 });
-  };
-
-  const handleDeliveryDaysChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const days = parseInt(e.target.value, 10);
-    if (!isNaN(days) && days >= 0) {
-      setValue("estimated_delivery_date", calculateEstimatedDeliveryDate(days));
+  const handleFacturaCreated = async (newFactura: { id: number }) => {
+    if (typeof selectedClientId === "number") {
+      await fetchClientFacturas(selectedClientId);
+      const currentFacturaIds = getValues("factura_ids") || [];
+      setValue("factura_ids", [...currentFacturaIds, newFactura.id], {
+        shouldDirty: true,
+      });
+      setCreateFacturaModalOpen(false);
+    } else {
+      console.error(
+        "ID de cliente no válido al intentar actualizar las facturas."
+      );
     }
   };
+
+  const getAvailableActivities = (currentIndex: number) => {
+    const selectedActivities =
+      watchedActivities?.map((act) => act.activity) || [];
+    const currentActivity = watchedActivities?.[currentIndex]?.activity;
+    return activityOptions.filter(
+      (opt) =>
+        !selectedActivities.includes(opt.activity) ||
+        opt.activity === currentActivity
+    );
+  };
+
+  const otTypes = [
+    { value: "Produccion", label: "Producción" },
+    { value: "Calibracion", label: "Calibración" },
+    { value: "Ensayo SE", label: "Ensayo SE" },
+    { value: "Ensayo EE", label: "Ensayo EE" },
+    { value: "Otros Servicios", label: "Otros Servicios" },
+  ];
+
+  const facturaOptions = facturasCliente.map((f) => ({
+    value: f.id,
+    label: `${f.numero_factura} - ${formatCurrency(f.monto)}`,
+  }));
+
+  const suggestedAmountForFactura =
+    watchedActivities?.reduce(
+      (sum, act) => sum + (Number(act.precio_sin_iva) || 0),
+      0
+    ) || 0;
 
   return (
-    <div className="max-w-6xl mx-auto p-4">
-      <NavigationPrompt when={isDirty} />
-      <div className="flex items-center mb-6">
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => navigate("/ots")}
-          aria-label="Volver a Órdenes de Trabajo"
-        >
-          <ArrowLeft />
-        </Button>
-        <h1 className="text-3xl font-bold ml-4">
-          Crear Nueva Orden de Trabajo
-        </h1>
-      </div>
+    <>
+      <NavigationPrompt
+        when={isDirty && !isSaving}
+        onSave={handleSubmit(onSubmit)}
+      />
+      <CreateFacturaModal
+        isOpen={isCreateFacturaModalOpen}
+        onClose={() => setCreateFacturaModalOpen(false)}
+        clienteId={Number(selectedClientId)}
+        clienteName={
+          clients.find((c) => c.id === Number(selectedClientId))?.name || ""
+        }
+        suggestedAmount={suggestedAmountForFactura}
+        onFacturaCreated={handleFacturaCreated}
+      />
 
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
-        {/* Sección de Cliente y Contacto */}
-        <Card>
-          <div className="p-6">
-            <h2 className="text-xl font-semibold mb-4">1. Datos del Cliente</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <Controller
-                name="client_id"
-                control={control}
-                rules={{ required: "Debe seleccionar un cliente" }}
-                render={({ field }) => (
-                  <ClienteSelect
-                    clients={clients || []}
-                    selectedClientId={field.value}
-                    onChange={(value) => {
-                      const id = value ? Number(value) : null;
-                      field.onChange(id);
-                      setSelectedClientId(id);
-                    }}
-                    error={errors.client_id?.message}
-                  />
-                )}
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+        <div className="flex justify-between items-center">
+          <h1 className="text-3xl font-bold">Crear Nueva Orden de Trabajo</h1>
+          <div className="flex gap-4">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => navigate("/ots")}
+            >
+              Cancelar
+            </Button>
+            <Button
+              type="submit"
+              disabled={isSubmitting}
+              className="flex items-center gap-2"
+            >
+              <Save className="h-5 w-5" />
+              {isSubmitting ? "Creando..." : "Crear y Continuar"}
+            </Button>
+          </div>
+        </div>
+        <div className="space-y-6">
+          <Card>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+              <Input
+                label="Fecha *"
+                type="date"
+                {...register("date", { required: true })}
               />
               <div>
-                <label
-                  htmlFor="contact_id"
-                  className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
-                >
-                  Contacto (Opcional)
+                <label className="text-sm font-medium dark:text-gray-300">
+                  Tipo de OT *
                 </label>
                 <select
-                  id="contact_id"
-                  {...register("contact_id", {
-                    setValueAs: (v) => (v ? Number(v) : undefined),
-                  })}
-                  value={selectedContactId ?? ""}
-                  onChange={(e) =>
-                    setSelectedContactId(
-                      e.target.value ? Number(e.target.value) : null
-                    )
-                  }
-                  disabled={!selectedClient || !selectedClient.contacts?.length}
-                  className="w-full p-2 border rounded-md dark:bg-gray-800 dark:border-gray-600 focus:border-indigo-500 focus:ring-indigo-500 disabled:bg-gray-200"
+                  {...register("type", { required: true })}
+                  className="w-full mt-1 p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
                 >
-                  <option value="">
-                    {selectedClient
-                      ? "Seleccione un contacto"
-                      : "Seleccione un cliente primero"}
-                  </option>
-                  {selectedClient?.contacts?.map((contact) => (
-                    <option key={contact.id} value={contact.id}>
-                      {contact.name} ({contact.type})
+                  <option value="">Seleccionar tipo...</option>
+                  {otTypes.map((t) => (
+                    <option key={t.value} value={t.value}>
+                      {t.label}
                     </option>
                   ))}
                 </select>
               </div>
-            </div>
-          </div>
-        </Card>
-
-        {/* Sección de Equipo y OT */}
-        <Card>
-          <div className="p-6">
-            <h2 className="text-xl font-semibold mb-4">2. Datos del Equipo</h2>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <Input
-                label="Producto / Equipo"
-                {...register("product", {
-                  required: "El producto es obligatorio",
-                })}
-                error={errors.product?.message}
-              />
-              <Input label="Marca" {...register("brand")} />
-              <Input label="Modelo" {...register("model")} />
-              <Input
-                label="Número de Serie / Sello"
-                {...register("seal_number")}
-              />
               <div>
-                <label
-                  htmlFor="type"
-                  className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
-                >
-                  Tipo de Servicio
+                <label className="text-sm font-medium dark:text-gray-300">
+                  Contrato
                 </label>
                 <select
-                  id="type"
-                  {...register("type", {
-                    required: "El tipo de servicio es obligatorio",
-                  })}
-                  className="w-full p-2 border rounded-md dark:bg-gray-800 dark:border-gray-600 focus:border-indigo-500 focus:ring-indigo-500"
+                  {...register("contract_type")}
+                  className="w-full mt-1 p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
                 >
-                  <option value="Produccion">Producción</option>
-                  <option value="Calibracion">Calibración</option>
-                  <option value="Ensayo">Ensayo</option>
-                </select>
-                {errors.type && (
-                  <p className="mt-1 text-sm text-red-600">
-                    {errors.type.message}
-                  </p>
-                )}
-              </div>
-              <div>
-                <label
-                  htmlFor="contract_type"
-                  className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
-                >
-                  Tipo de Contrato
-                </label>
-                <select
-                  id="contract_type"
-                  {...register("contract_type", {
-                    required: "El contrato es obligatorio",
-                  })}
-                  className="w-full p-2 border rounded-md dark:bg-gray-800 dark:border-gray-600 focus:border-indigo-500 focus:ring-indigo-500"
-                >
-                  {contracts?.map((contract) => (
+                  <option value="">Sin contrato</option>
+                  {contracts.map((contract) => (
                     <option key={contract.id} value={contract.name}>
                       {contract.name}
                     </option>
                   ))}
                 </select>
-                {errors.contract_type && (
-                  <p className="mt-1 text-sm text-red-600">
-                    {errors.contract_type.message}
-                  </p>
+              </div>
+              <div className="relative">
+                <Input label="ID de OT" value={idPreview} disabled readOnly />
+                {isIdLoading && (
+                  <Loader className="absolute right-3 top-9 h-5 w-5 animate-spin text-gray-400" />
                 )}
               </div>
             </div>
-            <div className="mt-6">
-              <label
-                htmlFor="observations"
-                className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
-              >
-                Observaciones del Cliente
-              </label>
-              <textarea
-                id="observations"
-                {...register("observations")}
-                rows={3}
-                className="w-full p-2 border rounded-md dark:bg-gray-800 dark:border-gray-600 focus:border-indigo-500 focus:ring-indigo-500"
-              />
-            </div>
-          </div>
-        </Card>
+          </Card>
 
-        {/* Sección de Actividades y Fechas */}
-        <Card>
-          <div className="p-6">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-xl font-semibold">Actividades</h3>
-              {/* Selector de Moneda */}
+          <Card>
+            <h2 className="text-lg font-semibold text-blue-700 dark:text-blue-400 col-span-full mb-4 flex items-center gap-2">
+              <UserSquare size={20} /> Información del Cliente
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <Controller
+                control={control}
+                name="client_id"
+                rules={{ required: true }}
+                render={({ field }) => (
+                  <ClienteSelect
+                    clients={clients}
+                    selectedClientId={field.value as number | undefined}
+                    onChange={(value) => field.onChange(value)}
+                  />
+                )}
+              />
               <div>
-                <label
-                  htmlFor="moneda"
-                  className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
-                >
-                  Moneda de Actividades
+                <label className="text-sm font-medium dark:text-gray-300">
+                  Referente
                 </label>
                 <select
-                  id="moneda"
-                  {...register("moneda")}
-                  disabled={isMonedaLocked}
-                  className="w-full md:w-auto p-2 border rounded-md dark:bg-gray-800 dark:border-gray-600 focus:border-indigo-500 focus:ring-indigo-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                  {...register("contact_id")}
+                  className="w-full mt-1 p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
+                  disabled={!selectedClientId || contacts.length === 0}
                 >
-                  <option value="ARS">ARS</option>
-                  <option value="USD">USD</option>
+                  <option value="">
+                    {contacts.length > 0
+                      ? "Seleccionar referente..."
+                      : "Sin referentes"}
+                  </option>
+                  {contacts.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name} ({c.type})
+                    </option>
+                  ))}
                 </select>
               </div>
             </div>
-            {fields.map((field, index) => (
-              <div
-                key={field.id}
-                className="grid grid-cols-1 md:grid-cols-12 gap-4 items-center mb-4 p-3 border rounded-md"
-              >
-                <div className="md:col-span-4">
-                  <Input
-                    label="Descripción de la Actividad"
-                    {...register(`activities.${index}.activity`, {
-                      required: "La descripción es obligatoria",
-                    })}
-                    error={errors.activities?.[index]?.activity?.message}
-                  />
-                </div>
-                <div className="md:col-span-3">
-                  <Input
-                    label="Norma Aplicada"
-                    {...register(`activities.${index}.norma`)}
-                  />
-                </div>
-                <div className="md:col-span-3">
-                  <Input
-                    label={`Precio sin IVA (${moneda})`}
-                    type="number"
-                    step="0.01"
-                    {...register(`activities.${index}.precio_sin_iva`, {
-                      valueAsNumber: true,
-                      min: {
-                        value: 0,
-                        message: "El precio no puede ser negativo",
-                      },
-                    })}
-                    error={errors.activities?.[index]?.precio_sin_iva?.message}
-                  />
-                </div>
-                <div className="md:col-span-2 flex items-end">
-                  <Button
-                    type="button"
-                    variant="destructive"
-                    onClick={() => remove(index)}
-                    className="w-full"
-                  >
-                    <Trash2 className="mr-2 h-4 w-4" />
-                    Quitar
-                  </Button>
-                </div>
-              </div>
-            ))}
-            <Button type="button" variant="outline" onClick={handleAddActivity}>
-              <Plus className="mr-2 h-4 w-4" />
-              Añadir Actividad
-            </Button>
-            {/* Sección de Fechas */}
-            <div className="border-t pt-6 mt-6 grid grid-cols-1 md:grid-cols-3 gap-6">
+          </Card>
+
+          <Card>
+            <h2 className="text-lg font-semibold text-blue-700 dark:text-blue-400 col-span-full mb-4 flex items-center gap-2">
+              <Package size={20} /> Producto
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <Input
-                label="Fecha de Ingreso"
-                type="date"
-                {...register("date", {
-                  required: "La fecha de ingreso es obligatoria",
-                })}
-                error={errors.date?.message}
+                label="Nombre *"
+                {...register("product", { required: true })}
+              />
+              <Input label="Marca" {...register("brand")} />
+              <Input label="Modelo" {...register("model")} />
+              <Input
+                label="Nº de Lacre"
+                {...register("seal_number")}
+                disabled={!isLacreEnabled}
               />
               <Input
-                label="Vencimiento Certificado"
+                label="Vto. del Certificado"
                 type="date"
                 {...register("certificate_expiry")}
+                disabled={!isLacreEnabled}
               />
               <Input
-                label="Fecha Entrega Estimada"
+                label="Fecha de Entrega Estimada"
                 type="date"
                 {...register("estimated_delivery_date")}
               />
-              <div>
-                <label
-                  htmlFor="delivery_days"
-                  className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
-                >
-                  Calcular Entrega (días)
-                </label>
-                <Input
-                  id="delivery_days"
-                  type="number"
-                  placeholder="Ej: 15"
-                  onChange={handleDeliveryDaysChange}
-                />
-              </div>
             </div>
+          </Card>
 
-            {/* Disposition y Autorización */}
-            <div className="border-t pt-6 mt-6">
-              <h2 className="text-xl font-semibold mb-4">
-                3. Disposición y Autorización
+          <Card>
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-lg font-semibold text-blue-700 dark:text-blue-400 flex items-center gap-2">
+                <ClipboardList size={20} /> Actividades y Asignaciones
               </h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <label
-                    htmlFor="disposition"
-                    className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
-                  >
-                    Disposición Final del Equipo
-                  </label>
-                  <select
-                    id="disposition"
-                    {...register("disposition")}
-                    className="w-full p-2 border rounded-md dark:bg-gray-800 dark:border-gray-600 focus:border-indigo-500 focus:ring-indigo-500"
-                  >
-                    <option value="Se entrega calibrado">
-                      Se entrega calibrado
-                    </option>
-                    <option value="Se entrega sin calibrar">
-                      Se entrega sin calibrar
-                    </option>
-                    <option value="Queda en el laboratorio">
-                      Queda en el laboratorio
-                    </option>
-                  </select>
-                </div>
-                {user?.role !== "empleado" && (
-                  <div className="flex items-center pt-6">
-                    <Controller
-                      name="authorized"
-                      control={control}
-                      render={({ field }) => (
-                        <Checkbox
-                          id="authorized"
-                          checked={field.value}
-                          onCheckedChange={field.onChange}
-                          className="mr-3"
-                        />
-                      )}
-                    />
-                    <label
-                      htmlFor="authorized"
-                      className="text-sm font-medium text-gray-800 dark:text-gray-200"
-                    >
-                      Autorizar OT (requiere rol de Director o Administrador)
-                    </label>
-                  </div>
-                )}
-              </div>
+              <Button
+                type="button"
+                size="sm"
+                onClick={() =>
+                  append({
+                    activity: "",
+                    assigned_users: [],
+                    norma: "",
+                    precio_sin_iva: undefined,
+                  })
+                }
+              >
+                <PlusCircle className="h-4 w-4 mr-2" /> Agregar Actividad
+              </Button>
             </div>
-          </div>
-        </Card>
+            <div className="space-y-4">
+              {fields.map((field, index) => (
+                <div
+                  key={field.id}
+                  className="bg-gray-50 dark:bg-gray-700/50 p-4 rounded-md space-y-4"
+                >
+                  <div className="grid grid-cols-1 md:grid-cols-[1fr,2fr,auto] gap-4 items-start">
+                    <div>
+                      <label className="text-sm font-medium mb-1 dark:text-gray-300">
+                        Actividad
+                      </label>
+                      <select
+                        {...register(`activities.${index}.activity`)}
+                        className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
+                      >
+                        <option value="">Seleccionar...</option>
+                        {getAvailableActivities(index).map((opt) => (
+                          <option key={opt.id} value={opt.activity}>
+                            {opt.activity}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium mb-1 dark:text-gray-300">
+                        Asignar a
+                      </label>
+                      <Controller
+                        control={control}
+                        name={`activities.${index}.assigned_users`}
+                        render={({ field }) => (
+                          // CORREGIDO: Se transforma User[] a number[] y viceversa
+                          <MultiUserSelect
+                            users={users}
+                            selectedUserIds={(field.value || []).map(
+                              (u) => u.id
+                            )}
+                            onChange={(userIds: number[]) => {
+                              const selectedUsers = userIds
+                                .map((id) => users.find((u) => u.id === id))
+                                .filter(Boolean) as User[];
+                              field.onChange(selectedUsers);
+                            }}
+                          />
+                        )}
+                      />
+                    </div>
+                    <div className="self-end">
+                      <Button
+                        type="button"
+                        variant="danger"
+                        size="sm"
+                        onClick={() => remove(index)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <Input
+                      label="Norma"
+                      {...register(`activities.${index}.norma`)}
+                      placeholder="Ej: IEC 60601"
+                    />
+                    <Input
+                      label="Precio (Sin IVA)"
+                      type="number"
+                      step="0.01"
+                      {...register(`activities.${index}.precio_sin_iva`, {
+                        valueAsNumber: true,
+                      })}
+                      placeholder="Ej: 15000"
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </Card>
 
-        {/* Botones de Acción */}
-        <div className="flex justify-end gap-4 mt-8">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => navigate("/ots")}
-          >
-            Cancelar
-          </Button>
-          <Button type="submit" disabled={isSubmitting}>
-            {isSubmitting ? "Creando OT..." : "Crear Orden de Trabajo"}
-          </Button>
+          <Card>
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-lg font-semibold text-blue-700 dark:text-blue-400 flex items-center gap-2">
+                <FileText size={20} /> Facturas Vinculadas
+              </h2>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => setCreateFacturaModalOpen(true)}
+                disabled={!selectedClientId}
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Crear Factura
+              </Button>
+            </div>
+            <div>
+              <label className="text-sm font-medium dark:text-gray-300">
+                Vincular facturas existentes
+              </label>
+              <Controller
+                name="factura_ids"
+                control={control}
+                render={({ field }) => (
+                  <Select
+                    isMulti
+                    options={facturaOptions}
+                    value={facturaOptions.filter(
+                      (option) =>
+                        Array.isArray(field.value) &&
+                        field.value.includes(option.value)
+                    )}
+                    isDisabled={!selectedClientId}
+                    placeholder={
+                      !selectedClientId
+                        ? "Seleccione un cliente primero"
+                        : "Buscar y seleccionar facturas..."
+                    }
+                    onChange={(selectedOptions) =>
+                      field.onChange(
+                        selectedOptions.map((option) => option.value)
+                      )
+                    }
+                    className="react-select-container mt-1"
+                    classNamePrefix="react-select"
+                  />
+                )}
+              />
+            </div>
+          </Card>
+
+          <Card>
+            <h2 className="text-lg font-semibold text-blue-700 dark:text-blue-400 col-span-full mb-4 flex items-center gap-2">
+              <BookText size={20} /> Observaciones
+            </h2>
+            <label className="text-sm font-medium dark:text-gray-300">
+              Observaciones Generales (visibles para el cliente)
+            </label>
+            <textarea
+              {...register("observations")}
+              className="w-full mt-1 p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
+              rows={3}
+            ></textarea>
+          </Card>
         </div>
       </form>
-    </div>
+    </>
   );
 };
 

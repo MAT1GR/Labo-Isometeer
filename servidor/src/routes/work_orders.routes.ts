@@ -2,7 +2,7 @@
 
 import { Router } from "express";
 import db from "../config/database";
-import sseService from "../services/sseService"; // <-- LÍNEA CORREGIDA
+import * as sseService from "../services/sseService"; // <-- CORREGIDO: Se utiliza una importación de espacio de nombres
 
 const router = Router();
 

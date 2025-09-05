@@ -72,19 +72,22 @@ export interface WorkOrderCreateData {
 
 export const otService = {
   getAllOTs: async (filters: any): Promise<WorkOrder[]> => {
-    const { data } = await apiClient.get("/work_orders", { params: filters });
+    // CORREGIDO: La ruta ahora es '/ots' en lugar de '/work_orders'
+    const { data } = await apiClient.get("/ots", { params: filters });
     return data;
   },
 
   getOTById: async (id: number): Promise<WorkOrder> => {
-    const { data } = await apiClient.get(`/work_orders/${id}`);
+    // CORREGIDO: La ruta ahora es '/ots/:id'
+    const { data } = await apiClient.get(`/ots/${id}`);
     return data;
   },
 
   createOT: async (
     otData: WorkOrderCreateData
   ): Promise<{ id: number; custom_id: string }> => {
-    const { data } = await apiClient.post("/work_orders", otData);
+    // CORREGIDO: La ruta ahora es '/ots'
+    const { data } = await apiClient.post("/ots", otData);
     return data;
   },
 
@@ -92,7 +95,8 @@ export const otService = {
     id: number,
     otData: Partial<WorkOrder>
   ): Promise<WorkOrder> => {
-    const { data } = await apiClient.patch(`/work_orders/${id}`, otData);
+    // CORREGIDO: La ruta ahora es '/ots/:id'
+    const { data } = await apiClient.patch(`/ots/${id}`, otData);
     return data;
   },
 

@@ -48,6 +48,20 @@ export const sseHandler = (req: Request, res: Response, userId: number) => {
 };
 
 /**
+ * Envía datos a todos los clientes conectados o a un cliente específico.
+ * @param data - El objeto de datos a enviar. Si contiene recipient_id, se envía a ese usuario.
+ */
+export const send = (data: any) => {
+  if (data.recipient_id) {
+    sendNotificationToUser(data.recipient_id, data);
+  } else {
+    clients.forEach((client) => {
+      client.res.write(`data: ${JSON.stringify(data)}\n\n`);
+    });
+  }
+};
+
+/**
  * Envía datos a un usuario específico a través de su conexión SSE.
  * @param userId - El ID del usuario destinatario.
  * @param data - El objeto de datos a enviar (normalmente una notificación).
