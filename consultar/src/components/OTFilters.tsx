@@ -37,14 +37,6 @@ const OTFilters: React.FC<OTFiltersProps> = ({
     <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg border dark:border-gray-700 mb-6 shadow-md">
       <div className="flex justify-between items-center mb-4">
         <h3 className="text-lg font-semibold">Filtrar Órdenes de Trabajo</h3>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={onClose}
-          className="p-1 h-auto"
-        >
-          <X className="h-5 w-5" />
-        </Button>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <Input

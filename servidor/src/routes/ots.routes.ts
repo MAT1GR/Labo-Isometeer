@@ -189,7 +189,7 @@ router.post("/", (req: Request, res: Response) => {
       .status(403)
       .json({ error: "No tienes permisos para crear una OT." });
   }
-
+  
   const insertOTStmt = db.prepare(
     `INSERT INTO work_orders (
     custom_id, date, type, client_id, contact_id, product, brand, model,

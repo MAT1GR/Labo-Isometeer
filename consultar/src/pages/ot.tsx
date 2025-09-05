@@ -1,8 +1,8 @@
-// RUTA: /cliente/src/pages/OT.tsx
+// RUTA: /cliente/src/pages/ot.tsx
 
 import React, { useState, useMemo, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { otService, WorkOrder, OTFilters } from "../services/otService";
+import { otService, WorkOrder } from "../services/otService";
 import { clientService, Client } from "../services/clientService";
 import { authService, User } from "../services/auth";
 import { useAuth } from "../contexts/AuthContext";
@@ -12,7 +12,6 @@ import {
   PlusCircle,
   Briefcase,
   Trash2,
-  Edit,
   CheckSquare,
   XSquare,
   Filter,
@@ -21,7 +20,16 @@ import {
 } from "lucide-react";
 import useSWR, { mutate } from "swr";
 import ConfirmationModal from "../components/ui/ConfirmationModal";
-import OTFiltersComponent from "../components/OTFilters"; // Importamos el nuevo componente
+import OTFiltersComponent from "../components/OTFilters";
+
+export interface OTFilters {
+  client_id?: number;
+  status?: string;
+  assigned_to?: number;
+  authorized?: boolean;
+  start_date?: string;
+  end_date?: string;
+}
 
 const OTS_PER_PAGE = 50;
 
@@ -34,24 +42,22 @@ const OT: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [otToDelete, setOtToDelete] = useState<number | null>(null);
 
-  // Estados para los filtros
   const [filters, setFilters] = useState<OTFilters>({});
   const [showFilters, setShowFilters] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
 
-  // Fetching de datos para los selectores del filtro
   const { data: clients } = useSWR<Client[]>(
     "/clients",
     clientService.getAllClients
   );
   const { data: users } = useSWR<User[]>("/users", authService.getAllUsers);
 
-  // SWR ahora depende de los filtros. Se volverá a ejecutar cuando cambien.
+  // <-- CAMBIO AQUÍ: Se mejora la función fetcher de useSWR
   const {
     data: ots,
     error,
     isLoading,
-  } = useSWR(user ? ["/ots", user, filters] : null, () =>
+  } = useSWR(user ? ["/ots", user, filters] : null, ([, user, filters]) =>
     otService.getAllOTs(user, filters)
   );
 
@@ -220,7 +226,8 @@ const OT: React.FC = () => {
                 {paginatedOts.map((ot) => (
                   <tr
                     key={ot.id}
-                    className={`${
+                    onClick={() => navigate(`/ot/editar/${ot.id}`)}
+                    className={`cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-600 ${
                       !ot.authorized && canViewAdminContent()
                         ? "bg-orange-50 dark:bg-orange-900/20"
                         : ""
@@ -229,7 +236,10 @@ const OT: React.FC = () => {
                     {canAuthorizeOT() && (
                       <td className="px-6 py-4">
                         <button
-                          onClick={() => handleToggleAuthorization(ot)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleToggleAuthorization(ot);
+                          }}
                           title={ot.authorized ? "Desautorizar" : "Autorizar"}
                         >
                           {ot.authorized ? (
@@ -261,22 +271,14 @@ const OT: React.FC = () => {
                       </span>
                     </td>
                     <td className="px-6 py-4 text-right space-x-2">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => navigate(`/ot/editar/${ot.id}`)}
-                      >
-                        {canViewAdminContent() ? (
-                          <Edit className="h-4 w-4" />
-                        ) : (
-                          "Ver"
-                        )}
-                      </Button>
                       {canViewAdminContent() && (
                         <Button
                           size="sm"
                           variant="danger"
-                          onClick={() => handleDeleteRequest(ot.id)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteRequest(ot.id);
+                          }}
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -337,11 +339,5 @@ const OT: React.FC = () => {
     </>
   );
 };
-
-export interface OT {
-  id: number;
-  name: string;
-  description: string;
-}
 
 export default OT;
