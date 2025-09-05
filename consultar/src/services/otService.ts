@@ -1,23 +1,19 @@
-// RUTA: /cliente/src/services/otService.ts
+// RUTA: consultar/src/services/otService.ts
 
-import axiosInstance from "../api/axiosInstance";
-import { Client } from "./clientService";
+import apiClient from "../api/axiosInstance";
 import { User } from "./auth";
-import { Factura } from "./facturacionService";
 
 export interface Activity {
-  id?: number;
-  work_order_id?: number;
+  id: number;
+  work_order_id: number;
   activity: string;
-  name: string; // Se mantiene 'name' para consistencia interna
   norma?: string;
   precio_sin_iva?: number;
-  status?: "pendiente" | "en_progreso" | "finalizada";
-  assigned_users?: { id: number; name: string }[];
-  assigned_to?: number[];
-  // --- PROPIEDADES AÑADIDAS ---
-  started_at?: string; // Para mostrar la fecha de inicio
-  completed_at?: string; // Para mostrar la fecha de fin
+  status: "pendiente" | "en_progreso" | "finalizada";
+  started_at?: string;
+  completed_at?: string;
+  assigned_users?: User[]; //  usuarios asignados
+  assigned_users_names?: string;
 }
 
 export interface WorkOrder {
@@ -32,146 +28,76 @@ export interface WorkOrder {
   model?: string;
   seal_number?: string;
   observations?: string;
+  collaborator_observations?: string;
   certificate_expiry?: string;
   estimated_delivery_date?: string;
-  collaborator_observations?: string;
-  status:
-    | "pendiente"
-    | "en_progreso"
-    | "finalizada"
-    | "cancelada"
-    | "facturada"
-    | "cerrada";
+  status: string;
   created_by: number;
-  quotation_amount?: number;
-  quotation_details?: string;
+  created_at: string;
+  updated_at: string;
+  client_name?: string;
+  contact_name?: string;
+  creator_name?: string;
+  activities: Activity[];
+  facturada?: boolean;
+  disposition?: string;
+  authorized: boolean;
+  contract_type?: string;
+  moneda: "ARS" | "USD";
+}
+
+export interface WorkOrderCreateData {
+  date: string;
+  type: string;
+  client_id: number;
+  contact_id?: number;
+  product: string;
+  brand?: string;
+  model?: string;
+  seal_number?: string;
+  observations?: string;
+  certificate_expiry?: string;
+  estimated_delivery_date?: string;
+  created_by: number;
+  activities: {
+    activity: string;
+    norma?: string;
+    precio_sin_iva?: number;
+  }[];
   disposition?: string;
   authorized: boolean;
   contract_type: string;
-  activities?: Activity[];
-  client?: Client;
-  facturada?: boolean;
-  client_name?: string;
-  assigned_to_name?: string;
-  facturas?: Factura[];
-  factura_ids?: number[];
+  moneda: "ARS" | "USD";
 }
 
-export interface OTFilters {
-  searchTerm?: string;
-  clientId?: number;
-  assignedToId?: number;
-  status?: string;
-  authorized?: boolean;
-}
+export const otService = {
+  getAllOTs: async (filters: any): Promise<WorkOrder[]> => {
+    const { data } = await apiClient.get("/work_orders", { params: filters });
+    return data;
+  },
 
-class OTService {
-  getUserSummary(id: number): any {
-    throw new Error("Method not implemented.");
-  }
-  async getAllOTs(user: User | null, filters: OTFilters): Promise<WorkOrder[]> {
-    if (!user) {
-      return [];
-    }
-    const params: any = { ...filters };
-    if (user.role === "empleado") {
-      params.role = user.role;
-      params.assigned_to = user.id;
-    }
-    const response = await axiosInstance.get("/ots", { params });
-    return response.data;
-  }
+  getOTById: async (id: number): Promise<WorkOrder> => {
+    const { data } = await apiClient.get(`/work_orders/${id}`);
+    return data;
+  },
 
-  async getOTById(id: number): Promise<WorkOrder> {
-    const response = await axiosInstance.get(`/ots/${id}`);
-    return response.data;
-  }
+  createOT: async (
+    otData: WorkOrderCreateData
+  ): Promise<{ id: number; custom_id: string }> => {
+    const { data } = await apiClient.post("/work_orders", otData);
+    return data;
+  },
 
-  async createOT(data: Partial<WorkOrder>): Promise<WorkOrder> {
-    const response = await axiosInstance.post("/ots", data);
-    return response.data;
-  }
+  updateOT: async (
+    id: number,
+    otData: Partial<WorkOrder>
+  ): Promise<WorkOrder> => {
+    const { data } = await apiClient.patch(`/work_orders/${id}`, otData);
+    return data;
+  },
 
-  async updateOT(id: number, data: Partial<WorkOrder>): Promise<WorkOrder> {
-    const response = await axiosInstance.put(`/ots/${id}`, data);
-    return response.data;
-  }
-
-  async deleteOT(id: number): Promise<void> {
-    await axiosInstance.delete(`/ots/${id}`);
-  }
-
-  async addActivity(
-    otId: number,
-    activityData: Omit<Activity, "id" | "work_order_id">
-  ): Promise<Activity> {
-    const response = await axiosInstance.post(
-      `/ots/${otId}/activities`,
-      activityData
-    );
-    return response.data;
-  }
-
-  async updateActivity(
-    activityId: number,
-    activityData: Partial<Activity>
-  ): Promise<Activity> {
-    const response = await axiosInstance.put(
-      `/ots/activities/${activityId}`,
-      activityData
-    );
-    return response.data;
-  }
-
-  async deleteActivity(activityId: number): Promise<void> {
-    await axiosInstance.delete(`/ots/activities/${activityId}`);
-  }
-
-  async assignUserToActivity(
-    activityId: number,
-    userId: number
-  ): Promise<void> {
-    await axiosInstance.post(`/ots/activities/${activityId}/assign`, {
-      userId,
-    });
-  }
-
-  async unassignUserFromActivity(
-    activityId: number,
-    userId: number
-  ): Promise<void> {
-    await axiosInstance.delete(
-      `/ots/activities/${activityId}/assign/${userId}`
-    );
-  }
-
-  async getOTsByClientId(clientId: number): Promise<WorkOrder[]> {
-    const response = await axiosInstance.get(`/ots/cliente/${clientId}`);
-    return response.data;
-  }
-
-  async authorizeOT(id: number, userId: number): Promise<WorkOrder> {
-    const response = await axiosInstance.put(`/ots/${id}/authorize`, {
-      userId,
-    });
-    return response.data;
-  }
-
-  async deauthorizeOT(id: number): Promise<void> {
-    await axiosInstance.put(`/ots/${id}/deauthorize`);
-  }
-
-  async closeOT(id: number, userId: number): Promise<void> {
-    await axiosInstance.put(`/ots/${id}/close`, { userId });
-  }
-
-  async startActivity(activityId: number): Promise<void> {
-    await axiosInstance.put(`/ots/activities/${activityId}/start`);
-  }
-
-  async stopActivity(activityId: number): Promise<void> {
-    await axiosInstance.put(`/ots/activities/${activityId}/stop`);
-  }
-}
-
-export const otService = new OTService();
+  getOTsByClientId: async (clientId: number): Promise<WorkOrder[]> => {
+    const { data } = await apiClient.get(`/clients/${clientId}/ots`);
+    return data;
+  },
+};

@@ -218,7 +218,7 @@ db.exec(`
     FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE
   );
 
-  CREATE TABLE IF NOT EXISTS work_orders (
+ CREATE TABLE IF NOT EXISTS work_orders (
     id INTEGER PRIMARY KEY AUTOINCREMENT, 
     custom_id TEXT UNIQUE,
     date TEXT NOT NULL, 
@@ -240,6 +240,7 @@ db.exec(`
     disposition TEXT,
     authorized BOOLEAN NOT NULL DEFAULT FALSE,
     contract_type TEXT DEFAULT 'Contrato de Producción',
+    moneda TEXT NOT NULL DEFAULT 'ARS' CHECK(moneda IN ('ARS', 'USD')),
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP, 
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE,

@@ -1,143 +1,385 @@
-// RUTA: /servidor/src/routes/work_orders.routes.ts
+// RUTA: servidor/src/routes/work_orders.routes.ts (Corregido)
 
-import { Router, Request, Response } from "express";
+import { Router } from "express";
 import db from "../config/database";
+import sseService from "../services/sseService"; // <-- LÍNEA CORREGIDA
 
 const router = Router();
 
-// [GET] /api/work-orders - Obtener todas las órdenes de trabajo con filtros
-router.get("/", (req: Request, res: Response) => {
-  const clientId = req.query.clientId;
-  let query = `
-      SELECT 
-        ot.id, 
-        ot.custom_id, 
-        ot.name as title, -- CAMBIO CLAVE: Se selecciona 'name' pero se le da el alias 'title'
-        c.name as client_name, 
-        ot.status, 
-        ot.created_at,
-        ot.client_id 
-      FROM work_orders ot
-      JOIN clients c ON ot.client_id = c.id
-    `;
-  const params = [];
+// Obtener todas las órdenes de trabajo
+router.get("/", (req, res) => {
+  const {
+    status,
+    type,
+    client_id,
+    creator_id,
+    date_from,
+    date_to,
+    authorized,
+    facturada,
+  } = req.query;
 
-  if (clientId) {
-    query += " WHERE ot.client_id = ?";
-    params.push(clientId as any);
+  let baseQuery = `
+    SELECT 
+      wo.*, 
+      c.name as client_name, 
+      u.name as creator_name,
+      con.name as contact_name,
+      CASE 
+        WHEN EXISTS (SELECT 1 FROM factura_ots fo WHERE fo.ot_id = wo.id) THEN 1
+        ELSE 0
+      END as facturada
+    FROM work_orders wo
+    JOIN clients c ON wo.client_id = c.id
+    JOIN users u ON wo.created_by = u.id
+    LEFT JOIN contacts con ON wo.contact_id = con.id
+  `;
+
+  const whereClauses: string[] = [];
+  const params: any[] = [];
+
+  if (status) {
+    whereClauses.push("wo.status = ?");
+    params.push(status);
+  }
+  if (type) {
+    whereClauses.push("wo.type = ?");
+    params.push(type);
+  }
+  if (client_id) {
+    whereClauses.push("wo.client_id = ?");
+    params.push(client_id);
+  }
+  if (creator_id) {
+    whereClauses.push("wo.created_by = ?");
+    params.push(creator_id);
+  }
+  if (date_from) {
+    whereClauses.push("wo.date >= ?");
+    params.push(date_from);
+  }
+  if (date_to) {
+    whereClauses.push("wo.date <= ?");
+    params.push(date_to);
+  }
+  if (authorized !== undefined) {
+    whereClauses.push("wo.authorized = ?");
+    params.push(authorized === "true" ? 1 : 0);
   }
 
-  query += " ORDER BY ot.created_at DESC";
+  if (whereClauses.length > 0) {
+    baseQuery += " WHERE " + whereClauses.join(" AND ");
+  }
+
+  // Filtrado por estado de facturación
+  if (facturada !== undefined) {
+    const havingClause =
+      facturada === "true" ? "HAVING facturada = 1" : "HAVING facturada = 0";
+    baseQuery += ` ${havingClause}`;
+  }
+
+  baseQuery += " ORDER BY wo.created_at DESC";
 
   try {
-    const workOrders = db.prepare(query).all(params);
-    res.status(200).json(workOrders);
+    const workOrders = db.prepare(baseQuery).all(params);
+    res.json(workOrders);
   } catch (error) {
     console.error("Error fetching work orders:", error);
-    res.status(500).json({ error: "Error al obtener las órdenes de trabajo." });
+    res.status(500).json({ error: "Error interno del servidor." });
   }
 });
 
-// [GET] /api/work-orders/:id - Obtener una orden de trabajo por ID
-router.get("/:id", (req: Request, res: Response) => {
+// Obtener una orden de trabajo por ID
+router.get("/:id", (req, res) => {
   try {
     const workOrder = db
       .prepare(
         `
       SELECT 
-        ot.*, 
-        c.name as client_name 
-      FROM work_orders ot
-      JOIN clients c ON ot.client_id = c.id
-      WHERE ot.id = ?
+        wo.*, 
+        c.name as client_name, 
+        u.name as creator_name,
+        con.name as contact_name
+      FROM work_orders wo
+      JOIN clients c ON wo.client_id = c.id
+      JOIN users u ON wo.created_by = u.id
+      LEFT JOIN contacts con ON wo.contact_id = con.id
+      WHERE wo.id = ?
     `
       )
       .get(req.params.id);
 
     if (workOrder) {
-      res.status(200).json(workOrder);
+      const activities = db
+        .prepare(
+          `
+        SELECT 
+          wa.*, 
+          GROUP_CONCAT(u.name) as assigned_users_names
+        FROM work_order_activities wa
+        LEFT JOIN work_order_activity_assignments waa ON wa.id = waa.activity_id
+        LEFT JOIN users u ON waa.user_id = u.id
+        WHERE wa.work_order_id = ?
+        GROUP BY wa.id
+      `
+        )
+        .all(req.params.id);
+      (workOrder as any).activities = activities;
+      res.json(workOrder);
     } else {
-      res.status(404).json({ error: "Orden de trabajo no encontrada." });
+      res.status(404).json({ message: "Orden de trabajo no encontrada" });
     }
   } catch (error) {
-    console.error(`Error fetching work order ${req.params.id}:`, error);
-    res.status(500).json({ error: "Error al obtener la orden de trabajo." });
+    res.status(500).json({ message: "Error al obtener la orden de trabajo" });
   }
 });
 
-// [POST] /api/work-orders - Crear una nueva orden de trabajo
-router.post("/", (req: Request, res: Response) => {
-  const { name, description, client_id, status } = req.body; // Cambiado de 'title' a 'name'
+// Crear una nueva orden de trabajo
+router.post("/", (req, res) => {
+  const {
+    date,
+    type,
+    client_id,
+    contact_id,
+    product,
+    brand,
+    model,
+    seal_number,
+    observations,
+    certificate_expiry,
+    estimated_delivery_date,
+    created_by,
+    activities,
+    disposition,
+    authorized,
+    contract_type,
+    moneda,
+  } = req.body;
 
-  if (!name || !client_id || !status) {
-    return res
-      .status(400)
-      .json({ error: "Nombre, cliente y estado son requeridos." });
+  if (!date || !type || !client_id || !product || !created_by || !activities) {
+    return res.status(400).json({ message: "Faltan campos obligatorios" });
   }
 
-  try {
+  const transaction = db.transaction(() => {
+    // 1. Generar el custom_id
     const year = new Date().getFullYear();
-    const lastWorkOrder = db
+    const lastOT = db
       .prepare(
-        "SELECT MAX(CAST(SUBSTR(custom_id, 6) AS INTEGER)) as max_num FROM work_orders WHERE custom_id LIKE ?"
+        "SELECT custom_id FROM work_orders WHERE custom_id LIKE ? ORDER BY custom_id DESC LIMIT 1"
       )
-      .get(`${year}-%`) as { max_num: number | null };
-    const nextNum = (lastWorkOrder?.max_num || 0) + 1;
-    const custom_id = `${year}-${String(nextNum).padStart(5, "0")}`;
+      .get(`${year}-%`);
 
-    const info = db
+    let nextId = 1;
+    if (lastOT) {
+      const lastIdNumber = parseInt(
+        (lastOT as { custom_id: string }).custom_id.split("-")[1],
+        10
+      );
+      nextId = lastIdNumber + 1;
+    }
+    const customId = `${year}-${String(nextId).padStart(4, "0")}`;
+
+    // 2. Insertar la orden de trabajo principal
+    const stmt = db.prepare(
+      `INSERT INTO work_orders 
+        (custom_id, date, type, client_id, contact_id, product, brand, model, seal_number, observations, certificate_expiry, estimated_delivery_date, created_by, disposition, authorized, contract_type, moneda) 
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    );
+
+    const info = stmt.run(
+      customId,
+      date,
+      type,
+      client_id,
+      contact_id,
+      product,
+      brand,
+      model,
+      seal_number,
+      observations,
+      certificate_expiry,
+      estimated_delivery_date,
+      created_by,
+      disposition,
+      authorized ? 1 : 0,
+      contract_type,
+      moneda || "ARS"
+    );
+    const workOrderId = info.lastInsertRowid;
+
+    // 3. Insertar las actividades
+    const activityStmt = db.prepare(
+      "INSERT INTO work_order_activities (work_order_id, activity, norma, precio_sin_iva) VALUES (?, ?, ?, ?)"
+    );
+    for (const activity of activities) {
+      activityStmt.run(
+        workOrderId,
+        activity.activity,
+        activity.norma,
+        activity.precio_sin_iva
+      );
+    }
+
+    // 4. Crear notificación
+    const directorAndAdminUsers = db
       .prepare(
-        "INSERT INTO work_orders (custom_id, name, description, client_id, status) VALUES (?, ?, ?, ?, ?)" // Cambiado de 'title' a 'name'
+        "SELECT id FROM users WHERE role = 'director' OR role = 'administrador'"
       )
-      .run(custom_id, name, description, client_id, status);
+      .all();
+    const notificationStmt = db.prepare(
+      "INSERT INTO notifications (user_id, message, ot_id) VALUES (?, ?, ?)"
+    );
 
-    res.status(201).json({ id: info.lastInsertRowid, custom_id });
-  } catch (error) {
-    console.error("Error creating work order:", error);
-    res.status(500).json({ error: "Error al crear la orden de trabajo." });
+    for (const user of directorAndAdminUsers as { id: number }[]) {
+      if (user.id !== created_by) {
+        // No notificar al creador
+        notificationStmt.run(
+          user.id,
+          `Se ha creado una nueva OT (${customId}) y requiere tu autorización.`,
+          workOrderId
+        );
+      }
+    }
+
+    // Enviar evento SSE
+    sseService.send({
+      type: "ot_created",
+      message: `Nueva OT ${customId} creada.`,
+      ot_id: workOrderId,
+    });
+
+    return { id: workOrderId, custom_id: customId };
+  });
+
+  try {
+    const result = transaction();
+    res.status(201).json(result);
+  } catch (err: any) {
+    console.error("Error in transaction:", err);
+    res.status(500).json({ message: err.message });
   }
 });
 
-// [PUT] /api/work-orders/:id - Actualizar una orden de trabajo
-router.put("/:id", (req: Request, res: Response) => {
-  const { name, description, status } = req.body; // Cambiado de 'title' a 'name'
+// Actualizar una orden de trabajo
+router.patch("/:id", (req, res) => {
+  const {
+    date,
+    type,
+    client_id,
+    contact_id,
+    product,
+    brand,
+    model,
+    seal_number,
+    observations,
+    collaborator_observations,
+    certificate_expiry,
+    estimated_delivery_date,
+    status,
+    disposition,
+    authorized,
+    contract_type,
+    activities, // Array de actividades actualizado
+  } = req.body;
+  const workOrderId = req.params.id;
 
-  if (!name || !status) {
-    return res.status(400).json({ error: "Nombre y estado son requeridos." });
-  }
+  const transaction = db.transaction(() => {
+    // 1. Actualizar la OT principal
+    const otFields: any = {};
+    if (date) otFields.date = date;
+    if (type) otFields.type = type;
+    if (client_id) otFields.client_id = client_id;
+    if (contact_id !== undefined) otFields.contact_id = contact_id;
+    if (product) otFields.product = product;
+    if (brand !== undefined) otFields.brand = brand;
+    if (model !== undefined) otFields.model = model;
+    if (seal_number !== undefined) otFields.seal_number = seal_number;
+    if (observations !== undefined) otFields.observations = observations;
+    if (collaborator_observations !== undefined)
+      otFields.collaborator_observations = collaborator_observations;
+    if (certificate_expiry !== undefined)
+      otFields.certificate_expiry = certificate_expiry;
+    if (estimated_delivery_date !== undefined)
+      otFields.estimated_delivery_date = estimated_delivery_date;
+    if (status) otFields.status = status;
+    if (disposition) otFields.disposition = disposition;
+    if (authorized !== undefined) otFields.authorized = authorized ? 1 : 0;
+    if (contract_type) otFields.contract_type = contract_type;
+
+    if (Object.keys(otFields).length > 0) {
+      const setClause = Object.keys(otFields)
+        .map((key) => `${key} = ?`)
+        .join(", ");
+      const params = [...Object.values(otFields), workOrderId];
+      db.prepare(`UPDATE work_orders SET ${setClause} WHERE id = ?`).run(
+        params
+      );
+    }
+
+    // 2. Sincronizar actividades (borrar y recrear es más simple aquí)
+    if (activities) {
+      db.prepare(
+        "DELETE FROM work_order_activities WHERE work_order_id = ?"
+      ).run(workOrderId);
+      const activityStmt = db.prepare(
+        "INSERT INTO work_order_activities (work_order_id, activity, norma, precio_sin_iva, status) VALUES (?, ?, ?, ?, ?)"
+      );
+      const assignStmt = db.prepare(
+        "INSERT INTO work_order_activity_assignments (activity_id, user_id) VALUES (?, ?)"
+      );
+      for (const act of activities) {
+        const info = activityStmt.run(
+          workOrderId,
+          act.activity,
+          act.norma,
+          act.precio_sin_iva,
+          act.status || "pendiente"
+        );
+        const activityId = info.lastInsertRowid;
+        if (act.assigned_users && act.assigned_users.length > 0) {
+          for (const userId of act.assigned_users) {
+            assignStmt.run(activityId, userId);
+          }
+        }
+      }
+    }
+
+    // Obtener la OT actualizada para la notificación y el SSE
+    const updatedOT = db
+      .prepare("SELECT custom_id, created_by FROM work_orders WHERE id = ?")
+      .get(workOrderId) as { custom_id: string; created_by: number };
+
+    // 3. Crear notificación si se autoriza
+    if (authorized === true) {
+      const message = `La OT ${updatedOT.custom_id} ha sido autorizada.`;
+      const notificationStmt = db.prepare(
+        "INSERT INTO notifications (user_id, message, ot_id) VALUES (?, ?, ?)"
+      );
+      // Notificar al creador de la OT
+      notificationStmt.run(updatedOT.created_by, message, workOrderId);
+
+      // Enviar evento SSE
+      sseService.send({
+        type: "ot_authorized",
+        message,
+        ot_id: workOrderId,
+        recipient_id: updatedOT.created_by,
+      });
+    }
+
+    return db
+      .prepare("SELECT * FROM work_orders WHERE id = ?")
+      .get(workOrderId);
+  });
 
   try {
-    const info = db
-      .prepare(
-        "UPDATE work_orders SET name = ?, description = ?, status = ? WHERE id = ?" // Cambiado de 'title' a 'name'
-      )
-      .run(name, description, status, req.params.id);
-
-    if (info.changes > 0) {
-      res.status(200).json({ message: "Orden de trabajo actualizada." });
-    } else {
-      res.status(404).json({ error: "Orden de trabajo no encontrada." });
-    }
-  } catch (error) {
-    console.error(`Error updating work order ${req.params.id}:`, error);
-    res.status(500).json({ error: "Error al actualizar la orden de trabajo." });
-  }
-});
-
-// [DELETE] /api/work-orders/:id - (Sin cambios aquí)
-router.delete("/:id", (req: Request, res: Response) => {
-  try {
-    const info = db
-      .prepare("DELETE FROM work_orders WHERE id = ?")
-      .run(req.params.id);
-    if (info.changes > 0) {
-      res.status(200).json({ message: "Orden de trabajo eliminada." });
-    } else {
-      res.status(404).json({ error: "Orden de trabajo no encontrada." });
-    }
-  } catch (error) {
-    console.error(`Error deleting work order ${req.params.id}:`, error);
-    res.status(500).json({ error: "Error al eliminar la orden de trabajo." });
+    const updatedWorkOrder = transaction();
+    res.json(updatedWorkOrder);
+  } catch (error: any) {
+    console.error("Error updating work order:", error);
+    res
+      .status(500)
+      .json({ error: "Error interno al actualizar la orden de trabajo." });
   }
 });
 
