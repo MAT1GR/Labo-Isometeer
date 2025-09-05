@@ -1,4 +1,4 @@
-// RUTA: /cliente/src/pages/ot.tsx
+// RUTA: consultar/src/pages/ot.tsx
 
 import React, { useState, useMemo, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
@@ -21,6 +21,7 @@ import {
 import useSWR, { mutate } from "swr";
 import ConfirmationModal from "../components/ui/ConfirmationModal";
 import OTFiltersComponent from "../components/OTFilters";
+import { AnimatePresence, motion } from "framer-motion";
 
 export interface OTFilters {
   client_id?: number;
@@ -52,7 +53,6 @@ const OT: React.FC = () => {
   );
   const { data: users } = useSWR<User[]>("/users", authService.getAllUsers);
 
-  // <-- CAMBIO AQUÍ: Se mejora la función fetcher de useSWR
   const {
     data: ots,
     error,
@@ -121,7 +121,10 @@ const OT: React.FC = () => {
   };
 
   const activeFilterCount = useMemo(
-    () => Object.values(filters).filter(Boolean).length,
+    () =>
+      Object.values(filters).filter(
+        (v) => v !== undefined && v !== null && v !== ""
+      ).length,
     [filters]
   );
 
@@ -153,8 +156,8 @@ const OT: React.FC = () => {
         title="Eliminar Orden de Trabajo"
         message="¿Estás seguro de que quieres eliminar esta OT? Esta acción no se puede deshacer."
       />
-      <div className="space-y-6" ref={topOfListRef}>
-        <div className="flex justify-between items-center">
+      <div ref={topOfListRef}>
+        <div className="flex justify-between items-center mb-6">
           <h1 className="text-3xl font-bold">
             {canViewAdminContent()
               ? "Órdenes de Trabajo"
@@ -183,15 +186,25 @@ const OT: React.FC = () => {
           </div>
         </div>
 
-        {showFilters && canViewAdminContent() && (
-          <OTFiltersComponent
-            filters={filters}
-            setFilters={setFilters}
-            clients={clients || []}
-            users={users || []}
-            onClose={() => setShowFilters(false)}
-          />
-        )}
+        <AnimatePresence>
+          {showFilters && canViewAdminContent() && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: "auto", opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.3, ease: "easeInOut" }}
+              className="overflow-hidden" // ✅ Se elimina mb-6 de aquí
+            >
+              <OTFiltersComponent
+                filters={filters}
+                setFilters={setFilters}
+                clients={clients || []}
+                users={users || []}
+                onClose={() => setShowFilters(false)}
+              />
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         <Card>
           {isLoading ? (
