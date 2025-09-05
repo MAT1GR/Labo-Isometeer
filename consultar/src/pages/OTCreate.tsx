@@ -528,6 +528,18 @@ const OTCreate: React.FC = () => {
                 {...register("estimated_delivery_date")}
               />
             </div>
+            <div>
+              <label className="text-sm font-medium dark:text-gray-300">
+                Moneda
+              </label>
+              <select
+                {...register("moneda")}
+                className="w-full mt-1 p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
+              >
+                <option value="ARS">ARS (Pesos)</option>
+                <option value="USD">USD (Dólares)</option>
+              </select>
+            </div>
           </Card>
 
           <Card>

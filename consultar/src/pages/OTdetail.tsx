@@ -31,6 +31,7 @@ import {
   FileText,
   Plus,
   Lock,
+  DollarSign, // Icono añadido
 } from "lucide-react";
 import { mutate } from "swr";
 import {
@@ -49,6 +50,7 @@ interface FacturaFormData {
   numero_factura: string;
   monto: number;
   vencimiento: string;
+  moneda: "ARS" | "USD";
 }
 
 interface CreateFacturaModalProps {
@@ -80,6 +82,7 @@ const CreateFacturaModal: React.FC<CreateFacturaModalProps> = ({
       );
       setValue("monto", totalActividades >= 0 ? totalActividades : 0);
       setValue("vencimiento", new Date().toISOString().split("T")[0]);
+      setValue("moneda", otData.moneda || "ARS");
     }
   }, [isOpen, otData, setValue]);
 
@@ -106,7 +109,7 @@ const CreateFacturaModal: React.FC<CreateFacturaModalProps> = ({
     <div className="fixed inset-0 bg-black bg-opacity-60 flex justify-center items-center z-50">
       <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-xl w-full max-w-md">
         <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100 mb-4">
-          Crear Nueva Factura
+          Crear Nueva Factura ({otData.moneda})
         </h2>
         <p className="mb-2 text-sm text-gray-600 dark:text-gray-300">
           Cliente: <span className="font-semibold">{otData.client?.name}</span>
@@ -122,7 +125,7 @@ const CreateFacturaModal: React.FC<CreateFacturaModalProps> = ({
             autoFocus
           />
           <Input
-            label="Monto (sugerido por actividades)"
+            label={`Monto (sugerido por actividades en ${otData.moneda})`}
             type="number"
             step="0.01"
             {...register("monto", { required: true, valueAsNumber: true })}
@@ -158,7 +161,11 @@ const OTDetail: React.FC = () => {
     setValue,
     getValues,
     formState: { isSubmitting, isDirty },
-  } = useForm<WorkOrder>();
+  } = useForm<WorkOrder>({
+    defaultValues: {
+      moneda: "ARS", // Valor por defecto
+    },
+  });
 
   const { fields, append, remove } = useFieldArray({
     control,
@@ -179,6 +186,7 @@ const OTDetail: React.FC = () => {
   const watchedActivities = useWatch({ control, name: "activities" });
   const otType = useWatch({ control, name: "type" });
   const otDate = useWatch({ control, name: "date" });
+  const otMoneda = useWatch({ control, name: "moneda" });
   const isLacreEnabled =
     otType === "Ensayo SE" ||
     otType === "Ensayo EE" ||
@@ -358,7 +366,7 @@ const OTDetail: React.FC = () => {
 
   const facturaOptions = facturasCliente.map((f) => ({
     value: f.id,
-    label: `${f.numero_factura} - ${formatCurrency(f.monto)}`,
+    label: `${f.numero_factura} - ${formatCurrency(f.monto, f.moneda)}`,
   }));
 
   return (
@@ -370,7 +378,7 @@ const OTDetail: React.FC = () => {
       <CreateFacturaModal
         isOpen={isCreateFacturaModalOpen}
         onClose={() => setCreateFacturaModalOpen(false)}
-        otData={otData}
+        otData={{ ...otData, moneda: otMoneda }}
         onFacturaCreated={handleFacturaCreated}
       />
       <ExportOtModal
@@ -384,9 +392,21 @@ const OTDetail: React.FC = () => {
             <ArrowLeft className="mr-2 h-5 w-5" />
             Volver
           </Button>
-          <h1 className="text-2xl font-bold text-center">
-            Detalle de OT: {otData.custom_id || `#${otData.id}`}
-          </h1>
+          <div className="flex flex-col items-center">
+            <h1 className="text-2xl font-bold text-center">
+              Detalle de OT: {otData.custom_id || `#${otData.id}`}
+            </h1>
+            {/* --- CAMBIO: Indicador de moneda --- */}
+            <div className="mt-1 text-sm font-semibold text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 px-3 py-1 rounded-full flex items-center gap-2">
+              <DollarSign size={14} />
+              <span>
+                Los montos de esta OT se gestionan en{" "}
+                <strong>
+                  {otMoneda === "USD" ? "Dólares (USD)" : "Pesos (ARS)"}
+                </strong>
+              </span>
+            </div>
+          </div>
           <div className="flex gap-2 flex-wrap">
             {!isEmployee && (
               <Button
@@ -405,7 +425,6 @@ const OTDetail: React.FC = () => {
           </div>
         </div>
 
-        {/* --- CORRECCIÓN: Esta barra de acciones ahora se oculta para los empleados --- */}
         {!isEmployee && (
           <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm flex flex-wrap justify-center items-center gap-4">
             {canAuthorizeOT() && !otData.authorized && (
@@ -440,7 +459,6 @@ const OTDetail: React.FC = () => {
           </div>
         )}
 
-        {/* --- CORRECCIÓN: Este aviso ahora se oculta para los empleados --- */}
         {!isFormEditable && !isEmployee && (
           <div className="bg-yellow-50 dark:bg-yellow-900/30 border-l-4 border-yellow-400 p-4 rounded-md">
             <div className="flex items-center">
@@ -457,7 +475,6 @@ const OTDetail: React.FC = () => {
           </div>
         )}
 
-        {/* --- SECCIÓN DE TAREAS ASIGNADAS CON NUEVA ESTÉTICA (INTEGRADA) --- */}
         {isEmployee && (
           <Card>
             <div className="p-6">
@@ -589,11 +606,19 @@ const OTDetail: React.FC = () => {
                     ))}
                   </select>
                 </div>
-                <Input
-                  label="ID de OT"
-                  value={otData.custom_id || `Interno #${id}`}
-                  readOnly
-                />
+                {/* --- CAMBIO: Campo de Moneda movido a la sección principal --- */}
+                <div>
+                  <label className="text-sm font-medium dark:text-gray-300">
+                    Moneda
+                  </label>
+                  <select
+                    {...register("moneda")}
+                    className="w-full mt-1 p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
+                  >
+                    <option value="ARS">ARS (Pesos)</option>
+                    <option value="USD">USD (Dólares)</option>
+                  </select>
+                </div>
               </div>
             </fieldset>
           </Card>
@@ -660,6 +685,7 @@ const OTDetail: React.FC = () => {
             </fieldset>
           </Card>
 
+          {/* --- CAMBIO: Sección de Actividades restaurada a su estado original funcional --- */}
           {!isEmployee && (
             <Card>
               <div className="p-6">
@@ -739,7 +765,7 @@ const OTDetail: React.FC = () => {
                           placeholder="Ej: IEC 60601"
                         />
                         <Input
-                          label="Precio (Sin IVA)"
+                          label={`Precio (Sin IVA) en ${otMoneda || "ARS"}`}
                           type="number"
                           step="0.01"
                           {...register(`activities.${index}.precio_sin_iva`, {
@@ -756,7 +782,6 @@ const OTDetail: React.FC = () => {
             </Card>
           )}
 
-          {/* --- SECCIÓN DE FACTURAS OCULTA PARA EMPLEADOS --- */}
           {!isEmployee && (
             <Card>
               <div className="p-6">
@@ -814,7 +839,7 @@ const OTDetail: React.FC = () => {
                               className="text-blue-600 hover:underline hover:text-blue-800 dark:hover:text-blue-400 transition-colors"
                             >
                               {factura.numero_factura} - (
-                              {formatCurrency(factura.monto)})
+                              {formatCurrency(factura.monto, factura.moneda)})
                             </Link>
                           </li>
                         ))}

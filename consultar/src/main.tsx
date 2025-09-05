@@ -45,6 +45,10 @@ const router = createBrowserRouter([
       { path: "/ot", element: <OT /> },
       { path: "/ot/crear", element: <OTCreate /> },
       { path: "/ot/editar/:id", element: <OTdetail /> },
+      {
+        path: "ots/:id",
+        element: <OTdetail />,
+      },
       { path: "/usuarios", element: <Usuarios /> },
       { path: "/perfil", element: <Perfil /> },
       { path: "/facturacion", element: <Facturacion /> },

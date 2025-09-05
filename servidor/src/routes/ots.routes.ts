@@ -3,10 +3,32 @@
 import { Router, Request, Response } from "express";
 import db from "../config/database";
 import { sendNotificationToUser } from "./notifications.routes";
+import { Statement } from "better-sqlite3";
 
 const router = Router();
 
-// ... (otras funciones como createAndSendNotification y generateCustomId permanecen igual)
+router.get("/generate-id", (req: Request, res: Response) => {
+  const { date, type, client_id } = req.query;
+
+  if (!date || !type || !client_id) {
+    return res.status(400).json({
+      error: "Faltan parámetros (date, type, client_id) para generar el ID.",
+    });
+  }
+
+  try {
+    // Reutilizamos la función que ya tenías
+    const customId = generateCustomId(
+      date as string,
+      type as string,
+      client_id as string
+    );
+    res.status(200).json({ custom_id: customId });
+  } catch (error: any) {
+    // Si el cliente no existe, la función generateCustomId arrojará un error
+    res.status(404).json({ error: error.message });
+  }
+});
 
 const createAndSendNotification = (
   userId: number,
@@ -14,7 +36,7 @@ const createAndSendNotification = (
   otId: number
 ) => {
   try {
-    const stmt = db.prepare(
+    const stmt: Statement = db.prepare(
       "INSERT INTO notifications (user_id, message, ot_id) VALUES (?, ?, ?)"
     );
     const info = stmt.run(userId, message, otId);
@@ -37,16 +59,16 @@ const generateCustomId = (
   type: string,
   client_id: string | number
 ): string => {
-  const client = db
+  const client: { code: string } | undefined = db
     .prepare("SELECT code FROM clients WHERE id = ?")
-    .get(client_id) as { code: string };
+    .get(client_id) as { code: string } | undefined;
   if (!client) throw new Error("Cliente inválido para generar ID");
 
   const [yearStr, monthStr, dayStr] = date.split("-");
   const year = yearStr.slice(-2);
   const datePrefix = `${year}${monthStr}${dayStr}`;
 
-  const otsOfTheDay = db
+  const otsOfTheDay: { custom_id: string }[] = db
     .prepare("SELECT custom_id FROM work_orders WHERE date = ?")
     .all(date) as { custom_id: string }[];
 
@@ -78,50 +100,6 @@ const generateCustomId = (
   return `${datePrefix}${sequentialNumber} ${typeInitial} ${client.code}`;
 };
 
-// Generar un ID de previsualización para una nueva OT
-router.get("/generate-id", (req, res) => {
-  const { date, type, client_id } = req.query;
-
-  if (!date || !type || !client_id) {
-    return res
-      .status(400)
-      .json({ message: "Faltan parámetros (date, type, client_id)" });
-  }
-
-  const typeMapping: { [key: string]: string } = {
-    Produccion: "P",
-    Calibracion: "CAL",
-    "Ensayo SE": "SE",
-    "Ensayo EE": "EE",
-    "Otros Servicios": "OS",
-  };
-
-  const typePrefix = typeMapping[type as string];
-  if (!typePrefix) {
-    return res.status(400).json({ message: "Tipo de OT no válido" });
-  }
-
-  const formattedDate = (date as string).replace(/-/g, ""); // Transforma '2025-09-05' a '20250905'
-
-  // Contar cuántas OTs del mismo tipo ya existen para la fecha dada
-  const sql = `SELECT COUNT(*) as count FROM work_orders WHERE type = ? AND date = ?`;
-
-  db.get(sql, [type, date], (err: { message: any }, row: { count: number }) => {
-    if (err) {
-      console.error("Error al generar ID de OT:", err.message);
-      return res.status(500).json({ error: err.message });
-    }
-
-    const nextSequence = row.count + 1;
-    const paddedSequence = String(nextSequence).padStart(2, "0"); // Asegura que tenga 2 dígitos, ej: 1 -> 01
-
-    // Construir el ID final
-    const previewId = `${typePrefix}-${client_id}-${formattedDate}-${paddedSequence}`;
-
-    res.json({ previewId });
-  });
-});
-
 // [GET] /api/ots
 router.get("/", (req: Request, res: Response) => {
   const {
@@ -152,7 +130,6 @@ router.get("/", (req: Request, res: Response) => {
     const params: any[] = [];
     const whereClauses: string[] = [];
 
-    // Lógica de filtros existente
     if (role === "empleado" && assigned_to) {
       whereClauses.push(
         `ot.id IN (SELECT work_order_id FROM work_order_activities wa JOIN work_order_activity_assignments waa ON wa.id = waa.activity_id WHERE waa.user_id = ?) AND ot.authorized = 1`
@@ -189,7 +166,8 @@ router.get("/", (req: Request, res: Response) => {
 
     query += " GROUP BY ot.id ORDER BY ot.created_at DESC";
 
-    const ots = db.prepare(query).all(params);
+    const stmt: Statement = db.prepare(query);
+    const ots = stmt.all(params);
     res.status(200).json(ots);
   } catch (error) {
     console.error("Error en GET /ots:", error);
@@ -200,9 +178,9 @@ router.get("/", (req: Request, res: Response) => {
 // [POST] /api/ots
 router.post("/", (req: Request, res: Response) => {
   const { activities = [], created_by, factura_ids = [], ...otData } = req.body;
-  const creator = db
+  const creator: { role: string } | undefined = db
     .prepare("SELECT role FROM users WHERE id = ?")
-    .get(created_by) as { role: string };
+    .get(created_by) as { role: string } | undefined;
   if (
     !creator ||
     !["administrador", "administracion", "director"].includes(creator.role)
@@ -214,10 +192,10 @@ router.post("/", (req: Request, res: Response) => {
 
   const insertOTStmt = db.prepare(
     `INSERT INTO work_orders (
-      custom_id, date, type, client_id, contact_id, product, brand, model,
-      seal_number, observations, certificate_expiry, estimated_delivery_date, collaborator_observations, created_by, status,
-      quotation_amount, quotation_details, disposition, contract_type
-     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    custom_id, date, type, client_id, contact_id, product, brand, model,
+    seal_number, observations, certificate_expiry, estimated_delivery_date, collaborator_observations, created_by, status,
+    quotation_amount, quotation_details, disposition, contract_type, moneda
+   ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)` // <--- Se añadió "moneda"
   );
   const insertActivityStmt = db.prepare(
     "INSERT INTO work_order_activities (work_order_id, activity, norma, precio_sin_iva) VALUES (?, ?, ?, ?)"
@@ -255,7 +233,8 @@ router.post("/", (req: Request, res: Response) => {
       data.otData.quotation_amount,
       data.otData.quotation_details,
       data.otData.disposition,
-      data.otData.contract_type
+      data.otData.contract_type,
+      data.otData.moneda
     );
     const otId = info.lastInsertRowid as number;
 
@@ -371,9 +350,9 @@ router.put("/:id", (req: Request, res: Response) => {
   const { id } = req.params;
   const { activities = [], role, factura_ids = [], ...otData } = req.body;
 
-  const user = db
+  const user: { role: string } | undefined = db
     .prepare("SELECT role FROM users WHERE id = ?")
-    .get(otData.user_id) as { role: string };
+    .get(otData.user_id) as { role: string } | undefined;
   if (
     !user ||
     !["administrador", "administracion", "director"].includes(user.role)
@@ -383,11 +362,15 @@ router.put("/:id", (req: Request, res: Response) => {
       .json({ error: "No tienes permisos para editar esta OT." });
   }
 
-  const oldOT = db
+  const oldOT:
+    | { collaborator_observations: string; authorized: number }
+    | undefined = db
     .prepare(
       "SELECT collaborator_observations, authorized FROM work_orders WHERE id = ?"
     )
-    .get(id) as { collaborator_observations: string; authorized: number };
+    .get(id) as
+    | { collaborator_observations: string; authorized: number }
+    | undefined;
   if (!oldOT) {
     return res.status(404).json({ error: "OT no encontrada" });
   }
@@ -400,7 +383,9 @@ router.put("/:id", (req: Request, res: Response) => {
      WHERE wa.work_order_id = ?
   `);
   const oldAssignments = new Set(
-    oldAssignmentsStmt.all(id).map((a: any) => `${a.activity_id}-${a.user_id}`)
+    (oldAssignmentsStmt.all(id) as any[]).map(
+      (a: any) => `${a.activity_id}-${a.user_id}`
+    )
   );
 
   if (role === "empleado") {
@@ -416,7 +401,7 @@ router.put("/:id", (req: Request, res: Response) => {
       otData.collaborator_observations.match(/@(\w+)/g) || []
     ).map((mention: string) => mention.substring(1));
     const oldMentions = (
-      oldOT.collaborator_observations.match(/@(\w+)/g) || []
+      (oldOT.collaborator_observations || "").match(/@(\w+)/g) || []
     ).map((mention: string) => mention.substring(1));
 
     const trulyNewMentions = newMentions.filter(
@@ -515,7 +500,7 @@ router.put("/:id", (req: Request, res: Response) => {
       otData.collaborator_observations.match(/@(\w+)/g) || []
     ).map((mention: string) => mention.substring(1));
     const oldMentions = (
-      oldOT.collaborator_observations.match(/@(\w+)/g) || []
+      (oldOT.collaborator_observations || "").match(/@(\w+)/g) || []
     ).map((mention: string) => mention.substring(1));
 
     const trulyNewMentions = newMentions.filter(
@@ -551,9 +536,9 @@ router.put("/:id/authorize", (req: Request, res: Response) => {
   if (!userId) {
     return res.status(400).json({ error: "userId es requerido." });
   }
-  const authorizer = db
+  const authorizer: { role: string } | undefined = db
     .prepare("SELECT role FROM users WHERE id = ?")
-    .get(userId) as { role: string };
+    .get(userId) as { role: string } | undefined;
   if (
     !authorizer ||
     (authorizer.role !== "director" && authorizer.role !== "administrador")
@@ -572,10 +557,10 @@ router.put("/:id/authorize", (req: Request, res: Response) => {
 
     if (info.changes > 0) {
       // Crear Notificación para todos los asignados
-      const ot = db
+      const ot: { custom_id: string } | undefined = db
         .prepare("SELECT custom_id FROM work_orders WHERE id = ?")
-        .get(otId) as { custom_id: string };
-      const assignedUsers = db
+        .get(otId) as { custom_id: string } | undefined;
+      const assignedUsers: { user_id: number }[] = db
         .prepare(
           `
         SELECT DISTINCT waa.user_id
@@ -636,18 +621,16 @@ router.put("/:id/close", (req: Request, res: Response) => {
     return res.status(400).json({ error: "userId es requerido." });
   }
 
-  const closer = db
+  const closer: { role: string } | undefined = db
     .prepare("SELECT role FROM users WHERE id = ?")
-    .get(userId) as { role: string };
+    .get(userId) as { role: string } | undefined;
   if (!closer || closer.role !== "director") {
     return res
       .status(403)
       .json({ error: "Solo un director puede cerrar OTs." });
   }
 
-  const ot = db
-    .prepare("SELECT * FROM work_orders WHERE id = ?")
-    .get(id) as any;
+  const ot: any = db.prepare("SELECT * FROM work_orders WHERE id = ?").get(id);
   if (!ot) {
     return res.status(404).json({ error: "OT no encontrada." });
   }
@@ -658,7 +641,7 @@ router.put("/:id/close", (req: Request, res: Response) => {
   }
 
   const getPointsForActivity = (activity: string): number => {
-    const row = db
+    const row: { points: number } | undefined = db
       .prepare("SELECT points FROM activity_points WHERE activity = ?")
       .get(activity) as { points: number } | undefined;
     return row ? row.points : 0;
@@ -669,7 +652,7 @@ router.put("/:id/close", (req: Request, res: Response) => {
       "UPDATE work_orders SET status = 'cerrada', updated_at = CURRENT_TIMESTAMP WHERE id = ?"
     ).run(id);
 
-    const activities = db
+    const activities: { activity: string; user_id: number }[] = db
       .prepare(
         `
             SELECT wa.activity, waa.user_id
@@ -731,7 +714,7 @@ router.delete("/:id", (req: Request, res: Response) => {
 router.put("/activities/:activityId/start", (req: Request, res: Response) => {
   const { activityId } = req.params;
   const startTransaction = db.transaction(() => {
-    const activity = db
+    const activity: { work_order_id: number } | undefined = db
       .prepare(
         "SELECT work_order_id FROM work_order_activities WHERE id = ? AND status = 'pendiente'"
       )
@@ -753,12 +736,11 @@ router.put("/activities/:activityId/start", (req: Request, res: Response) => {
 
     // Si el estado de la OT cambió a "en progreso", notificar al creador
     if (info.changes > 0) {
-      const ot = db
+      const ot: { created_by: number; custom_id: string } | undefined = db
         .prepare("SELECT created_by, custom_id FROM work_orders WHERE id = ?")
-        .get(activity.work_order_id) as {
-        created_by: number;
-        custom_id: string;
-      };
+        .get(activity.work_order_id) as
+        | { created_by: number; custom_id: string }
+        | undefined;
       if (ot) {
         createAndSendNotification(
           ot.created_by,
@@ -783,9 +765,9 @@ router.put("/activities/:activityId/start", (req: Request, res: Response) => {
 router.put("/activities/:activityId/stop", (req: Request, res: Response) => {
   const { activityId } = req.params;
   const stopTransaction = db.transaction(() => {
-    const activity = db
+    const activity: any = db
       .prepare("SELECT * FROM work_order_activities WHERE id = ?")
-      .get(activityId) as any;
+      .get(activityId);
     if (!activity || activity.status !== "en_progreso") {
       throw new Error("La actividad no está en progreso o no existe.");
     }
@@ -793,7 +775,7 @@ router.put("/activities/:activityId/stop", (req: Request, res: Response) => {
       "UPDATE work_order_activities SET status = 'finalizada', completed_at = CURRENT_TIMESTAMP WHERE id = ?"
     ).run(activityId);
     const otId = activity.work_order_id;
-    const pendingActivities = db
+    const pendingActivities: { count: number } = db
       .prepare(
         "SELECT COUNT(*) as count FROM work_order_activities WHERE work_order_id = ? AND status != 'finalizada'"
       )
@@ -803,9 +785,9 @@ router.put("/activities/:activityId/stop", (req: Request, res: Response) => {
         "UPDATE work_orders SET status = 'finalizada' WHERE id = ?"
       ).run(otId);
       // Notificar al creador que la OT completa ha finalizado
-      const ot = db
+      const ot: { created_by: number; custom_id: string } | undefined = db
         .prepare("SELECT created_by, custom_id FROM work_orders WHERE id = ?")
-        .get(otId) as { created_by: number; custom_id: string };
+        .get(otId) as { created_by: number; custom_id: string } | undefined;
       if (ot) {
         createAndSendNotification(
           ot.created_by,
