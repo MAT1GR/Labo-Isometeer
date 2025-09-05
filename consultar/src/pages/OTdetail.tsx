@@ -291,7 +291,7 @@ const OTDetail: React.FC = () => {
         contact_id: data.contact_id ? Number(data.contact_id) : undefined,
       };
       await otService.updateOT(Number(id), dataToSubmit);
-      mutate(["/ots", user]);
+      mutate(["/ot", user]);
       navigate("/ot");
     } catch (error: any) {
       alert(error.message || "Hubo un error al guardar los cambios.");
@@ -318,14 +318,14 @@ const OTDetail: React.FC = () => {
     if (!id || !user) return;
     await otService.authorizeOT(Number(id), user.id);
     await loadData();
-    mutate(["/ots", user]);
+    mutate(["/ot", user]);
   };
 
   const handleDeauthorize = async () => {
     if (!id) return;
     await otService.deauthorizeOT(Number(id));
     await loadData();
-    mutate(["/ots", user]);
+    mutate(["/ot", user]);
   };
 
   const handleCloseOT = async () => {
@@ -333,7 +333,7 @@ const OTDetail: React.FC = () => {
     try {
       await otService.closeOT(Number(id), user.id);
       await loadData();
-      mutate(["/ots", user]);
+      mutate(["/ot", user]);
     } catch (error: any) {
       alert(error.response?.data?.error || "Hubo un error al cerrar la OT.");
     }

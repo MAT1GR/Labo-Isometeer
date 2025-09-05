@@ -396,7 +396,7 @@ const OTCreate: React.FC = () => {
             <Button
               type="button"
               variant="outline"
-              onClick={() => navigate("/ots")}
+              onClick={() => navigate("/ot")}
             >
               Cancelar
             </Button>
