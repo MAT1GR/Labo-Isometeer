@@ -176,7 +176,8 @@ const OTCreate: React.FC = () => {
           activity: "",
           assigned_users: [],
           norma: "",
-          precio_sin_iva: undefined,
+          // AQUÍ ESTÁ LA CORRECCIÓN 1: Cambiamos 'undefined' por una cadena vacía.
+          precio_sin_iva: "" as any,
           currency: "ARS",
         },
       ],
@@ -314,7 +315,7 @@ const OTCreate: React.FC = () => {
         // CORREGIDO: Asegurarse de que 'assigned_users' envía solo los IDs
         activities: data.activities.map((act) => ({
           ...act,
-          assigned_users: (act.assigned_users || []).map((u) =>
+          assigned_users: (act.assigned_users || []).map((u: any) =>
             typeof u === "number" ? u : u.id
           ),
         })),
@@ -555,7 +556,8 @@ const OTCreate: React.FC = () => {
                     activity: "",
                     assigned_users: [],
                     norma: "",
-                    precio_sin_iva: undefined,
+                    // AQUÍ ESTÁ LA CORRECCIÓN 2: También al añadir una nueva fila.
+                    precio_sin_iva: "" as any,
                     currency: "ARS",
                   })
                 }
@@ -592,13 +594,13 @@ const OTCreate: React.FC = () => {
                       </label>
                       <Controller
                         control={control}
-                        name={`activities.${index}.assigned_users`}
+                        name={`activities.${index}.assigned_users` as any}
                         render={({ field }) => (
                           // CORREGIDO: Se transforma User[] a number[] y viceversa
                           <MultiUserSelect
                             users={users}
                             selectedUserIds={(field.value || []).map(
-                              (u) => u.id
+                              (u: User) => u.id
                             )}
                             onChange={(userIds: number[]) => {
                               const selectedUsers = userIds

@@ -189,7 +189,7 @@ router.post("/", (req: Request, res: Response) => {
       .status(403)
       .json({ error: "No tienes permisos para crear una OT." });
   }
-  
+
   const insertOTStmt = db.prepare(
     `INSERT INTO work_orders (
     custom_id, date, type, client_id, contact_id, product, brand, model,
@@ -530,7 +530,6 @@ router.put("/:id", (req: Request, res: Response) => {
   }
 });
 
-// ... (el resto de las rutas como authorize, deauthorize, close, delete, etc., permanecen igual)
 router.put("/:id/authorize", (req: Request, res: Response) => {
   const { userId } = req.body;
   if (!userId) {

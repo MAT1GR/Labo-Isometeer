@@ -5,6 +5,12 @@ import { User } from "./auth";
 
 // Interfaces
 export interface Activity {
+  precio_sin_iva: number;
+  assigned_users: any;
+  activity: any;
+  status: string;
+  started_at(started_at: any): import("react").ReactNode;
+  completed_at(completed_at: any): import("react").ReactNode;
   id: number;
   ot_id: number;
   description: string;
@@ -16,6 +22,13 @@ export interface Activity {
 }
 
 export interface WorkOrder {
+  moneda: string;
+  client: any;
+  date: any;
+  certificate_expiry: any;
+  estimated_delivery_date: any;
+  contact_id: any;
+  facturas: boolean;
   id: number;
   client_id: number;
   client_name?: string;
