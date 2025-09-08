@@ -138,12 +138,10 @@ const CreateFacturaModal: React.FC<CreateFacturaModalProps> = ({
   );
 };
 
-// --- START: MODIFICACIÓN DE TIPOS ---
 type Norma = {
   value: string;
 };
 
-// Tipo para los datos de una actividad en el formulario de creación
 type ActivityFormData = Omit<
   Activity,
   "id" | "work_order_id" | "status" | "norma"
@@ -151,9 +149,7 @@ type ActivityFormData = Omit<
   normas: Norma[];
   currency: "ARS" | "USD";
 };
-// --- END: MODIFICACIÓN DE TIPOS ---
 
-// Tipo principal para el formulario de creación de OT
 type OTCreateFormData = Omit<
   WorkOrder,
   | "id"
@@ -163,13 +159,12 @@ type OTCreateFormData = Omit<
   | "creator_name"
   | "contact_name"
   | "activities"
-  | "moneda" // Se elimina moneda global
+  | "moneda"
 > & {
   activities: Partial<ActivityFormData>[];
   factura_ids?: number[];
 };
 
-// Componente para manejar las normas dinámicas
 const NormaFields: React.FC<{
   activityIndex: number;
   control: any;
@@ -245,17 +240,15 @@ const OTCreate: React.FC = () => {
       estimated_delivery_date: "",
       observations: "",
       factura_ids: [],
-      // --- START: MODIFICACIÓN DE VALORES POR DEFECTO ---
       activities: [
         {
           activity: "",
           assigned_users: [],
-          normas: [{ value: "" }], // Inicializa con un campo de norma
+          normas: [{ value: "" }],
           precio_sin_iva: "" as any,
-          currency: "ARS", // Moneda por actividad
+          currency: "ARS",
         },
       ],
-      // --- END: MODIFICACIÓN DE VALORES POR DEFECTO ---
     },
   });
 
@@ -271,7 +264,7 @@ const OTCreate: React.FC = () => {
   const [contracts, setContracts] = useState<Contract[]>([]);
   const [activityOptions, setActivityOptions] = useState<ActivityPoint[]>([]);
   const [facturasCliente, setFacturasCliente] = useState<Factura[]>([]);
-  const [idPreview, setIdPreview] = useState("Completar campos...");
+  const [idPreview, setIdPreview] = useState("AAMMDDN T CCCC");
   const [isIdLoading, setIsIdLoading] = useState(false);
   const [isCreateFacturaModalOpen, setCreateFacturaModalOpen] = useState(false);
 
@@ -341,9 +334,43 @@ const OTCreate: React.FC = () => {
     fetchClientData();
   }, [selectedClientId, setValue]);
 
+  // --- START: LÓGICA DE ID PROGRESIVO CON FORMATO "AAMMDDN T CCCC" ---
   useEffect(() => {
     const [date, type, clientId] = watchedIdFields;
 
+    const otTypeMap: { [key: string]: string } = {
+      Produccion: "P",
+      Calibracion: "C",
+      "Ensayo SE": "S",
+      "Ensayo EE": "E",
+      "Otros Servicios": "O",
+    };
+
+    let datePart = "AAMMDD";
+    let dailyOtPart = "N";
+    let typePart = "T";
+    let clientPart = "CCCC";
+
+    if (date) {
+      const d = new Date(date + "T00:00:00");
+      const year = String(d.getFullYear()).slice(-2);
+      const month = String(d.getMonth() + 1).padStart(2, "0");
+      const day = String(d.getDate()).padStart(2, "0");
+      datePart = `${year}${month}${day}`;
+    }
+
+    if (type && otTypeMap[type as string]) {
+      typePart = otTypeMap[type as string];
+    }
+
+    if (clientId) {
+      clientPart = String(clientId).padStart(4, "0");
+    }
+
+    // Actualizar vista previa progresiva
+    setIdPreview(`${datePart}${dailyOtPart} ${typePart} ${clientPart}`);
+
+    // Llamada a la API solo cuando todos los campos están completos
     if (date && type && clientId) {
       setIsIdLoading(true);
       const params = new URLSearchParams({
@@ -351,18 +378,29 @@ const OTCreate: React.FC = () => {
         type: type as string,
         client_id: String(clientId),
       });
+
       axiosInstance
         .get(`/ots/generate-id?${params.toString()}`)
         .then((response) => {
-          const newId = response.data.previewId;
-          setIdPreview(newId);
-          setValue("custom_id", newId);
+          const fullId = response.data.previewId;
+
+          if (fullId && typeof fullId === "string") {
+            const sequentialNumber =
+              fullId.split("-").pop()?.replace(/^0+/, "") || "N";
+            const finalId = `${datePart}${sequentialNumber} ${typePart} ${clientPart}`;
+            setIdPreview(finalId);
+            setValue("custom_id", finalId);
+          }
+        })
+        .catch((error) => {
+          console.error("Error al generar el ID de OT:", error);
         })
         .finally(() => setIsIdLoading(false));
     } else {
-      setIdPreview("Completar campos...");
+      setValue("custom_id", "");
     }
   }, [watchedIdFields, setValue]);
+  // --- END: LÓGICA DE ID PROGRESIVO ---
 
   useEffect(() => {
     const date = watchedIdFields[0];
@@ -385,17 +423,17 @@ const OTCreate: React.FC = () => {
         client_id: Number(data.client_id),
         contact_id: data.contact_id ? Number(data.contact_id) : undefined,
         created_by: user.id,
+        // --- START: CORRECCIÓN DE ERROR "moneda" ---
+        moneda: data.activities[0]?.currency || "ARS",
+        // --- END: CORRECCIÓN DE ERROR "moneda" ---
         collaborator_observations: "",
-        // --- START: AJUSTE EN DATOS A ENVIAR ---
         activities: data.activities.map((act) => ({
           ...act,
           assigned_users: (act.assigned_users || []).map((u: any) =>
             typeof u === "number" ? u : u.id
           ),
-          // Convertir el array de objetos de normas a un array de strings
           normas: (act.normas || []).map((n: Norma) => n.value).filter(Boolean),
         })),
-        // --- END: AJUSTE EN DATOS A ENVIAR ---
       };
       const newOt = await otService.createOT(dataToSubmit as any);
       navigate(`/ots/${newOt.id}`);
@@ -608,7 +646,6 @@ const OTCreate: React.FC = () => {
             </div>
           </Card>
 
-          {/* --- START: SECCIÓN DE ACTIVIDADES MODIFICADA --- */}
           <Card>
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-lg font-semibold text-blue-700 dark:text-blue-400 flex items-center gap-2">
@@ -621,9 +658,9 @@ const OTCreate: React.FC = () => {
                   append({
                     activity: "",
                     assigned_users: [],
-                    normas: [{ value: "" }], // Añadir con una norma por defecto
+                    normas: [{ value: "" }],
                     precio_sin_iva: "" as any,
-                    currency: "ARS", // Moneda por defecto para nueva actividad
+                    currency: "ARS",
                   })
                 }
               >
@@ -652,7 +689,6 @@ const OTCreate: React.FC = () => {
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {/* Columna Izquierda */}
                     <div className="space-y-4">
                       <div>
                         <label className="text-sm font-medium mb-1 dark:text-gray-300">
@@ -695,8 +731,6 @@ const OTCreate: React.FC = () => {
                         />
                       </div>
                     </div>
-
-                    {/* Columna Derecha */}
                     <div className="space-y-4">
                       <NormaFields
                         activityIndex={index}
@@ -732,7 +766,6 @@ const OTCreate: React.FC = () => {
               ))}
             </div>
           </Card>
-          {/* --- END: SECCIÓN DE ACTIVIDADES MODIFICADA --- */}
 
           <Card>
             <div className="flex justify-between items-center mb-4">
