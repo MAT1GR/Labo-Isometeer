@@ -163,6 +163,7 @@ type OTCreateFormData = Omit<
 > & {
   activities: Partial<ActivityFormData>[];
   factura_ids?: number[];
+  seal_entity?: string;
 };
 
 const NormaFields: React.FC<{
@@ -236,6 +237,7 @@ const OTCreate: React.FC = () => {
       brand: "",
       model: "",
       seal_number: "",
+      seal_entity: "",
       certificate_expiry: "",
       estimated_delivery_date: "",
       observations: "",
@@ -334,7 +336,6 @@ const OTCreate: React.FC = () => {
     fetchClientData();
   }, [selectedClientId, setValue]);
 
-  // --- START: LÓGICA DE ID PROGRESIVO CON FORMATO "AAMMDDN T CCCC" ---
   useEffect(() => {
     const [date, type, clientId] = watchedIdFields;
 
@@ -367,10 +368,8 @@ const OTCreate: React.FC = () => {
       clientPart = String(clientId).padStart(4, "0");
     }
 
-    // Actualizar vista previa progresiva
     setIdPreview(`${datePart}${dailyOtPart} ${typePart} ${clientPart}`);
 
-    // Llamada a la API solo cuando todos los campos están completos
     if (date && type && clientId) {
       setIsIdLoading(true);
       const params = new URLSearchParams({
@@ -400,7 +399,6 @@ const OTCreate: React.FC = () => {
       setValue("custom_id", "");
     }
   }, [watchedIdFields, setValue]);
-  // --- END: LÓGICA DE ID PROGRESIVO ---
 
   useEffect(() => {
     const date = watchedIdFields[0];
@@ -418,14 +416,17 @@ const OTCreate: React.FC = () => {
     if (!user) return;
     setIsSaving(true);
     try {
+      const fullSealNumber = data.seal_entity
+        ? `${data.seal_entity} - ${data.seal_number}`
+        : data.seal_number;
+
       const dataToSubmit = {
         ...data,
+        seal_number: fullSealNumber,
         client_id: Number(data.client_id),
         contact_id: data.contact_id ? Number(data.contact_id) : undefined,
         created_by: user.id,
-        // --- START: CORRECCIÓN DE ERROR "moneda" ---
         moneda: data.activities[0]?.currency || "ARS",
-        // --- END: CORRECCIÓN DE ERROR "moneda" ---
         collaborator_observations: "",
         activities: data.activities.map((act) => ({
           ...act,
@@ -435,6 +436,7 @@ const OTCreate: React.FC = () => {
           normas: (act.normas || []).map((n: Norma) => n.value).filter(Boolean),
         })),
       };
+
       const newOt = await otService.createOT(dataToSubmit as any);
       navigate(`/ots/${newOt.id}`);
     } catch (error) {
@@ -487,6 +489,16 @@ const OTCreate: React.FC = () => {
       (sum, act) => sum + (Number(act.precio_sin_iva) || 0),
       0
     ) || 0;
+
+  const sealEntities = [
+    "IRAM",
+    "UL",
+    "IQC",
+    "Intertek",
+    "Qetkra",
+    "BVA",
+    "TÜV",
+  ];
 
   return (
     <>
@@ -627,11 +639,32 @@ const OTCreate: React.FC = () => {
               />
               <Input label="Marca" {...register("brand")} />
               <Input label="Modelo" {...register("model")} />
-              <Input
-                label="Nº de Lacre"
-                {...register("seal_number")}
-                disabled={!isLacreEnabled}
-              />
+
+              <div>
+                <label className="text-sm font-medium dark:text-gray-300">
+                  Nº de Lacre
+                </label>
+                <div className="flex w-full items-center mt-1">
+                  <select
+                    {...register("seal_entity")}
+                    className="flex-shrink-0 w-[30%] p-2 border-r-0 rounded-l-md dark:bg-gray-700 dark:border-gray-600"
+                    disabled={!isLacreEnabled}
+                  >
+                    <option value="">Entidad...</option>
+                    {sealEntities.map((entity) => (
+                      <option key={entity} value={entity}>
+                        {entity}
+                      </option>
+                    ))}
+                  </select>
+                  <Input
+                    {...register("seal_number")}
+                    className="flex-grow rounded-l-none"
+                    disabled={!isLacreEnabled}
+                  />
+                </div>
+              </div>
+
               <Input
                 label="Vto. del Certificado"
                 type="date"
