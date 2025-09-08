@@ -29,6 +29,7 @@ import {
   BookText,
   FileText,
   Plus,
+  X,
 } from "lucide-react";
 import axiosInstance from "../api/axiosInstance";
 import MultiUserSelect from "../components/ui/MultiUserSelect";
@@ -137,10 +138,20 @@ const CreateFacturaModal: React.FC<CreateFacturaModalProps> = ({
   );
 };
 
-// Tipo para los datos de una actividad en el formulario de creación
-type ActivityFormData = Omit<Activity, "id" | "work_order_id" | "status"> & {
-  currency?: string;
+// --- START: MODIFICACIÓN DE TIPOS ---
+type Norma = {
+  value: string;
 };
+
+// Tipo para los datos de una actividad en el formulario de creación
+type ActivityFormData = Omit<
+  Activity,
+  "id" | "work_order_id" | "status" | "norma"
+> & {
+  normas: Norma[];
+  currency: "ARS" | "USD";
+};
+// --- END: MODIFICACIÓN DE TIPOS ---
 
 // Tipo principal para el formulario de creación de OT
 type OTCreateFormData = Omit<
@@ -152,9 +163,60 @@ type OTCreateFormData = Omit<
   | "creator_name"
   | "contact_name"
   | "activities"
+  | "moneda" // Se elimina moneda global
 > & {
   activities: Partial<ActivityFormData>[];
   factura_ids?: number[];
+};
+
+// Componente para manejar las normas dinámicas
+const NormaFields: React.FC<{
+  activityIndex: number;
+  control: any;
+  register: any;
+}> = ({ activityIndex, control, register }) => {
+  const { fields, append, remove } = useFieldArray({
+    control,
+    name: `activities.${activityIndex}.normas`,
+  });
+
+  return (
+    <div>
+      <label className="text-sm font-medium mb-1 dark:text-gray-300">
+        Normas
+      </label>
+      <div className="space-y-2">
+        {fields.map((field, index) => (
+          <div key={field.id} className="flex items-center gap-2">
+            <Input
+              {...register(`activities.${activityIndex}.normas.${index}.value`)}
+              placeholder="Ej: IEC 60601"
+              className="w-full"
+            />
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              onClick={() => (fields.length > 1 ? remove(index) : null)}
+              disabled={fields.length <= 1}
+            >
+              <X className="h-4 w-4" />
+            </Button>
+            {index === fields.length - 1 && (
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                onClick={() => append({ value: "" })}
+              >
+                <Plus className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 };
 
 const OTCreate: React.FC = () => {
@@ -171,8 +233,6 @@ const OTCreate: React.FC = () => {
     defaultValues: {
       date: new Date().toISOString().split("T")[0],
       status: "pendiente",
-      // --- START: FIX ---
-      // Initialize all fields to prevent the controlled/uncontrolled warning
       type: "",
       client_id: undefined,
       contact_id: undefined,
@@ -183,19 +243,19 @@ const OTCreate: React.FC = () => {
       seal_number: "",
       certificate_expiry: "",
       estimated_delivery_date: "",
-      moneda: "ARS",
       observations: "",
       factura_ids: [],
-      // --- END: FIX ---
+      // --- START: MODIFICACIÓN DE VALORES POR DEFECTO ---
       activities: [
         {
           activity: "",
           assigned_users: [],
-          norma: "",
+          normas: [{ value: "" }], // Inicializa con un campo de norma
           precio_sin_iva: "" as any,
-          currency: "ARS",
+          currency: "ARS", // Moneda por actividad
         },
       ],
+      // --- END: MODIFICACIÓN DE VALORES POR DEFECTO ---
     },
   });
 
@@ -326,13 +386,16 @@ const OTCreate: React.FC = () => {
         contact_id: data.contact_id ? Number(data.contact_id) : undefined,
         created_by: user.id,
         collaborator_observations: "",
-        // CORREGIDO: Asegurarse de que 'assigned_users' envía solo los IDs
+        // --- START: AJUSTE EN DATOS A ENVIAR ---
         activities: data.activities.map((act) => ({
           ...act,
           assigned_users: (act.assigned_users || []).map((u: any) =>
             typeof u === "number" ? u : u.id
           ),
+          // Convertir el array de objetos de normas a un array de strings
+          normas: (act.normas || []).map((n: Norma) => n.value).filter(Boolean),
         })),
+        // --- END: AJUSTE EN DATOS A ENVIAR ---
       };
       const newOt = await otService.createOT(dataToSubmit as any);
       navigate(`/ots/${newOt.id}`);
@@ -545,6 +608,7 @@ const OTCreate: React.FC = () => {
             </div>
           </Card>
 
+          {/* --- START: SECCIÓN DE ACTIVIDADES MODIFICADA --- */}
           <Card>
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-lg font-semibold text-blue-700 dark:text-blue-400 flex items-center gap-2">
@@ -557,104 +621,118 @@ const OTCreate: React.FC = () => {
                   append({
                     activity: "",
                     assigned_users: [],
-                    norma: "",
-                    // AQUÍ ESTÁ LA CORRECCIÓN 2: También al añadir una nueva fila.
+                    normas: [{ value: "" }], // Añadir con una norma por defecto
                     precio_sin_iva: "" as any,
-                    currency: "ARS",
+                    currency: "ARS", // Moneda por defecto para nueva actividad
                   })
                 }
               >
                 <PlusCircle className="h-4 w-4 mr-2" /> Agregar Actividad
               </Button>
             </div>
-            <div className="space-y-4">
+            <div className="space-y-6">
               {fields.map((field, index) => (
                 <div
                   key={field.id}
-                  className="bg-gray-50 dark:bg-gray-700/50 p-4 rounded-md space-y-4"
+                  className="bg-gray-50 dark:bg-gray-700/50 p-4 rounded-lg border dark:border-gray-600"
                 >
-                  <div className="grid grid-cols-1 md:grid-cols-[1fr,2fr,auto] gap-4 items-start">
-                    <div>
-                      <label className="text-sm font-medium mb-1 dark:text-gray-300">
-                        Actividad
-                      </label>
-                      <select
-                        {...register(`activities.${index}.activity`)}
-                        className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
-                      >
-                        <option value="">Seleccionar...</option>
-                        {getAvailableActivities(index).map((opt) => (
-                          <option key={opt.id} value={opt.activity}>
-                            {opt.activity}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="text-sm font-medium mb-1 dark:text-gray-300">
-                        Asignar a
-                      </label>
-                      <Controller
-                        control={control}
-                        name={`activities.${index}.assigned_users` as any}
-                        render={({ field }) => (
-                          // CORREGIDO: Se transforma User[] a number[] y viceversa
-                          <MultiUserSelect
-                            users={users}
-                            selectedUserIds={(field.value || []).map(
-                              (u: User) => u.id
-                            )}
-                            onChange={(userIds: number[]) => {
-                              const selectedUsers = userIds
-                                .map((id) => users.find((u) => u.id === id))
-                                .filter(Boolean) as User[];
-                              field.onChange(selectedUsers);
-                            }}
-                          />
-                        )}
-                      />
-                    </div>
-                    <div className="self-end">
-                      <Button
-                        type="button"
-                        variant="danger"
-                        size="sm"
-                        onClick={() => remove(index)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
+                  <div className="flex justify-between items-start mb-4">
+                    <h3 className="font-semibold text-md text-gray-700 dark:text-gray-200">
+                      Actividad #{index + 1}
+                    </h3>
+                    <Button
+                      type="button"
+                      variant="danger"
+                      size="sm"
+                      onClick={() => remove(index)}
+                    >
+                      <Trash2 className="h-4 w-4 mr-1" />
+                      Eliminar
+                    </Button>
                   </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <Input
-                      label="Norma"
-                      {...register(`activities.${index}.norma`)}
-                      placeholder="Ej: IEC 60601"
-                    />
-                    <div className="flex items-end gap-2">
-                      <Input
-                        label="Precio (Sin IVA)"
-                        type="number"
-                        step="0.01"
-                        {...register(`activities.${index}.precio_sin_iva`, {
-                          valueAsNumber: true,
-                        })}
-                        placeholder="Ej: 15000"
-                        className="w-full"
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Columna Izquierda */}
+                    <div className="space-y-4">
+                      <div>
+                        <label className="text-sm font-medium mb-1 dark:text-gray-300">
+                          Actividad
+                        </label>
+                        <select
+                          {...register(`activities.${index}.activity`)}
+                          className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
+                        >
+                          <option value="">Seleccionar...</option>
+                          {getAvailableActivities(index).map((opt) => (
+                            <option key={opt.id} value={opt.activity}>
+                              {opt.activity}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="text-sm font-medium mb-1 dark:text-gray-300">
+                          Asignar a
+                        </label>
+                        <Controller
+                          control={control}
+                          name={`activities.${index}.assigned_users` as any}
+                          render={({ field }) => (
+                            <MultiUserSelect
+                              users={users}
+                              selectedUserIds={(field.value || []).map(
+                                (u: User) => u.id
+                              )}
+                              onChange={(userIds: number[]) => {
+                                const selectedUsers = userIds
+                                  .map((id) => users.find((u) => u.id === id))
+                                  .filter(Boolean) as User[];
+                                field.onChange(selectedUsers);
+                              }}
+                            />
+                          )}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Columna Derecha */}
+                    <div className="space-y-4">
+                      <NormaFields
+                        activityIndex={index}
+                        control={control}
+                        register={register}
                       />
-                      <select
-                        {...register("moneda")}
-                        className="p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 h-[42px]"
-                      >
-                        <option value="ARS">ARS</option>
-                        <option value="USD">USD</option>
-                      </select>
+                      <div>
+                        <label className="text-sm font-medium mb-1 dark:text-gray-300">
+                          Precio (Sin IVA)
+                        </label>
+                        <div className="flex items-center gap-2">
+                          <Input
+                            type="number"
+                            step="0.01"
+                            {...register(`activities.${index}.precio_sin_iva`, {
+                              valueAsNumber: true,
+                            })}
+                            placeholder="Ej: 15000"
+                            className="w-full"
+                          />
+                          <select
+                            {...register(`activities.${index}.currency`)}
+                            className="p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 h-[42px]"
+                          >
+                            <option value="ARS">ARS</option>
+                            <option value="USD">USD</option>
+                          </select>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
               ))}
             </div>
           </Card>
+          {/* --- END: SECCIÓN DE ACTIVIDADES MODIFICADA --- */}
 
           <Card>
             <div className="flex justify-between items-center mb-4">
