@@ -171,17 +171,31 @@ const OTCreate: React.FC = () => {
     defaultValues: {
       date: new Date().toISOString().split("T")[0],
       status: "pendiente",
+      // --- START: FIX ---
+      // Initialize all fields to prevent the controlled/uncontrolled warning
+      type: "",
+      client_id: undefined,
+      contact_id: undefined,
+      contract_type: "Contrato de Producción",
+      product: "",
+      brand: "",
+      model: "",
+      seal_number: "",
+      certificate_expiry: "",
+      estimated_delivery_date: "",
+      moneda: "ARS",
+      observations: "",
+      factura_ids: [],
+      // --- END: FIX ---
       activities: [
         {
           activity: "",
           assigned_users: [],
           norma: "",
-          // AQUÍ ESTÁ LA CORRECCIÓN 1: Cambiamos 'undefined' por una cadena vacía.
           precio_sin_iva: "" as any,
           currency: "ARS",
         },
       ],
-      contract_type: "Contrato de Producción",
     },
   });
 
@@ -529,18 +543,6 @@ const OTCreate: React.FC = () => {
                 {...register("estimated_delivery_date")}
               />
             </div>
-            <div>
-              <label className="text-sm font-medium dark:text-gray-300">
-                Moneda
-              </label>
-              <select
-                {...register("moneda")}
-                className="w-full mt-1 p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
-              >
-                <option value="ARS">ARS (Pesos)</option>
-                <option value="USD">USD (Dólares)</option>
-              </select>
-            </div>
           </Card>
 
           <Card>
@@ -641,7 +643,7 @@ const OTCreate: React.FC = () => {
                         className="w-full"
                       />
                       <select
-                        {...register(`activities.${index}.currency` as const)}
+                        {...register("moneda")}
                         className="p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 h-[42px]"
                       >
                         <option value="ARS">ARS</option>
