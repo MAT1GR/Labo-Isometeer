@@ -44,6 +44,8 @@ import ExportOtModal from "../components/ui/ExportOtModal";
 import Card from "../components/ui/Card";
 import NavigationPrompt from "../components/ui/NavigationPrompt";
 import Select from "react-select";
+// --- 1. IMPORTA EL MODAL DE HISTORIAL ---
+import OtHistoryModal from "../components/ui/OtHistoryModal";
 
 // --- Interfaces de Tipos para los Formularios ---
 interface FacturaFormData {
@@ -153,6 +155,8 @@ const OTDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user, canViewAdminContent, canAuthorizeOT } = useAuth();
+  // --- 2. AÑADE EL ESTADO PARA CONTROLAR EL MODAL ---
+  const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
   const {
     register,
     handleSubmit,
@@ -320,10 +324,11 @@ const OTDetail: React.FC = () => {
     await loadData();
     mutate(["/ot", user]);
   };
-
   const handleDeauthorize = async () => {
-    if (!id) return;
-    await otService.deauthorizeOT(Number(id));
+    if (!id || !user) return; // Verificamos que tengamos el usuario
+    // --- CORRECCIÓN AQUÍ ---
+    // Pasamos el user.id a la función del servicio
+    await otService.deauthorizeOT(Number(id), user.id);
     await loadData();
     mutate(["/ot", user]);
   };
@@ -386,6 +391,14 @@ const OTDetail: React.FC = () => {
         onClose={() => setIsExportModalOpen(false)}
         otData={dataForExport}
       />
+      {/* --- 3. RENDERIZA EL MODAL (no se verá hasta que se haga clic en el botón) --- */}
+      {id && (
+        <OtHistoryModal
+          isOpen={isHistoryModalOpen}
+          onClose={() => setIsHistoryModalOpen(false)}
+          otId={Number(id)}
+        />
+      )}
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
         <div className="flex justify-between items-center flex-wrap gap-4">
           <Button type="button" variant="ghost" onClick={() => navigate("/ot")}>
@@ -396,7 +409,6 @@ const OTDetail: React.FC = () => {
             <h1 className="text-2xl font-bold text-center">
               Detalle de OT: {otData.custom_id || `#${otData.id}`}
             </h1>
-            {/* --- CAMBIO: Indicador de moneda --- */}
             <div className="mt-1 text-sm font-semibold text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 px-3 py-1 rounded-full flex items-center gap-2">
               <DollarSign size={14} />
               <span>
@@ -407,7 +419,20 @@ const OTDetail: React.FC = () => {
               </span>
             </div>
           </div>
-          <div className="flex gap-2 flex-wrap">
+
+          <div className="flex gap-2 flex-wrap items-center">
+            {/* >>>>>>>>>>>>> AQUÍ ESTÁ EL BOTÓN <<<<<<<<<<<<<
+
+            */}
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setIsHistoryModalOpen(true)}
+            >
+              <Clock className="mr-2 h-5 w-5" />
+              Historial
+            </Button>
+
             {!isEmployee && (
               <Button
                 type="button"
@@ -606,7 +631,6 @@ const OTDetail: React.FC = () => {
                     ))}
                   </select>
                 </div>
-                {/* --- CAMBIO: Campo de Moneda movido a la sección principal --- */}
                 <div>
                   <label className="text-sm font-medium dark:text-gray-300">
                     Moneda
@@ -685,7 +709,6 @@ const OTDetail: React.FC = () => {
             </fieldset>
           </Card>
 
-          {/* --- CAMBIO: Sección de Actividades restaurada a su estado original funcional --- */}
           {!isEmployee && (
             <Card>
               <div className="p-6">

@@ -61,7 +61,7 @@ export interface OTFilters {
   end_date?: string;
 }
 
-// Funciones del Servicio
+// --- Funciones del Servicio ---
 
 const getAllOTs = async (
   user: User | null,
@@ -114,14 +114,17 @@ const deleteOT = async (id: number): Promise<void> => {
 };
 
 const authorizeOT = async (id: number, userId: number): Promise<WorkOrder> => {
-  // ✅ Solución: Cambiado de POST a PUT
   const response = await axiosInstance.put(`/ots/${id}/authorize`, { userId });
   return response.data;
 };
 
-const deauthorizeOT = async (id: number): Promise<WorkOrder> => {
-  // ✅ Solución: Cambiado de POST a PUT
-  const response = await axiosInstance.put(`/ots/${id}/deauthorize`);
+const deauthorizeOT = async (
+  id: number,
+  userId: number
+): Promise<WorkOrder> => {
+  const response = await axiosInstance.put(`/ots/${id}/deauthorize`, {
+    userId,
+  });
   return response.data;
 };
 
@@ -135,8 +138,6 @@ const addActivityToOT = async (
   return response.data;
 };
 
-
-
 const deleteActivity = async (
   otId: number,
   activityId: number
@@ -144,7 +145,13 @@ const deleteActivity = async (
   await axiosInstance.delete(`/ots/${otId}/activities/${activityId}`);
 };
 
-// Objeto de servicio exportado
+// --- AQUÍ SE DEFINE LA NUEVA FUNCIÓN ---
+const getOtHistory = async (id: number) => {
+  const response = await axiosInstance.get(`/ots/${id}/history`);
+  return response.data;
+};
+
+// --- Objeto de servicio exportado (AHORA CON LA NUEVA FUNCIÓN) ---
 export const otService = {
   getAllOTs,
   getOTById,
@@ -155,4 +162,5 @@ export const otService = {
   deleteOT,
   authorizeOT,
   deauthorizeOT,
+  getOtHistory, // <-- ¡LA AÑADIMOS AQUÍ!
 };
