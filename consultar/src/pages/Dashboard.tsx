@@ -1,4 +1,4 @@
-// RUTA: /cliente/src/pages/Dashboard.tsx
+// RUTA: /consultar/src/pages/Dashboard.tsx
 
 import React, { useMemo, useRef, useState } from "react";
 import { useAuth } from "../contexts/AuthContext";
@@ -351,7 +351,7 @@ const AdminDirectorDashboard: React.FC = () => {
   );
 };
 
-// --- NUEVO DASHBOARD DEL EMPLEADO ---
+// --- DASHBOARD DEL EMPLEADO ---
 const EmpleadoDashboard: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();

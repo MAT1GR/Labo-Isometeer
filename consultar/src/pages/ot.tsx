@@ -53,17 +53,28 @@ const OT: React.FC = () => {
   );
   const { data: users } = useSWR<User[]>("/users", authService.getAllUsers);
 
+  // --- MODIFICACIÓN CLAVE: Lógica condicional para obtener las OTs ---
   const {
     data: ots,
     error,
     isLoading,
-  } = useSWR(user ? ["/ots", user, filters] : null, ([, user, filters]) =>
-    otService.getAllOTs(user, filters)
+  } = useSWR(
+    user ? [`/ot`, user, filters] : null,
+    ([, user, currentFilters]) => {
+      if (canViewAdminContent()) {
+        // Los administradores ven todo, aplicando filtros
+        return otService.getAllOTs(user, currentFilters);
+      } else {
+        // Los empleados solo ven sus OTs, no se aplican filtros desde la UI
+        return otService.getMisOts();
+      }
+    }
   );
+  // --- FIN DE LA MODIFICACIÓN ---
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [filters]);
+  }, [filters, ots]); // Resetear en cambio de ots también
 
   useEffect(() => {
     if (topOfListRef.current) {
@@ -92,7 +103,7 @@ const OT: React.FC = () => {
     if (otToDelete === null) return;
     try {
       await otService.deleteOT(otToDelete);
-      mutate(["/ots", user, filters]);
+      mutate([`/ot`, user, filters]); // Revalidar los datos
     } catch (err: any) {
       alert(err.message || "Error al eliminar la OT.");
     } finally {
@@ -110,11 +121,11 @@ const OT: React.FC = () => {
           );
           return;
         }
-        await otService.deauthorizeOT(ot.id);
+        await otService.deauthorizeOT(ot.id, user.id);
       } else {
         await otService.authorizeOT(ot.id, user.id);
       }
-      mutate(["/ots", user, filters]);
+      mutate([`/ot`, user, filters]); // Revalidar los datos
     } catch (error: any) {
       alert(error.message || "Error al cambiar el estado de autorización.");
     }
@@ -193,7 +204,7 @@ const OT: React.FC = () => {
               animate={{ height: "auto", opacity: 1 }}
               exit={{ height: 0, opacity: 0 }}
               transition={{ duration: 0.3, ease: "easeInOut" }}
-              className="overflow-hidden" // ✅ Se elimina mb-6 de aquí
+              className="overflow-hidden"
             >
               <OTFiltersComponent
                 filters={filters}
@@ -208,7 +219,7 @@ const OT: React.FC = () => {
 
         <Card>
           {isLoading ? (
-            <div>Cargando...</div>
+            <div className="text-center py-12">Cargando...</div>
           ) : paginatedOts && paginatedOts.length > 0 ? (
             <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
               <thead className="bg-gray-50 dark:bg-gray-700">

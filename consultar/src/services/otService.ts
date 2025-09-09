@@ -9,8 +9,8 @@ export interface Activity {
   assigned_users: any;
   activity: any;
   status: string;
-  started_at(started_at: any): import("react").ReactNode;
-  completed_at(completed_at: any): import("react").ReactNode;
+  started_at: string | null;
+  completed_at: string | null;
   id: number;
   ot_id: number;
   description: string;
@@ -61,6 +61,16 @@ export interface OTFilters {
   end_date?: string;
 }
 
+export interface UserSummaryItem {
+  id: number;
+  custom_id: string;
+  product: string;
+  client_name: string;
+  ot_date: string;
+  activity: string;
+  status: "pendiente" | "en_progreso" | "finalizada";
+}
+
 // --- Funciones del Servicio ---
 
 const getAllOTs = async (
@@ -70,7 +80,8 @@ const getAllOTs = async (
   if (!user) return [];
   try {
     const params = new URLSearchParams();
-
+    if (user.role) params.append("role", user.role);
+    if (user.id) params.append("user_id", user.id.toString());
     if (filters.client_id)
       params.append("clientId", filters.client_id.toString());
     if (filters.status) params.append("status", filters.status);
@@ -80,11 +91,20 @@ const getAllOTs = async (
       params.append("authorized", filters.authorized.toString());
     if (filters.start_date) params.append("startDate", filters.start_date);
     if (filters.end_date) params.append("endDate", filters.end_date);
-
     const response = await axiosInstance.get("/ots", { params });
     return response.data;
   } catch (error) {
     console.error("Error fetching work orders:", error);
+    throw error;
+  }
+};
+
+const getMisOts = async (): Promise<WorkOrder[]> => {
+  try {
+    const response = await axiosInstance.get("/ots/mis-ots");
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching assigned work orders:", error);
     throw error;
   }
 };
@@ -120,7 +140,7 @@ const authorizeOT = async (id: number, userId: number): Promise<WorkOrder> => {
 
 const deauthorizeOT = async (
   id: number,
-  userId: number
+  userId?: number
 ): Promise<WorkOrder> => {
   const response = await axiosInstance.put(`/ots/${id}/deauthorize`, {
     userId,
@@ -145,15 +165,35 @@ const deleteActivity = async (
   await axiosInstance.delete(`/ots/${otId}/activities/${activityId}`);
 };
 
-// --- AQUÍ SE DEFINE LA NUEVA FUNCIÓN ---
 const getOtHistory = async (id: number) => {
   const response = await axiosInstance.get(`/ots/${id}/history`);
   return response.data;
 };
 
-// --- Objeto de servicio exportado (AHORA CON LA NUEVA FUNCIÓN) ---
+const getUserSummary = async (userId: number): Promise<UserSummaryItem[]> => {
+  const response = await axiosInstance.get(`/ots/user-summary/${userId}`);
+  return response.data;
+};
+
+// --- NUEVAS FUNCIONES PARA INICIAR Y DETENER ACTIVIDADES ---
+const startActivity = async (
+  activityId: number,
+  userId: number
+): Promise<void> => {
+  await axiosInstance.put(`/ots/activities/${activityId}/start`, { userId });
+};
+
+const stopActivity = async (
+  activityId: number,
+  userId: number
+): Promise<void> => {
+  await axiosInstance.put(`/ots/activities/${activityId}/stop`, { userId });
+};
+
+// --- Objeto de servicio exportado (AHORA CON LAS NUEVAS FUNCIONES) ---
 export const otService = {
   getAllOTs,
+  getMisOts,
   getOTById,
   createOT,
   updateOT,
@@ -162,5 +202,8 @@ export const otService = {
   deleteOT,
   authorizeOT,
   deauthorizeOT,
-  getOtHistory, // <-- ¡LA AÑADIMOS AQUÍ!
+  getOtHistory,
+  getUserSummary,
+  startActivity, // <-- ¡AÑADIDA!
+  stopActivity, // <-- ¡AÑADIDA!
 };

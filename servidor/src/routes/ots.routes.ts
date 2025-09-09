@@ -1,11 +1,41 @@
 // RUTA: /servidor/src/routes/ots.routes.ts
 
-import { Router, Request, Response } from "express";
+import { Router, Request, Response, NextFunction } from "express";
 import db from "../config/database";
 import { sendNotificationToUser } from "./notifications.routes";
 import { Statement } from "better-sqlite3";
+import jwt from "jsonwebtoken"; // <--- IMPORTACIÓN AÑADIDA
 
 const router = Router();
+
+// --- MIDDLEWARE DE AUTENTICACIÓN ---
+// Añadido aquí para proteger la ruta /mis-ots
+interface DecodedToken {
+  id: number;
+  role: string;
+}
+
+const verifyToken = (req: Request, res: Response, next: NextFunction) => {
+  const token = req.headers["authorization"]?.split(" ")[1];
+
+  if (!token) {
+    return res.status(403).json({ error: "No token provided." });
+  }
+
+  try {
+    const decoded = jwt.verify(
+      token,
+      process.env.JWT_SECRET || "default_secret"
+    ) as DecodedToken;
+    // Adjuntamos el usuario decodificado al objeto request
+    // @ts-ignore
+    req.user = decoded;
+    next();
+  } catch (error) {
+    return res.status(401).json({ error: "Unauthorized." });
+  }
+};
+// --- FIN DEL MIDDLEWARE ---
 
 // --- FUNCIÓN HELPER PARA SIMPLIFICAR Y CENTRALIZAR EL REGISTRO DE HISTORIAL ---
 const addHistoryEntry = (otId: number, userId: number, changes: string[]) => {
@@ -111,11 +141,52 @@ const generateCustomId = (
   return `${datePrefix}${sequentialNumber} ${typeInitial} ${client.code}`;
 };
 
+// [GET] /api/ots/mis-ots (RUTA CORREGIDA CON MIDDLEWARE)
+router.get("/mis-ots", verifyToken, (req: Request, res: Response) => {
+  // @ts-ignore
+  const userId = req.user?.id; // Ahora req.user existe gracias al middleware
+
+  if (!userId) {
+    // Esta comprobación es redundante si verifyToken funciona, pero es una buena práctica
+    return res.status(401).json({ error: "No autenticado." });
+  }
+
+  try {
+    const query = `
+      SELECT
+        ot.id, ot.custom_id, ot.product as title, ot.status, ot.authorized,
+        c.name as client_name,
+        ot.client_id,
+        (SELECT GROUP_CONCAT(DISTINCT u.name)
+         FROM work_order_activities wa
+         JOIN work_order_activity_assignments waa ON wa.id = waa.activity_id
+         JOIN users u ON waa.user_id = u.id
+         WHERE wa.work_order_id = ot.id) as assigned_to_name
+      FROM work_orders ot
+      LEFT JOIN clients c ON ot.client_id = c.id
+      WHERE ot.id IN (
+        SELECT DISTINCT wa.work_order_id
+        FROM work_order_activities wa
+        JOIN work_order_activity_assignments waa ON wa.id = waa.activity_id
+        WHERE waa.user_id = ?
+      ) AND ot.authorized = 1
+      GROUP BY ot.id
+      ORDER BY ot.created_at DESC
+    `;
+    const stmt: Statement = db.prepare(query);
+    const ots = stmt.all(userId);
+    res.status(200).json(ots);
+  } catch (error) {
+    console.error("Error en GET /mis-ots:", error);
+    res.status(500).json({ error: "Error al obtener mis órdenes de trabajo." });
+  }
+});
+
 // [GET] /api/ots
 router.get("/", (req: Request, res: Response) => {
   const {
     role,
-    assigned_to,
+    user_id, // Se espera user_id en lugar de assigned_to
     searchTerm,
     clientId,
     assignedToId,
@@ -141,12 +212,19 @@ router.get("/", (req: Request, res: Response) => {
     const params: any[] = [];
     const whereClauses: string[] = [];
 
-    if (role === "empleado" && assigned_to) {
+    // Lógica principal de filtrado
+    if (role === "empleado" && user_id) {
       whereClauses.push(
-        `ot.id IN (SELECT work_order_id FROM work_order_activities wa JOIN work_order_activity_assignments waa ON wa.id = waa.activity_id WHERE waa.user_id = ?) AND ot.authorized = 1`
+        `ot.id IN (
+          SELECT DISTINCT wa.work_order_id
+          FROM work_order_activities wa
+          JOIN work_order_activity_assignments waa ON wa.id = waa.activity_id
+          WHERE waa.user_id = ?
+        ) AND ot.authorized = 1`
       );
-      params.push(assigned_to);
-    } else if (Object.keys(req.query).length > 0) {
+      params.push(user_id);
+    } else {
+      // Filtros para roles administrativos
       if (searchTerm) {
         whereClauses.push(`(ot.custom_id LIKE ? OR ot.product LIKE ?)`);
         params.push(`%${searchTerm}%`, `%${searchTerm}%`);
@@ -165,7 +243,12 @@ router.get("/", (req: Request, res: Response) => {
       }
       if (assignedToId) {
         whereClauses.push(
-          `ot.id IN (SELECT work_order_id FROM work_order_activities wa JOIN work_order_activity_assignments waa ON wa.id = waa.activity_id WHERE waa.user_id = ?)`
+          `ot.id IN (
+            SELECT DISTINCT wa.work_order_id
+            FROM work_order_activities wa
+            JOIN work_order_activity_assignments waa ON wa.id = waa.activity_id
+            WHERE waa.user_id = ?
+          )`
         );
         params.push(assignedToId);
       }
@@ -185,7 +268,6 @@ router.get("/", (req: Request, res: Response) => {
     res.status(500).json({ error: "Error al obtener las órdenes de trabajo." });
   }
 });
-
 // [POST] /api/ots
 router.post("/", (req: Request, res: Response) => {
   const { activities = [], created_by, factura_ids = [], ...otData } = req.body;

@@ -1,4 +1,4 @@
-// RUTA: /cliente/src/api/axiosInstance.ts
+// RUTA: /consultar/src/api/axiosInstance.ts
 
 import axios from "axios";
 
@@ -14,6 +14,33 @@ const axiosInstance = axios.create({
     "Content-Type": "application/json",
   },
 });
+
+// --- INTERCEPTOR CORREGIDO PARA AÑADIR EL TOKEN DE AUTENTICACIÓN ---
+axiosInstance.interceptors.request.use(
+  (config) => {
+    // 1. Obtener el string del usuario del localStorage
+    const userString = localStorage.getItem("user");
+
+    if (userString) {
+      // 2. Parsear el string JSON para obtener el objeto de usuario
+      const userData = JSON.parse(userString);
+      const token = userData.token;
+
+      // 3. Si el token existe dentro del objeto, añadirlo a la cabecera
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+      }
+    }
+
+    // Devolver la configuración (modificada o no) para que la petición continúe
+    return config;
+  },
+  (error) => {
+    // Manejar errores en la configuración de la petición
+    return Promise.reject(error);
+  }
+);
+// --- FIN DEL INTERCEPTOR ---
 
 export const fetcher = (url: string) =>
   axiosInstance.get(url).then((res) => res.data);
