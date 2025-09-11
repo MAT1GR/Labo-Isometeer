@@ -3,16 +3,15 @@
 import React, { useState, useEffect } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
-// --- IMPORTAMOS LOS NUEVOS TIPOS ---
 import {
   facturacionService,
   Factura,
   Cobro,
   CreateCobroData,
-  CobroUpdateData, // Importamos el nuevo tipo
-  FacturaUpdateData, // Importamos el nuevo tipo
+  CobroUpdateData,
+  FacturaUpdateData,
 } from "../services/facturacionService";
-import { formatCurrency, formatDateTime } from "../lib/utils";
+import { formatDateTime } from "../lib/utils";
 import Card from "../components/ui/Card";
 import Button from "../components/ui/Button";
 import Input from "../components/ui/Input";
@@ -22,15 +21,24 @@ import {
   ChevronDown,
   FileText,
   PlusCircle,
-  Edit, // Añadimos el icono de edición
-  Trash2, // Añadimos el icono de borrado
-  Save, // Añadimos el icono de guardar
+  Edit,
+  Trash2,
+  Save,
+  AlertTriangle,
 } from "lucide-react";
 import { cn } from "../lib/utils";
 import { WorkOrder, Activity } from "../services/otService";
 import ConfirmationModal from "../components/ui/ConfirmationModal";
 
-// Componente para el tag de estado
+// Helper para formatear la moneda. Usará la moneda que se le pase.
+const formatCurrency = (amount: number, currency: string) => {
+  return new Intl.NumberFormat("es-AR", {
+    style: "currency",
+    currency: currency,
+  }).format(amount);
+};
+
+// Componente para el tag de estado (sin cambios)
 const StatusTag: React.FC<{ status: string }> = ({ status }) => {
   const statusStyles: { [key: string]: string } = {
     pagada: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
@@ -51,12 +59,12 @@ const StatusTag: React.FC<{ status: string }> = ({ status }) => {
 // Componente para mostrar detalles de un cobro
 const CobroDetail: React.FC<{
   cobro: Cobro;
+  facturaMoneda: string;
   onEdit: (cobro: Cobro) => void;
   onDelete: (cobro: Cobro) => void;
-}> = ({ cobro, onEdit, onDelete }) => {
+}> = ({ cobro, facturaMoneda, onEdit, onDelete }) => {
   const [isOpen, setIsOpen] = useState(false);
 
-  // Esta validación ahora funcionará correctamente
   const hasDetails =
     cobro.identificacion_cobro ||
     cobro.ingresos_brutos ||
@@ -69,7 +77,7 @@ const CobroDetail: React.FC<{
       <div className="p-4 flex justify-between items-center">
         <div>
           <p className="font-bold text-lg text-gray-800 dark:text-gray-100">
-            {formatCurrency(cobro.monto)}
+            {formatCurrency(cobro.monto, facturaMoneda)}
           </p>
           <p className="text-sm text-gray-500 dark:text-gray-400">
             {cobro.medio_de_pago}
@@ -117,25 +125,25 @@ const CobroDetail: React.FC<{
             {cobro.ingresos_brutos != null && (
               <div>
                 <span className="font-semibold">IIBB:</span>{" "}
-                {formatCurrency(cobro.ingresos_brutos)}
+                {formatCurrency(cobro.ingresos_brutos, facturaMoneda)}
               </div>
             )}
             {cobro.iva != null && (
               <div>
                 <span className="font-semibold">IVA:</span>{" "}
-                {formatCurrency(cobro.iva)}
+                {formatCurrency(cobro.iva, facturaMoneda)}
               </div>
             )}
             {cobro.impuesto_ganancias != null && (
               <div>
                 <span className="font-semibold">Ganancias:</span>{" "}
-                {formatCurrency(cobro.impuesto_ganancias)}
+                {formatCurrency(cobro.impuesto_ganancias, facturaMoneda)}
               </div>
             )}
             {cobro.retencion_suss != null && (
               <div>
                 <span className="font-semibold">SUSS:</span>{" "}
-                {formatCurrency(cobro.retencion_suss)}
+                {formatCurrency(cobro.retencion_suss, facturaMoneda)}
               </div>
             )}
           </div>
@@ -146,7 +154,10 @@ const CobroDetail: React.FC<{
 };
 
 // Componente para el acordeón de cada OT
-const OTAccordion: React.FC<{ ot: WorkOrder }> = ({ ot }) => {
+const OTAccordion: React.FC<{ ot: WorkOrder; facturaMoneda: string }> = ({
+  ot,
+  facturaMoneda,
+}) => {
   const [isOpen, setIsOpen] = useState(false);
 
   if (!ot.activities || ot.activities.length === 0) {
@@ -195,7 +206,7 @@ const OTAccordion: React.FC<{ ot: WorkOrder }> = ({ ot }) => {
                   {act.name}
                 </span>
                 <span className="font-mono text-gray-800 dark:text-gray-100">
-                  {formatCurrency(act.precio_sin_iva)}
+                  {formatCurrency(act.precio_sin_iva, facturaMoneda)}
                 </span>
               </li>
             ))}
@@ -214,7 +225,6 @@ const FacturaDetail: React.FC = () => {
   const [isAddingCobro, setIsAddingCobro] = useState(false);
   const [isEditingCobro, setIsEditingCobro] = useState<Cobro | null>(null);
   const [cobroToDelete, setCobroToDelete] = useState<Cobro | null>(null);
-  // Nuevo estado para la edición de observaciones
   const [isEditingObservations, setIsEditingObservations] = useState(false);
 
   const {
@@ -245,17 +255,18 @@ const FacturaDetail: React.FC = () => {
   }, [id]);
 
   const handleCobroSubmit = async (data: any) => {
-    if (id) {
+    if (id && factura) {
       try {
         const finalMedioDePago =
           data.medio_de_pago === "Otro"
             ? data.otro_medio_de_pago
             : data.medio_de_pago;
 
-        const cobroData: CreateCobroData = {
+        const cobroData = {
           monto: Number(data.monto),
           fecha: new Date(data.fecha).toISOString(),
           medio_de_pago: finalMedioDePago,
+          moneda: factura.moneda, // Se toma siempre de la factura
           identificacion_cobro: data.identificacion_cobro || undefined,
           ingresos_brutos: data.ingresos_brutos
             ? Number(data.ingresos_brutos)
@@ -270,7 +281,6 @@ const FacturaDetail: React.FC = () => {
         };
 
         if (isEditingCobro) {
-          // Lógica para editar un cobro
           await facturacionService.updateCobro(
             Number(id),
             isEditingCobro.id,
@@ -278,13 +288,12 @@ const FacturaDetail: React.FC = () => {
           );
           setIsEditingCobro(null);
         } else {
-          // Lógica para crear un nuevo cobro
           await facturacionService.createCobro(Number(id), cobroData);
-          setIsAddingCobro(false);
         }
 
+        setIsAddingCobro(false);
         reset();
-        await loadFactura(); // Recarga la factura para ver los cambios
+        await loadFactura();
       } catch (error) {
         console.error("Error al guardar el cobro:", error);
         alert("No se pudo registrar/actualizar el cobro.");
@@ -297,7 +306,7 @@ const FacturaDetail: React.FC = () => {
     try {
       await facturacionService.deleteCobro(Number(id), cobroToDelete.id);
       setCobroToDelete(null);
-      await loadFactura(); // Recarga la factura
+      await loadFactura();
     } catch (error) {
       console.error("Error al eliminar el cobro:", error);
       alert("No se pudo eliminar el cobro.");
@@ -382,13 +391,21 @@ const FacturaDetail: React.FC = () => {
             </div>
           </div>
 
+          {factura.moneda === "USD" && (
+            <div className="mt-4 p-3 bg-yellow-100 border-l-4 border-yellow-500 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-200 rounded-md flex items-center">
+              <AlertTriangle className="h-5 w-5 mr-3" />
+              <span className="font-semibold">Atención: </span> Los montos de
+              esta factura están expresados en Dólares (USD).
+            </div>
+          )}
+
           <div className="mt-6 border-t pt-6 dark:border-gray-700 grid grid-cols-1 md:grid-cols-3 gap-6">
             <div>
               <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">
                 Monto Neto
               </h3>
               <p className="text-2xl font-semibold text-gray-800 dark:text-gray-100">
-                {formatCurrency(montoNeto)}
+                {formatCurrency(montoNeto, factura.moneda)}
               </p>
             </div>
             {factura.iva && (
@@ -397,7 +414,7 @@ const FacturaDetail: React.FC = () => {
                   IVA
                 </h3>
                 <p className="text-2xl font-semibold text-gray-800 dark:text-gray-100">
-                  {formatCurrency(factura.iva)}
+                  {formatCurrency(factura.iva, factura.moneda)}
                 </p>
               </div>
             )}
@@ -406,7 +423,7 @@ const FacturaDetail: React.FC = () => {
                 Monto Total
               </h3>
               <p className="text-2xl font-bold text-gray-800 dark:text-gray-100">
-                {formatCurrency(montoTotal)}
+                {formatCurrency(montoTotal, factura.moneda)}
               </p>
             </div>
             <div>
@@ -414,7 +431,7 @@ const FacturaDetail: React.FC = () => {
                 Monto Pagado
               </h3>
               <p className="text-2xl font-semibold text-green-600 dark:text-green-400">
-                {formatCurrency(montoPagado)}
+                {formatCurrency(montoPagado, factura.moneda)}
               </p>
             </div>
             <div>
@@ -422,7 +439,7 @@ const FacturaDetail: React.FC = () => {
                 Saldo Restante
               </h3>
               <p className="text-2xl font-semibold text-red-600 dark:text-red-400">
-                {formatCurrency(saldoRestante)}
+                {formatCurrency(saldoRestante, factura.moneda)}
               </p>
             </div>
           </div>
@@ -489,10 +506,19 @@ const FacturaDetail: React.FC = () => {
             <h2 className="text-xl font-bold mb-4 flex items-center gap-2 text-gray-800 dark:text-gray-100">
               <Banknote /> Historial de Cobros
             </h2>
-            {saldoRestante > 0 && !isEditingCobro && (
+
+            {saldoRestante > 0 && (
               <div className="mb-6">
                 {!isAddingCobro ? (
-                  <Button onClick={() => setIsAddingCobro(true)}>
+                  <Button
+                    onClick={() => {
+                      setIsAddingCobro(true);
+                      setIsEditingCobro(null);
+                      reset({
+                        fecha: new Date().toISOString().split("T")[0],
+                      });
+                    }}
+                  >
                     <PlusCircle className="mr-2 h-4 w-4" />
                     Registrar Nuevo Cobro
                   </Button>
@@ -502,16 +528,16 @@ const FacturaDetail: React.FC = () => {
                     className="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg space-y-4"
                   >
                     <h3 className="font-semibold text-gray-800 dark:text-gray-100">
-                      Nuevo Cobro
+                      {isEditingCobro ? "Editar Cobro" : "Nuevo Cobro"}
                     </h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <Input
-                        label="Monto"
+                        label={`Monto (${factura.moneda})`}
                         type="number"
                         step="0.01"
                         {...register("monto", {
                           required: true,
-                          max: saldoRestante,
+                          max: isEditingCobro ? undefined : saldoRestante,
                         })}
                       />
                       <Input
@@ -560,6 +586,7 @@ const FacturaDetail: React.FC = () => {
                       )}
                     </div>
 
+                    {/* <-- INPUTS ADICIONALES RESTAURADOS --> */}
                     <div className="border-t pt-4 space-y-4">
                       <h4 className="text-sm font-semibold text-gray-600 dark:text-gray-300">
                         Detalles Adicionales (Opcional)
@@ -598,13 +625,18 @@ const FacturaDetail: React.FC = () => {
 
                     <div className="flex gap-4 pt-4 border-t">
                       <Button type="submit" disabled={isSubmitting}>
-                        {isSubmitting ? "Guardando..." : "Guardar Cobro"}
+                        {isSubmitting
+                          ? "Guardando..."
+                          : isEditingCobro
+                          ? "Actualizar Cobro"
+                          : "Guardar Cobro"}
                       </Button>
                       <Button
                         variant="outline"
                         type="button"
                         onClick={() => {
                           setIsAddingCobro(false);
+                          setIsEditingCobro(null);
                           reset();
                         }}
                       >
@@ -615,125 +647,14 @@ const FacturaDetail: React.FC = () => {
                 )}
               </div>
             )}
-            {isEditingCobro && (
-              <div className="mb-6">
-                <form
-                  onSubmit={handleSubmit(handleCobroSubmit)}
-                  className="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg space-y-4"
-                >
-                  <h3 className="font-semibold text-gray-800 dark:text-gray-100">
-                    Editar Cobro
-                  </h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <Input
-                      label="Monto"
-                      type="number"
-                      step="0.01"
-                      {...register("monto", { required: true })}
-                    />
-                    <Input
-                      label="Fecha"
-                      type="date"
-                      {...register("fecha", { required: true })}
-                    />
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium dark:text-gray-300">
-                      Medio de Pago
-                    </label>
-                    <select
-                      {...register("medio_de_pago", { required: true })}
-                      className="w-full mt-1 p-2 border rounded-md dark:bg-gray-800 dark:border-gray-600"
-                    >
-                      <option value="Efectivo">Efectivo</option>
-                      <option value="Transferencia">Transferencia</option>
-                      <option value="Tarjeta de Crédito">
-                        Tarjeta de Crédito
-                      </option>
-                      <option value="Tarjeta de Débito">
-                        Tarjeta de Débito
-                      </option>
-                      <option value="Otro">Otro</option>
-                    </select>
-                  </div>
-                  <div
-                    className={cn(
-                      "transition-all duration-300 ease-in-out overflow-hidden",
-                      medioDePago === "Otro"
-                        ? "max-h-40 opacity-100"
-                        : "max-h-0 opacity-0"
-                    )}
-                  >
-                    {medioDePago === "Otro" && (
-                      <Input
-                        label="Especificar otro medio de pago"
-                        {...register("otro_medio_de_pago", {
-                          required: medioDePago === "Otro",
-                        })}
-                        className="mt-2"
-                      />
-                    )}
-                  </div>
-                  <div className="border-t pt-4 space-y-4">
-                    <h4 className="text-sm font-semibold text-gray-600 dark:text-gray-300">
-                      Detalles Adicionales (Opcional)
-                    </h4>
-                    <Input
-                      label="Identificación del Cobro"
-                      {...register("identificacion_cobro")}
-                    />
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                      <Input
-                        label="Ingresos Brutos"
-                        type="number"
-                        step="0.01"
-                        {...register("ingresos_brutos")}
-                      />
-                      <Input
-                        label="IVA"
-                        type="number"
-                        step="0.01"
-                        {...register("iva")}
-                      />
-                      <Input
-                        label="Ganancias"
-                        type="number"
-                        step="0.01"
-                        {...register("impuesto_ganancias")}
-                      />
-                      <Input
-                        label="Retención SUSS"
-                        type="number"
-                        step="0.01"
-                        {...register("retencion_suss")}
-                      />
-                    </div>
-                  </div>
-                  <div className="flex gap-4 pt-4 border-t">
-                    <Button type="submit" disabled={isSubmitting}>
-                      {isSubmitting ? "Actualizando..." : "Actualizar Cobro"}
-                    </Button>
-                    <Button
-                      variant="outline"
-                      type="button"
-                      onClick={() => {
-                        setIsEditingCobro(null);
-                        setIsAddingCobro(false);
-                        reset();
-                      }}
-                    >
-                      Cancelar
-                    </Button>
-                  </div>
-                </form>
-              </div>
-            )}
+
             <div className="space-y-4">
               {factura.cobros && factura.cobros.length > 0 ? (
                 factura.cobros.map((cobro) => (
                   <CobroDetail
                     key={cobro.id}
                     cobro={cobro}
+                    facturaMoneda={factura.moneda}
                     onEdit={handleEditCobro}
                     onDelete={() => setCobroToDelete(cobro)}
                   />
@@ -754,7 +675,13 @@ const FacturaDetail: React.FC = () => {
             </h2>
             <div className="space-y-2">
               {factura.ots && factura.ots.length > 0 ? (
-                factura.ots.map((ot) => <OTAccordion key={ot.id} ot={ot} />)
+                factura.ots.map((ot) => (
+                  <OTAccordion
+                    key={ot.id}
+                    ot={ot}
+                    facturaMoneda={factura.moneda}
+                  />
+                ))
               ) : (
                 <p className="text-gray-500 dark:text-gray-400 italic">
                   No hay OTs asociadas a esta factura.
@@ -769,7 +696,8 @@ const FacturaDetail: React.FC = () => {
         isOpen={!!cobroToDelete}
         title="Confirmar eliminación de cobro"
         message={`¿Estás seguro de que deseas eliminar el cobro de ${formatCurrency(
-          cobroToDelete?.monto || 0
+          cobroToDelete?.monto || 0,
+          factura.moneda
         )}? Esta acción es irreversible.`}
         onConfirm={handleDeleteCobro}
         onClose={() => setCobroToDelete(null)}

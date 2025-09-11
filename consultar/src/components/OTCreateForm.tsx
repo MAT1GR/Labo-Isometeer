@@ -20,6 +20,7 @@ import {
   BookText,
   FileText,
   Plus,
+  ActivitySquare,
 } from "lucide-react";
 import { formatCurrency } from "../lib/utils";
 import { useOTCreateForm } from "../hooks/useOTCreateForm";
@@ -46,7 +47,7 @@ const OTCreateForm: React.FC = () => {
     fields,
     append,
     remove,
-    onSubmit, // <-- Esta es la función ya procesada por handleSubmit
+    onSubmit,
     handleFacturaCreated,
     getAvailableActivities,
   } = useOTCreateForm();
@@ -88,10 +89,7 @@ const OTCreateForm: React.FC = () => {
 
   return (
     <>
-      <NavigationPrompt
-        when={isDirty && !isSaving}
-        onSave={onSubmit} // <-- CORREGIDO: Usar directamente
-      />
+      <NavigationPrompt when={isDirty && !isSaving} onSave={onSubmit} />
       <CreateFacturaModal
         isOpen={isCreateFacturaModalOpen}
         onClose={() => setCreateFacturaModalOpen(false)}
@@ -104,8 +102,6 @@ const OTCreateForm: React.FC = () => {
       />
 
       <form onSubmit={onSubmit} className="space-y-6">
-        {" "}
-        {/* <-- CORREGIDO: Usar directamente */}
         <div className="flex justify-between items-center">
           <h1 className="text-3xl font-bold">Crear Nueva Orden de Trabajo</h1>
           <div className="flex gap-4">
@@ -267,6 +263,7 @@ const OTCreateForm: React.FC = () => {
             </div>
           </Card>
 
+          {/* SECCIÓN DE ACTIVIDADES RE-DISEÑADA */}
           <Card>
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-lg font-semibold text-blue-700 dark:text-blue-400 flex items-center gap-2">
@@ -292,32 +289,35 @@ const OTCreateForm: React.FC = () => {
               {fields.map((field, index) => (
                 <div
                   key={field.id}
-                  className="bg-gray-50 dark:bg-gray-700/50 p-4 rounded-lg border dark:border-gray-600"
+                  className="bg-gray-50 dark:bg-gray-800/50 p-5 rounded-xl border border-gray-200 dark:border-gray-700/80"
                 >
-                  <div className="flex justify-between items-start mb-4">
-                    <h3 className="font-semibold text-md text-gray-700 dark:text-gray-200">
+                  <div className="flex justify-between items-center pb-3 mb-4 border-b border-gray-200 dark:border-gray-700">
+                    <h3 className="font-bold text-lg text-gray-800 dark:text-gray-100 flex items-center gap-2">
+                      <ActivitySquare size={20} className="text-blue-500" />
                       Actividad #{index + 1}
                     </h3>
                     <Button
                       type="button"
-                      variant="danger"
+                      variant="ghost"
                       size="sm"
                       onClick={() => remove(index)}
+                      className="text-red-500 hover:text-red-700 dark:hover:text-red-400 px-2"
                     >
-                      <Trash2 className="h-4 w-4 mr-1" />
-                      Eliminar
+                      <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
+                    {/* --- Columna Izquierda --- */}
+                    <div className="flex flex-col gap-4">
+                      {/* Actividad */}
                       <div>
-                        <label className="text-sm font-medium mb-1 dark:text-gray-300">
+                        <label className="text-sm font-medium mb-1 block dark:text-gray-300">
                           Actividad
                         </label>
                         <select
                           {...register(`activities.${index}.activity`)}
-                          className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
+                          className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 focus:ring-blue-500 focus:border-blue-500"
                         >
                           <option value="">Seleccionar...</option>
                           {getAvailableActivities(index).map((opt) => (
@@ -328,8 +328,21 @@ const OTCreateForm: React.FC = () => {
                         </select>
                       </div>
 
+                      {/* Normas */}
+                      <div className="flex-grow">
+                        <NormaFields
+                          activityIndex={index}
+                          control={control}
+                          register={register}
+                        />
+                      </div>
+                    </div>
+
+                    {/* --- Columna Derecha --- */}
+                    <div className="flex flex-col gap-4">
+                      {/* Asignar a */}
                       <div>
-                        <label className="text-sm font-medium mb-1 dark:text-gray-300">
+                        <label className="text-sm font-medium mb-1 block dark:text-gray-300">
                           Asignar a
                         </label>
                         <Controller
@@ -351,18 +364,13 @@ const OTCreateForm: React.FC = () => {
                           )}
                         />
                       </div>
-                    </div>
-                    <div className="space-y-4">
-                      <NormaFields
-                        activityIndex={index}
-                        control={control}
-                        register={register}
-                      />
+
+                      {/* Precio */}
                       <div>
-                        <label className="text-sm font-medium mb-1 dark:text-gray-300">
+                        <label className="text-sm font-medium mb-1 block dark:text-gray-300">
                           Precio (Sin IVA)
                         </label>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center">
                           <Input
                             type="number"
                             step="0.01"
@@ -370,11 +378,11 @@ const OTCreateForm: React.FC = () => {
                               valueAsNumber: true,
                             })}
                             placeholder="Ej: 15000"
-                            className="w-full"
+                            className="w-full rounded-r-none"
                           />
                           <select
                             {...register(`activities.${index}.currency`)}
-                            className="p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 h-[42px]"
+                            className="p-2 border border-l-0 rounded-md rounded-l-none dark:bg-gray-700 dark:border-gray-600 h-[42px] focus:ring-blue-500 focus:border-blue-500"
                           >
                             <option value="ARS">ARS</option>
                             <option value="USD">USD</option>
@@ -385,8 +393,19 @@ const OTCreateForm: React.FC = () => {
                   </div>
                 </div>
               ))}
+              {fields.length === 0 && (
+                <div className="text-center py-10 px-4 border-2 border-dashed rounded-lg">
+                  <p className="text-gray-500 dark:text-gray-400">
+                    No hay actividades agregadas.
+                  </p>
+                  <p className="text-sm text-gray-400 dark:text-gray-500 mt-1">
+                    Haga clic en "Agregar Actividad" para comenzar.
+                  </p>
+                </div>
+              )}
             </div>
           </Card>
+          {/* FIN DE LA SECCIÓN */}
 
           <Card>
             <div className="flex justify-between items-center mb-4">

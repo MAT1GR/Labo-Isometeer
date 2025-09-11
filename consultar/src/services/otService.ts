@@ -114,6 +114,11 @@ const getOTById = async (id: number): Promise<WorkOrder> => {
   return response.data;
 };
 
+const getOTsByClientId = async (clientId: number): Promise<WorkOrder[]> => {
+  const response = await axiosInstance.get(`/ots/cliente/${clientId}`);
+  return response.data;
+};
+
 const createOT = async (
   otData: Omit<WorkOrder, "id" | "created_at" | "updated_at" | "activities">
 ): Promise<WorkOrder> => {
@@ -204,6 +209,7 @@ export const otService = {
   deauthorizeOT,
   getOtHistory,
   getUserSummary,
-  startActivity, // <-- ¡AÑADIDA!
-  stopActivity, // <-- ¡AÑADIDA!
+  startActivity,
+  stopActivity,
+  getOTsByClientId,
 };

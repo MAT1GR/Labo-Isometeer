@@ -41,11 +41,14 @@ const verifyToken = (req: Request, res: Response, next: NextFunction) => {
 const addHistoryEntry = (otId: number, userId: number, changes: string[]) => {
   if (!otId || !userId || changes.length === 0) return;
   try {
+    // --- CORRECCIÓN AQUÍ ---
+    // El nombre de la tabla es 'ot_history', no 'ots'.
     const stmt = db.prepare(
       "INSERT INTO ot_history (ot_id, user_id, changes) VALUES (?, ?, ?)"
     );
     stmt.run(otId, userId, JSON.stringify(changes));
   } catch (error) {
+    // Se mantiene el log de errores por si acaso
     console.error("Error al registrar entrada en el historial:", error);
   }
 };

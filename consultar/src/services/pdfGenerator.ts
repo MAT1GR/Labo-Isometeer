@@ -1,4 +1,4 @@
-// RUTA: /cliente/src/services/pdfGenerator.ts
+// RUTA: /consultar/src/services/pdfGenerator.ts
 
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -200,16 +200,18 @@ export const exportOtPdfWorkOrder = async (otData: WorkOrder) => {
     columnStyles: { 0: { fontStyle: "bold" } },
   });
 
-  // --- SECCIÓN DE ACTIVIDADES (SEPARADA) ---
+  // --- SECCIÓN DE ACTIVIDADES (CORREGIDA) ---
   if (otData.activities && otData.activities.length > 0) {
     autoTable(jspdfDoc, {
       startY: (jspdfDoc as any).lastAutoTable.finalY + 5,
       head: [["Actividad", "Norma de Referencia", "Precio (Sin IVA)"]],
-      body: otData.activities.map((act) => [
-        act.activity,
-        act.norma || "N/A",
-        formatCurrency(act.precio_sin_iva || 0),
-      ]),
+      body: otData.activities.map((act) => {
+        const normas =
+          act.normas && act.normas.length > 0
+            ? act.normas.map((n) => n.value).join(", ")
+            : "N/A";
+        return [act.activity, normas, formatCurrency(act.precio_sin_iva || 0)];
+      }),
       theme: "striped",
       headStyles: { fillColor: [107, 114, 128] },
     });
@@ -311,12 +313,18 @@ export const exportOtPdfRemito = async (otData: WorkOrder) => {
     columnStyles: { 0: { fontStyle: "bold" } },
   });
 
-  // --- SECCIÓN DE ACTIVIDADES (SEPARADA) ---
+  // --- SECCIÓN DE ACTIVIDADES (CORREGIDA) ---
   if (otData.activities && otData.activities.length > 0) {
     autoTable(jspdfDoc, {
       startY: (jspdfDoc as any).lastAutoTable.finalY + 5,
       head: [["Actividades a Realizar", "Norma"]],
-      body: otData.activities.map((act) => [act.activity, act.norma || "N/A"]),
+      body: otData.activities.map((act) => {
+        const normas =
+          act.normas && act.normas.length > 0
+            ? act.normas.map((n) => n.value).join(", ")
+            : "N/A";
+        return [act.activity, normas];
+      }),
       theme: "striped",
       headStyles: { fillColor: [107, 114, 128] },
     });
