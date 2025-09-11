@@ -12,12 +12,14 @@ interface FacturaFormData {
   vencimiento: string;
 }
 
+// --- La definición correcta de Props ---
 interface CreateFacturaModalProps {
   isOpen: boolean;
   onClose: () => void;
   clienteId: number;
   clienteName: string;
   suggestedAmount: number;
+  // --- CORRECCIÓN AQUÍ: La función debe aceptar la nueva factura como argumento ---
   onFacturaCreated: (newFactura: { id: number }) => void;
 }
 
@@ -54,6 +56,7 @@ const CreateFacturaModal: React.FC<CreateFacturaModalProps> = ({
         monto: Number(data.monto),
         cliente_id: clienteId,
       });
+      // --- Se pasa el argumento 'newFactura' al callback ---
       onFacturaCreated(newFactura);
     } catch (error) {
       console.error("Error al crear la factura", error);
