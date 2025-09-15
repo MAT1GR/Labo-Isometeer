@@ -228,10 +228,10 @@ const OTCreateForm: React.FC = () => {
                 <label className="text-sm font-medium dark:text-gray-300">
                   Nº de Lacre
                 </label>
-                <div className="flex w-full items-center mt-1">
+                <div className="flex mt-1">
                   <select
                     {...register("seal_entity")}
-                    className="flex-shrink-0 w-[30%] p-2 border-r-0 rounded-l-md dark:bg-gray-700 dark:border-gray-600"
+                    className="flex-shrink-1 w-20% p-2 border-r-0 rounded-l-md dark:bg-gray-700 dark:border-gray-600"
                     disabled={!isLacreEnabled}
                   >
                     <option value="">Entidad...</option>
@@ -243,7 +243,7 @@ const OTCreateForm: React.FC = () => {
                   </select>
                   <Input
                     {...register("seal_number")}
-                    className="flex-grow rounded-l-none"
+                    className="flex w-full rounded-l-none"
                     disabled={!isLacreEnabled}
                   />
                 </div>
