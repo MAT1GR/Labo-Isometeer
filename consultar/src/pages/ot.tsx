@@ -23,7 +23,7 @@ import useSWR, { mutate } from "swr";
 import ConfirmationModal from "../components/ui/ConfirmationModal";
 import OTFiltersComponent from "../components/OTFilters";
 import { AnimatePresence, motion } from "framer-motion";
-import UserSelect from "../components/ui/UserSelect";
+import MultiUserSelect from "../components/ui/MultiUserSelect";
 
 export interface OTFilters {
   client_id?: number;
@@ -49,6 +49,7 @@ const OT: React.FC = () => {
   const [showFilters, setShowFilters] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [editingOtId, setEditingOtId] = useState<number | null>(null);
+  const [tempSelectedUserIds, setTempSelectedUserIds] = useState<number[]>([]);
 
   const { data: clients } = useSWR<Client[]>(
     "/clients",
@@ -56,20 +57,19 @@ const OT: React.FC = () => {
   );
   const { data: users } = useSWR<User[]>("/users", authService.getAllUsers);
 
+  const swrKey = user ? [`/ot`, user.id, user.role, filters] : null;
+
   const {
     data: ots,
     error,
     isLoading,
-  } = useSWR(
-    user ? [`/ot`, user, filters] : null,
-    ([, user, currentFilters]) => {
-      if (canViewAdminContent()) {
-        return otService.getAllOTs(user, currentFilters);
-      } else {
-        return otService.getMisOts();
-      }
+  } = useSWR(swrKey, () => {
+    if (canViewAdminContent()) {
+      return otService.getAllOTs(user, filters);
+    } else {
+      return otService.getMisOts();
     }
-  );
+  });
 
   useEffect(() => {
     setCurrentPage(1);
@@ -102,7 +102,7 @@ const OT: React.FC = () => {
     if (otToDelete === null) return;
     try {
       await otService.deleteOT(otToDelete);
-      mutate([`/ot`, user, filters]);
+      mutate(swrKey);
     } catch (err: any) {
       alert(err.message || "Error al eliminar la OT.");
     } finally {
@@ -124,26 +124,42 @@ const OT: React.FC = () => {
       } else {
         await otService.authorizeOT(ot.id, user.id);
       }
-      mutate([`/ot`, user, filters]);
+      mutate(swrKey);
     } catch (error: any) {
       alert(error.message || "Error al cambiar el estado de autorización.");
     }
   };
 
-  // --- INICIO DE LA MODIFICACIÓN ---
-  // Se utiliza 'updateOT' en lugar de 'assignOT' para reutilizar la lógica existente
-  const handleAssignOT = async (otId: number, userId: number | null) => {
+  const handleSaveAssignees = async (otId: number, userIds: number[]) => {
     if (!user) return;
     try {
-      // Usamos el servicio de actualización general, pasando solo el campo a cambiar
-      await otService.updateOT(otId, { assigned_to: userId, user_id: user.id });
-      mutate([`/ot`, user, filters]); // Revalidamos los datos para refrescar la tabla
-      setEditingOtId(null); // Salimos del modo de edición
+      const currentOT = await otService.getOTById(otId.toString());
+      if (!currentOT.activities || currentOT.activities.length === 0) {
+        alert("Esta OT no tiene actividades para asignar usuarios.");
+        return;
+      }
+
+      const updatedActivities = currentOT.activities.map((activity, index) => {
+        const existingUserIds = activity.assigned_users?.map((u) => u.id) || [];
+        if (index === 0) {
+          return { ...activity, assigned_to: userIds };
+        }
+        return { ...activity, assigned_to: existingUserIds };
+      });
+
+      const payload = {
+        ...currentOT,
+        activities: updatedActivities,
+        user_id: user.id,
+      };
+      await otService.updateOT(otId, payload);
+      mutate(swrKey);
     } catch (error: any) {
       alert(error.message || "Error al asignar la OT.");
+    } finally {
+      setEditingOtId(null);
     }
   };
-  // --- FIN DE LA MODIFICACIÓN ---
 
   const activeFilterCount = useMemo(
     () =>
@@ -194,8 +210,7 @@ const OT: React.FC = () => {
                 variant="outline"
                 onClick={() => setShowFilters(!showFilters)}
               >
-                <Filter className="mr-2 h-4 w-4" />
-                Filtrar
+                <Filter className="mr-2 h-4 w-4" /> Filtrar
                 {activeFilterCount > 0 && (
                   <span className="ml-2 bg-blue-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
                     {activeFilterCount}
@@ -298,23 +313,40 @@ const OT: React.FC = () => {
                     <td className="px-6 py-4">{ot.client_name}</td>
                     <td
                       className="px-6 py-4 group"
+                      // --- ¡LA SOLUCIÓN ESTÁ AQUÍ! ---
+                      // Detenemos la propagación del clic para que no active el `onClick` de la fila (`<tr>`)
                       onClick={(e) => {
                         e.stopPropagation();
                         if (canViewAdminContent()) {
-                          setEditingOtId(editingOtId === ot.id ? null : ot.id);
+                          if (editingOtId !== ot.id) {
+                            const initialUserIds = [
+                              ...new Set(
+                                ot.activities?.flatMap(
+                                  (act) =>
+                                    act.assigned_users?.map((u) => u.id) ?? []
+                                ) ?? []
+                              ),
+                            ];
+                            setTempSelectedUserIds(initialUserIds);
+                            setEditingOtId(ot.id);
+                          }
                         }
                       }}
                     >
                       {editingOtId === ot.id ? (
-                        <UserSelect
-                          users={users || []}
-                          selectedValue={ot.assigned_to}
-                          onChange={(userId) => handleAssignOT(ot.id, userId)}
-                          onBlur={() => setEditingOtId(null)}
-                          autoFocus
-                        />
+                        <div className="min-w-[250px]">
+                          <MultiUserSelect
+                            users={users || []}
+                            selectedUserIds={tempSelectedUserIds}
+                            onChange={setTempSelectedUserIds}
+                            onBlur={() =>
+                              handleSaveAssignees(ot.id, tempSelectedUserIds)
+                            }
+                            autoFocus
+                          />
+                        </div>
                       ) : (
-                        <div className="flex items-center gap-2 cursor-pointer">
+                        <div className="flex items-center gap-2">
                           <span>{ot.assigned_to_name || "Sin asignar"}</span>
                           {canViewAdminContent() && (
                             <Pencil className="h-3 w-3 text-gray-400 invisible group-hover:visible" />
