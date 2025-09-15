@@ -1,10 +1,12 @@
+// RUTA: consultar/src/components/ui/NavigationPrompt.tsx
+
 import React, { useState, useEffect } from "react";
 import { useBlocker } from "react-router-dom";
 import ConfirmationModal from "./ConfirmationModal";
 
 interface NavigationPromptProps {
   when: boolean;
-  onSave: () => void; // 1. Hacemos que la prop onSave sea obligatoria
+  onSave: () => void;
 }
 
 const NavigationPrompt: React.FC<NavigationPromptProps> = ({
@@ -49,13 +51,8 @@ const NavigationPrompt: React.FC<NavigationPromptProps> = ({
     blocker.proceed?.();
   };
 
-  // 2. Nueva función que se ejecuta al hacer clic en "Guardar y Salir"
   const handleSaveAndExit = () => {
-    // Primero, ejecuta la función de guardado que nos pasaron desde el formulario.
     onSave();
-
-    // Cerramos el modal. La navegación procederá una vez que el guardado se complete
-    // y la función `onSubmit` del formulario haga la redirección.
     setShowModal(false);
   };
 
@@ -64,13 +61,12 @@ const NavigationPrompt: React.FC<NavigationPromptProps> = ({
       isOpen={showModal}
       onClose={handleClose}
       onConfirm={handleConfirm}
-      // --- Pasamos la nueva función al modal ---
       onSave={handleSaveAndExit}
       title="Salir sin guardar"
-      message="Tienes cambios sin guardar. ¿Qué deseas hacer?"
+      message="Tienes cambios sin guardar. ¿Qué deseas hacer con tu progreso?"
       confirmText="Salir sin Guardar"
       saveText="Guardar y Salir"
-      cancelText="Permanecer"
+      cancelText="Permanecer en la página"
     />
   );
 };

@@ -1,118 +1,111 @@
 // RUTA: consultar/src/components/ui/ConfirmationModal.tsx
 
-import React, { Fragment } from "react";
-import { Dialog, Transition } from "@headlessui/react";
+import React from "react";
+import { AnimatePresence, motion } from "framer-motion";
+import { AlertTriangle, Save, Trash2 } from "lucide-react";
 import Button from "./Button";
-import { AlertTriangle, Save } from "lucide-react";
 
 interface ConfirmationModalProps {
   isOpen: boolean;
   onClose: () => void;
   onConfirm: () => void;
+  onSave?: () => void;
   title: string;
   message: string;
   confirmText?: string;
-  cancelText?: string;
-  onSave?: () => void;
   saveText?: string;
-  children?: React.ReactNode;
+  cancelText?: string;
 }
 
 const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
   isOpen,
   onClose,
   onConfirm,
+  onSave,
   title,
   message,
   confirmText = "Confirmar",
+  saveText = "Guardar",
   cancelText = "Cancelar",
-  onSave,
-  saveText = "Guardar y Salir",
-  children, // Aseguramos que se reciba la prop
 }) => {
   return (
-    <Transition appear show={isOpen} as={Fragment}>
-      <Dialog as="div" className="relative z-50" onClose={onClose}>
-        <Transition.Child
-          as={Fragment}
-          enter="ease-out duration-300"
-          enterFrom="opacity-0"
-          enterTo="opacity-100"
-          leave="ease-in duration-200"
-          leaveFrom="opacity-100"
-          leaveTo="opacity-0"
+    <AnimatePresence>
+      {isOpen && (
+        // El posicionamiento aquí es correcto. 'fixed inset-0' asegura que se base
+        // en la pantalla del monitor. Las clases 'flex' y 'items-center' se encargan del centrado.
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60 p-4"
+          onClick={onClose}
         >
-          <div className="fixed inset-0 bg-gray-900 bg-opacity-75 transition-opacity" />
-        </Transition.Child>
-
-        <div className="fixed inset-0 overflow-y-auto">
-          <div className="flex min-h-full items-center justify-center p-4 text-center">
-            <Transition.Child
-              as={Fragment}
-              enter="ease-out duration-300"
-              enterFrom="opacity-0 scale-95"
-              enterTo="opacity-100 scale-100"
-              leave="ease-in duration-200"
-              leaveFrom="opacity-100 scale-100"
-              leaveTo="opacity-0 scale-95"
-            >
-              <Dialog.Panel className="w-full max-w-2xl transform overflow-hidden rounded-xl bg-white dark:bg-gray-800 text-left align-middle shadow-2xl transition-all">
-                <div className="md:flex">
-                  <div className="flex flex-shrink-0 items-center justify-center bg-red-500 p-6 md:p-0 md:w-1/3">
-                    <AlertTriangle
-                      className="h-24 w-24 text-white"
-                      aria-hidden="true"
-                    />
-                  </div>
-
-                  <div className="flex-grow p-8">
-                    <Dialog.Title
-                      as="h3"
-                      className="text-3xl font-bold leading-9 text-gray-900 dark:text-gray-100"
-                    >
-                      {title}
-                    </Dialog.Title>
-                    <div className="mt-4">
-                      <p className="text-lg text-gray-600 dark:text-gray-300">
-                        {message}
-                      </p>
-                      {children} {/* Renderizamos los elementos hijos aquí */}
-                    </div>
-
-                    <div className="mt-10 flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-4 space-y-4 space-y-reverse sm:space-y-0">
-                      <Button
-                        variant="outline"
-                        onClick={onClose}
-                        className="w-full justify-center sm:w-auto px-6 py-2 text-base"
-                      >
-                        {cancelText}
-                      </Button>
-                      <Button
-                        onClick={onConfirm}
-                        variant="danger"
-                        className="w-full justify-center sm:w-auto px-6 py-2 text-base"
-                      >
-                        {confirmText}
-                      </Button>
-                      {onSave && (
-                        <Button
-                          onClick={onSave}
-                          variant="primary"
-                          className="w-full justify-center sm:w-auto px-6 py-2 text-base"
-                        >
-                          <Save className="mr-2 h-5 w-5" />
-                          {saveText}
-                        </Button>
-                      )}
-                    </div>
+          <motion.div
+            initial={{ scale: 0.9, y: 20, opacity: 0 }}
+            animate={{ scale: 1, y: 0, opacity: 1 }}
+            exit={{ scale: 0.9, y: 20, opacity: 0 }}
+            transition={{ duration: 0.2, ease: "easeInOut" }}
+            className="relative bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-md"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-6">
+              <div className="flex items-start">
+                <div className="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-yellow-100 dark:bg-yellow-900/50 sm:mx-0 sm:h-10 sm:w-10">
+                  <AlertTriangle
+                    className="h-6 w-6 text-yellow-500"
+                    aria-hidden="true"
+                  />
+                </div>
+                <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left">
+                  <h3
+                    className="text-lg leading-6 font-bold text-gray-900 dark:text-white"
+                    id="modal-title"
+                  >
+                    {title}
+                  </h3>
+                  <div className="mt-2">
+                    <p className="text-sm text-gray-500 dark:text-gray-300">
+                      {message}
+                    </p>
                   </div>
                 </div>
-              </Dialog.Panel>
-            </Transition.Child>
-          </div>
-        </div>
-      </Dialog>
-    </Transition>
+              </div>
+            </div>
+
+            {/* --- ¡SOLUCIÓN AQUÍ! --- */}
+            {/* 1. Se añade 'rounded-b-lg' para que las esquinas inferiores del área de botones coincidan con el modal. */}
+            {/* 2. Se añade 'overflow-hidden' al contenedor principal para asegurar que nada se "salga". */}
+            <div className="bg-gray-50 dark:bg-gray-800/50 px-4 py-3 sm:px-6 flex flex-col-reverse sm:flex-row sm:justify-end gap-3 rounded-b-lg">
+              <Button
+                variant="outline"
+                onClick={onClose}
+                className="whitespace-nowrap"
+              >
+                {cancelText}
+              </Button>
+              <Button
+                variant="danger"
+                onClick={onConfirm}
+                className="whitespace-nowrap"
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                {confirmText}
+              </Button>
+              {onSave && (
+                <Button
+                  variant="primary"
+                  onClick={onSave}
+                  className="whitespace-nowrap"
+                >
+                  <Save className="h-4 w-4 mr-2" />
+                  {saveText}
+                </Button>
+              )}
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 };
 
