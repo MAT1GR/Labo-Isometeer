@@ -66,7 +66,7 @@ const NavigationPrompt: React.FC<NavigationPromptProps> = ({
       message="Tienes cambios sin guardar. ¿Qué deseas hacer con tu progreso?"
       confirmText="Salir sin Guardar"
       saveText="Guardar y Salir"
-      cancelText="Permanecer en la página"
+      cancelText="Permanecer"
     />
   );
 };
