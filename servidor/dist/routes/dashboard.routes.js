@@ -49,6 +49,28 @@ router.get("/administracion", (req, res) => {
             .json({ error: "Error al obtener las estadísticas de administración." });
     }
 });
+// [GET] /api/dashboard/ingresos - MODIFICADO PARA FILTRAR POR MONEDA
+router.get("/ingresos", (req, res) => {
+    try {
+        // <-- Se añade el filtro de moneda desde la query, con 'ARS' como valor por defecto
+        const { moneda = "ARS" } = req.query;
+        const query = `
+      SELECT
+        strftime('%Y-%m', fecha) as mes,
+        SUM(monto) as total
+      FROM cobros
+      WHERE moneda = ? 
+      GROUP BY mes
+      ORDER BY mes ASC
+    `;
+        const ingresos = database_1.default.prepare(query).all(moneda);
+        res.json(ingresos);
+    }
+    catch (error) {
+        console.error("Error al obtener los ingresos:", error);
+        res.status(500).json({ error: "Error interno del servidor." });
+    }
+});
 // [GET] /api/dashboard/stats
 router.get("/stats", (req, res) => {
     try {

@@ -1,4 +1,4 @@
 @echo off
-cd "C:\Users\Consultar\Desktop\prueba\Labo-Isometeer\servidor"
+cd "C:\Users\Consultar\Desktop\ISOMETERGO\Labo-Isometeer\servidor"
 npm run dev
 pause

@@ -17,11 +17,13 @@ import {
   Filter,
   ChevronLeft,
   ChevronRight,
+  Pencil,
 } from "lucide-react";
 import useSWR, { mutate } from "swr";
 import ConfirmationModal from "../components/ui/ConfirmationModal";
 import OTFiltersComponent from "../components/OTFilters";
 import { AnimatePresence, motion } from "framer-motion";
+import UserSelect from "../components/ui/UserSelect";
 
 export interface OTFilters {
   client_id?: number;
@@ -46,6 +48,7 @@ const OT: React.FC = () => {
   const [filters, setFilters] = useState<OTFilters>({});
   const [showFilters, setShowFilters] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
+  const [editingOtId, setEditingOtId] = useState<number | null>(null);
 
   const { data: clients } = useSWR<Client[]>(
     "/clients",
@@ -53,7 +56,6 @@ const OT: React.FC = () => {
   );
   const { data: users } = useSWR<User[]>("/users", authService.getAllUsers);
 
-  // --- MODIFICACIÓN CLAVE: Lógica condicional para obtener las OTs ---
   const {
     data: ots,
     error,
@@ -62,19 +64,16 @@ const OT: React.FC = () => {
     user ? [`/ot`, user, filters] : null,
     ([, user, currentFilters]) => {
       if (canViewAdminContent()) {
-        // Los administradores ven todo, aplicando filtros
         return otService.getAllOTs(user, currentFilters);
       } else {
-        // Los empleados solo ven sus OTs, no se aplican filtros desde la UI
         return otService.getMisOts();
       }
     }
   );
-  // --- FIN DE LA MODIFICACIÓN ---
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [filters, ots]); // Resetear en cambio de ots también
+  }, [filters, ots]);
 
   useEffect(() => {
     if (topOfListRef.current) {
@@ -103,7 +102,7 @@ const OT: React.FC = () => {
     if (otToDelete === null) return;
     try {
       await otService.deleteOT(otToDelete);
-      mutate([`/ot`, user, filters]); // Revalidar los datos
+      mutate([`/ot`, user, filters]);
     } catch (err: any) {
       alert(err.message || "Error al eliminar la OT.");
     } finally {
@@ -125,11 +124,26 @@ const OT: React.FC = () => {
       } else {
         await otService.authorizeOT(ot.id, user.id);
       }
-      mutate([`/ot`, user, filters]); // Revalidar los datos
+      mutate([`/ot`, user, filters]);
     } catch (error: any) {
       alert(error.message || "Error al cambiar el estado de autorización.");
     }
   };
+
+  // --- INICIO DE LA MODIFICACIÓN ---
+  // Se utiliza 'updateOT' en lugar de 'assignOT' para reutilizar la lógica existente
+  const handleAssignOT = async (otId: number, userId: number | null) => {
+    if (!user) return;
+    try {
+      // Usamos el servicio de actualización general, pasando solo el campo a cambiar
+      await otService.updateOT(otId, { assigned_to: userId, user_id: user.id });
+      mutate([`/ot`, user, filters]); // Revalidamos los datos para refrescar la tabla
+      setEditingOtId(null); // Salimos del modo de edición
+    } catch (error: any) {
+      alert(error.message || "Error al asignar la OT.");
+    }
+  };
+  // --- FIN DE LA MODIFICACIÓN ---
 
   const activeFilterCount = useMemo(
     () =>
@@ -282,8 +296,31 @@ const OT: React.FC = () => {
                       {ot.custom_id || `Interno #${ot.id}`}
                     </td>
                     <td className="px-6 py-4">{ot.client_name}</td>
-                    <td className="px-6 py-4">
-                      {ot.assigned_to_name || "Sin asignar"}
+                    <td
+                      className="px-6 py-4 group"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (canViewAdminContent()) {
+                          setEditingOtId(editingOtId === ot.id ? null : ot.id);
+                        }
+                      }}
+                    >
+                      {editingOtId === ot.id ? (
+                        <UserSelect
+                          users={users || []}
+                          selectedValue={ot.assigned_to}
+                          onChange={(userId) => handleAssignOT(ot.id, userId)}
+                          onBlur={() => setEditingOtId(null)}
+                          autoFocus
+                        />
+                      ) : (
+                        <div className="flex items-center gap-2 cursor-pointer">
+                          <span>{ot.assigned_to_name || "Sin asignar"}</span>
+                          {canViewAdminContent() && (
+                            <Pencil className="h-3 w-3 text-gray-400 invisible group-hover:visible" />
+                          )}
+                        </div>
+                      )}
                     </td>
                     <td className="px-6 py-4">
                       <span
@@ -340,8 +377,7 @@ const OT: React.FC = () => {
               onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
               disabled={currentPage === 1}
             >
-              <ChevronLeft className="h-4 w-4 mr-1" />
-              Anterior
+              <ChevronLeft className="h-4 w-4 mr-1" /> Anterior
             </Button>
             <span className="text-sm text-gray-600 dark:text-gray-400">
               Página {currentPage} de {totalPages}
@@ -354,8 +390,7 @@ const OT: React.FC = () => {
               }
               disabled={currentPage === totalPages}
             >
-              Siguiente
-              <ChevronRight className="h-4 w-4 ml-1" />
+              Siguiente <ChevronRight className="h-4 w-4 ml-1" />
             </Button>
           </div>
         )}

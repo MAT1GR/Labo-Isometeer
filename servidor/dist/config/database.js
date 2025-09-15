@@ -80,6 +80,17 @@ const runMigration = () => {
             db.exec("ALTER TABLE facturas ADD COLUMN observaciones TEXT;");
             console.log("[MIGRATION] 'observaciones' column added successfully.");
         }
+        // Migración para añadir la columna 'moneda'
+        const tableInfoMoneda = db
+            .prepare(`SELECT sql FROM sqlite_master WHERE type='table' AND name='facturas'`)
+            .get();
+        if (tableInfoMoneda &&
+            tableInfoMoneda.sql &&
+            !tableInfoMoneda.sql.includes("moneda TEXT")) {
+            console.log("[MIGRATION] Adding 'moneda' column to 'facturas' table.");
+            db.exec("ALTER TABLE facturas ADD COLUMN moneda TEXT NOT NULL DEFAULT 'ARS';");
+            console.log("[MIGRATION] 'moneda' column added successfully.");
+        }
         // --- NUEVA MIGRACIÓN para la tabla 'cobros' ---
         const cobrosTableInfo = db.prepare(`PRAGMA table_info(cobros)`).all();
         const columnNames = cobrosTableInfo.map((col) => col.name);
@@ -152,7 +163,7 @@ db.exec(`
     FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE
   );
 
-  CREATE TABLE IF NOT EXISTS work_orders (
+ CREATE TABLE IF NOT EXISTS work_orders (
     id INTEGER PRIMARY KEY AUTOINCREMENT, 
     custom_id TEXT UNIQUE,
     date TEXT NOT NULL, 
@@ -174,6 +185,7 @@ db.exec(`
     disposition TEXT,
     authorized BOOLEAN NOT NULL DEFAULT FALSE,
     contract_type TEXT DEFAULT 'Contrato de Producción',
+    moneda TEXT NOT NULL DEFAULT 'ARS' CHECK(moneda IN ('ARS', 'USD')),
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP, 
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE,
@@ -213,6 +225,7 @@ db.exec(`
     observaciones TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     motivo_archivo TEXT,
+    moneda TEXT NOT NULL DEFAULT 'ARS' CHECK(moneda IN ('ARS', 'USD')),
     FOREIGN KEY (cliente_id) REFERENCES clients(id) ON DELETE SET NULL
   );
 

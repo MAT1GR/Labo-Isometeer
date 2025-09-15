@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.sendNotificationToUser = exports.sseHandler = void 0;
+exports.sendNotificationToUser = exports.send = exports.sseHandler = void 0;
 // Este array ahora vive aquí, de forma segura y centralizada.
 let clients = [];
 /**
@@ -35,6 +35,21 @@ const sseHandler = (req, res, userId) => {
     });
 };
 exports.sseHandler = sseHandler;
+/**
+ * Envía datos a todos los clientes conectados o a un cliente específico.
+ * @param data - El objeto de datos a enviar. Si contiene recipient_id, se envía a ese usuario.
+ */
+const send = (data) => {
+    if (data.recipient_id) {
+        (0, exports.sendNotificationToUser)(data.recipient_id, data);
+    }
+    else {
+        clients.forEach((client) => {
+            client.res.write(`data: ${JSON.stringify(data)}\n\n`);
+        });
+    }
+};
+exports.send = send;
 /**
  * Envía datos a un usuario específico a través de su conexión SSE.
  * @param userId - El ID del usuario destinatario.

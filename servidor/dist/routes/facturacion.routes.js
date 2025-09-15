@@ -1,5 +1,5 @@
 "use strict";
-// RUTA: /servidor/src/routes/facturacion.routes.ts
+// RUTA: /servidor/src/routes/facturacion.routes.ts (Corregido)
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
@@ -15,7 +15,7 @@ router.get("/", (req, res) => {
         const { cliente_id, fecha_desde, fecha_hasta, estado } = req.query;
         let baseQuery = `
       SELECT 
-        f.id, f.numero_factura, f.monto, f.iva, f.vencimiento, f.estado, f.cliente_id, f.created_at, f.tipo, f.observaciones, f.motivo_archivo,
+        f.id, f.numero_factura, f.monto, f.iva, f.vencimiento, f.estado, f.cliente_id, f.created_at, f.tipo, f.observaciones, f.motivo_archivo, f.moneda,
         c.name as cliente_name,
         (SELECT SUM(monto) FROM cobros WHERE factura_id = f.id) as pagado,
         GROUP_CONCAT(ot.custom_id) as ots_asociadas
@@ -26,9 +26,6 @@ router.get("/", (req, res) => {
     `;
         const whereClauses = [];
         const params = [];
-        // Si no se especifica un estado, no se incluyen las archivadas.
-        // Si el estado es 'archivada', solo se muestran esas.
-        // En cualquier otro caso, el filtro por estado funcionará como siempre.
         if (!estado) {
             whereClauses.push("f.estado != 'archivada'");
         }
@@ -91,7 +88,7 @@ router.get("/:id", (req, res) => {
             .prepare(`
       SELECT ot.id, ot.custom_id, ot.product 
       FROM work_orders ot
-      JOIN factura_ots fo ON ot.id = fo.factura_id
+      JOIN factura_ots fo ON ot.id = fo.ot_id
       WHERE fo.factura_id = ?
     `)
             .all(facturaId);
@@ -115,9 +112,10 @@ router.get("/:id", (req, res) => {
         res.status(500).json({ error: "Error interno al obtener la factura." });
     }
 });
+// ... (resto del archivo sin cambios)
 // [POST] /api/facturacion - Crear una nueva factura
 router.post("/", (req, res) => {
-    const { numero_factura, monto, vencimiento, cliente_id, ot_ids = [], calculation_type = "manual", tipo, observaciones, } = req.body;
+    const { numero_factura, monto, vencimiento, cliente_id, ot_ids = [], calculation_type = "manual", tipo, observaciones, moneda, } = req.body;
     if (!numero_factura || !vencimiento || !cliente_id) {
         return res.status(400).json({ message: "Faltan campos obligatorios." });
     }
@@ -154,8 +152,8 @@ router.post("/", (req, res) => {
                 totalIva = montoNeto * 0.21;
             }
             const montoFinal = montoNeto + totalIva;
-            const insertFacturaStmt = database_1.default.prepare("INSERT INTO facturas (numero_factura, monto, iva, vencimiento, estado, cliente_id, tipo, observaciones) VALUES (?, ?, ?, ?, 'pendiente', ?, ?, ?)");
-            const info = insertFacturaStmt.run(numero_factura, montoFinal, totalIva, vencimiento, cliente_id, tipo, observaciones);
+            const insertFacturaStmt = database_1.default.prepare("INSERT INTO facturas (numero_factura, monto, iva, vencimiento, estado, cliente_id, tipo, observaciones, moneda) VALUES (?, ?, ?, ?, 'pendiente', ?, ?, ?, ?)");
+            const info = insertFacturaStmt.run(numero_factura, montoFinal, totalIva, vencimiento, cliente_id, tipo, observaciones, moneda);
             const facturaId = info.lastInsertRowid;
             if (ot_ids.length > 0) {
                 const linkStmt = database_1.default.prepare("INSERT INTO factura_ots (factura_id, ot_id) VALUES (?, ?)");
