@@ -31,6 +31,8 @@ export const generateIdHandler = (req: Request, res: Response) => {
   }
 };
 
+
+
 export const getMisOts = (req: Request, res: Response) => {
   // @ts-ignore
   const userId = req.user?.id;
@@ -554,3 +556,23 @@ export const deleteOt = (req: Request, res: Response) => {
     res.status(500).json({ error: "Error interno del servidor." });
   }
 };
+export function addActivityToOt(arg0: string, arg1: any, addActivityToOt: any) {
+    throw new Error("Function not implemented.");
+}
+
+export function updateActivity(arg0: string, arg1: any, updateActivity: any) {
+    throw new Error("Function not implemented.");
+}
+
+export function getOts(arg0: string, arg1: any, getOts: any) {
+    throw new Error("Function not implemented.");
+}
+
+export function getOtsByUser(arg0: string, arg1: any, getOtsByUser: any) {
+    throw new Error("Function not implemented.");
+}
+
+export function deleteActivity(arg0: string, arg1: any, deleteActivity: any) {
+    throw new Error("Function not implemented.");
+}
+

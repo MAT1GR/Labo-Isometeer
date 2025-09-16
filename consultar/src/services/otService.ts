@@ -99,12 +99,26 @@ const getAllOTs = async (
   }
 };
 
-const getMisOts = async (): Promise<WorkOrder[]> => {
+export const getMisOts = async (userId: number) => {
   try {
-    const response = await axiosInstance.get("/ots/mis-ots");
+    if (!userId) {
+      return [];
+    }
+    const response = await axiosInstance.get(`/ots/asignadas/${userId}`);
     return response.data;
   } catch (error) {
     console.error("Error fetching assigned work orders:", error);
+    throw error;
+  }
+};
+
+// [GET] /api/ots/history/:id
+export const getOtHistory = async (id: string) => {
+  try {
+    const response = await axiosInstance.get(`/ots/history/${id}`);
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching OT history:", error);
     throw error;
   }
 };
@@ -168,11 +182,6 @@ const deleteActivity = async (
   activityId: number
 ): Promise<void> => {
   await axiosInstance.delete(`/ots/${otId}/activities/${activityId}`);
-};
-
-const getOtHistory = async (id: number) => {
-  const response = await axiosInstance.get(`/ots/${id}/history`);
-  return response.data;
 };
 
 const getUserSummary = async (userId: number): Promise<UserSummaryItem[]> => {

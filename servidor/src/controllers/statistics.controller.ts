@@ -16,11 +16,9 @@ const handleError = (res: Response, error: unknown, functionName: string) => {
   const message =
     error instanceof Error ? error.message : "Ocurrió un error desconocido";
   console.error(`[ERROR] en ${functionName}:`, message);
-  res
-    .status(500)
-    .json({
-      error: `Fallo en el servidor al ejecutar ${functionName}: ${message}`,
-    });
+  res.status(500).json({
+    error: `Fallo en el servidor al ejecutar ${functionName}: ${message}`,
+  });
 };
 
 export const getEstadisticasCobranza = (req: Request, res: Response) => {
@@ -121,9 +119,11 @@ export const getEstadisticasOT = (req: Request, res: Response) => {
       )
       .all();
 
+    // --- CORRECCIÓN AQUÍ ---
+    // Se cambió el estado 'abierta' por 'en progreso'
     const otsAbiertasRow = db
       .prepare(
-        "SELECT COUNT(*) as count FROM work_orders WHERE status = 'abierta'"
+        "SELECT COUNT(*) as count FROM work_orders WHERE status = 'en progreso'"
       )
       .get() as CountResult | undefined;
     const otsAbiertas = otsAbiertasRow?.count || 0;
@@ -133,13 +133,12 @@ export const getEstadisticasOT = (req: Request, res: Response) => {
         `
             SELECT type, COUNT(*) as cantidad 
             FROM work_orders 
-            WHERE status = 'pendiente de cierre' 
+            WHERE status = 'pendiente' 
             GROUP BY type
         `
       )
       .all();
 
-    // CORRECCIÓN: Se cambió 'f.client_id' por 'f.cliente_id'.
     const topClientes = db
       .prepare(
         `
