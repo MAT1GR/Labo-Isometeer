@@ -67,7 +67,7 @@ const OT: React.FC = () => {
     if (canViewAdminContent()) {
       return otService.getAllOTs(user, filters);
     } else {
-      return otService.getMisOts();
+      return otService.getMisOts(user.id);
     }
   });
 

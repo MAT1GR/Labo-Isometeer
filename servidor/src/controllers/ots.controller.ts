@@ -31,13 +31,11 @@ export const generateIdHandler = (req: Request, res: Response) => {
   }
 };
 
-
-
+// CÓDIGO CORREGIDO
 export const getMisOts = (req: Request, res: Response) => {
-  // @ts-ignore
-  const userId = req.user?.id;
+  const { userId } = req.params; // <--- TOMA EL ID DEL PARÁMETRO DE LA URL
   if (!userId) {
-    return res.status(401).json({ error: "No autenticado." });
+    return res.status(400).json({ error: "Falta el ID de usuario en la URL." });
   }
   try {
     const query = `
@@ -62,10 +60,10 @@ export const getMisOts = (req: Request, res: Response) => {
       ORDER BY ot.created_at DESC
     `;
     const stmt: Statement = db.prepare(query);
-    const ots = stmt.all(userId);
+    const ots = stmt.all(userId); // Usa el userId de la URL en la consulta
     res.status(200).json(ots);
   } catch (error) {
-    console.error("Error en GET /mis-ots:", error);
+    console.error("Error en GET /ots/asignadas:", error);
     res.status(500).json({ error: "Error al obtener mis órdenes de trabajo." });
   }
 };
@@ -557,22 +555,21 @@ export const deleteOt = (req: Request, res: Response) => {
   }
 };
 export function addActivityToOt(arg0: string, arg1: any, addActivityToOt: any) {
-    throw new Error("Function not implemented.");
+  throw new Error("Function not implemented.");
 }
 
 export function updateActivity(arg0: string, arg1: any, updateActivity: any) {
-    throw new Error("Function not implemented.");
+  throw new Error("Function not implemented.");
 }
 
 export function getOts(arg0: string, arg1: any, getOts: any) {
-    throw new Error("Function not implemented.");
+  throw new Error("Function not implemented.");
 }
 
 export function getOtsByUser(arg0: string, arg1: any, getOtsByUser: any) {
-    throw new Error("Function not implemented.");
+  throw new Error("Function not implemented.");
 }
 
 export function deleteActivity(arg0: string, arg1: any, deleteActivity: any) {
-    throw new Error("Function not implemented.");
+  throw new Error("Function not implemented.");
 }
-

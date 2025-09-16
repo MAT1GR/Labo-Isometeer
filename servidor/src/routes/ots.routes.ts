@@ -8,10 +8,10 @@ const router = Router();
 
 // --- RUTAS DE OBTENCIÓN (GET) ---
 router.get("/generate-id", otsController.generateIdHandler);
-router.get("/asignadas/:userId", verifyToken, otsController.getMisOts);
+router.get("/asignadas/:userId", otsController.getMisOts);
 router.get("/", otsController.getAllOts);
 router.get("/:id", otsController.getOtById);
-router.get("/history¬/:id", otsController.getOtHistory);
+router.get("/history/:id", otsController.getOtHistory);
 router.get("/user-summary/:userId", otsController.getUserSummary);
 router.get("/cliente/:id", otsController.getOtsByClient);
 
