@@ -131,4 +131,13 @@ export const facturacionService = {
     const response = await axiosInstance.patch(`/facturacion/${id}`, data);
     return response.data;
   },
+
+  // --- NUEVAS FUNCIONES AÑADIDAS ---
+  unarchiveFactura: async (id: number): Promise<void> => {
+    await apiClient.patch(`/facturacion/${id}/unarchive`);
+  },
+
+  deleteFactura: async (id: number): Promise<void> => {
+    await apiClient.delete(`/facturacion/${id}`);
+  },
 };

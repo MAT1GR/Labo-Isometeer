@@ -7,7 +7,14 @@ import { facturacionService, Factura } from "../services/facturacionService";
 import { formatCurrency, formatDateTime } from "../lib/utils";
 import Card from "../components/ui/Card";
 import Button from "../components/ui/Button";
-import { PlusCircle, Filter, Archive, Info } from "lucide-react";
+import {
+  PlusCircle,
+  Filter,
+  Archive,
+  Info,
+  ArchiveRestore,
+  Trash2,
+} from "lucide-react";
 import FacturaFilters from "../components/FacturaFilters";
 import { cn } from "../lib/utils";
 import ConfirmationModal from "../components/ui/ConfirmationModal";
@@ -42,6 +49,10 @@ const Facturacion: React.FC = () => {
   const [archiveReason, setArchiveReason] = useState("");
   const [showReasonModal, setShowReasonModal] = useState(false);
   const [currentReason, setCurrentReason] = useState("");
+
+  // --- NUEVOS ESTADOS PARA MODAL DE ELIMINACIÓN ---
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [facturaToDelete, setFacturaToDelete] = useState<Factura | null>(null);
 
   useEffect(() => {
     const newFilters = getFiltersFromURL();
@@ -105,6 +116,37 @@ const Facturacion: React.FC = () => {
   const handleResetFilters = () => {
     setFilters({});
     navigate(location.pathname, { replace: true });
+  };
+
+  // --- NUEVAS FUNCIONES HANDLER PARA DESARCHIVAR Y ELIMINAR ---
+
+  const handleUnarchive = async (facturaId: number) => {
+    try {
+      await facturacionService.unarchiveFactura(facturaId);
+      mutate(); // Recarga los datos
+    } catch (error) {
+      console.error("Error al desarchivar factura:", error);
+      alert("No se pudo desarchivar la factura.");
+    }
+  };
+
+  const handleDeleteRequest = (factura: Factura) => {
+    setFacturaToDelete(factura);
+    setIsDeleteModalOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!facturaToDelete) return;
+    try {
+      await facturacionService.deleteFactura(facturaToDelete.id);
+      mutate(); // Recarga los datos
+    } catch (error) {
+      console.error("Error al eliminar la factura:", error);
+      alert("No se pudo eliminar la factura.");
+    } finally {
+      setIsDeleteModalOpen(false);
+      setFacturaToDelete(null);
+    }
   };
 
   if (error) return <div>Error al cargar facturas...</div>;
@@ -270,6 +312,7 @@ const Facturacion: React.FC = () => {
                           <Button
                             variant="ghost"
                             size="icon"
+                            title="Archivar"
                             onClick={(e) => {
                               e.stopPropagation();
                               handleOpenArchiveModal(factura);
@@ -278,19 +321,47 @@ const Facturacion: React.FC = () => {
                             <Archive className="h-4 w-4" />
                           </Button>
                         )}
-                        {factura.estado === "archivada" &&
-                          factura.motivo_archivo && (
+                        {factura.estado === "archivada" && (
+                          <div className="flex items-center justify-center gap-1">
+                            {factura.motivo_archivo && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                title="Ver motivo del archivo"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleViewReason(
+                                    factura.motivo_archivo || ""
+                                  );
+                                }}
+                              >
+                                <Info className="h-4 w-4 text-blue-400" />
+                              </Button>
+                            )}
                             <Button
                               variant="ghost"
                               size="icon"
+                              title="Desarchivar"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                handleViewReason(factura.motivo_archivo || "");
+                                handleUnarchive(factura.id);
                               }}
                             >
-                              <Info className="h-4 w-4 text-gray-400" />
+                              <ArchiveRestore className="h-4 w-4 text-green-500" />
                             </Button>
-                          )}
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              title="Eliminar Permanentemente"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteRequest(factura);
+                              }}
+                            >
+                              <Trash2 className="h-4 w-4 text-red-500" />
+                            </Button>
+                          </div>
+                        )}
                       </td>
                     </tr>
                   );
@@ -309,7 +380,7 @@ const Facturacion: React.FC = () => {
           </table>
         </div>
       </Card>
-      {/* Modal de confirmación para archivar */}
+
       <ConfirmationModal
         isOpen={showArchiveModal}
         title="Confirmar Archivo de Factura"
@@ -327,13 +398,25 @@ const Facturacion: React.FC = () => {
         />
       </ConfirmationModal>
 
+      {/* --- NUEVO MODAL PARA CONFIRMAR ELIMINACIÓN --- */}
+      <ConfirmationModal
+        isOpen={isDeleteModalOpen}
+        title="Eliminar Factura Permanentemente"
+        message={`¿Estás seguro de que quieres eliminar la factura #${facturaToDelete?.numero_factura}? Esta acción no se puede deshacer.`}
+        onConfirm={handleConfirmDelete}
+        onClose={() => setIsDeleteModalOpen(false)}
+        confirmText="Sí, Eliminar"
+        confirmVariant="danger"
+      />
+
       <Modal
         isOpen={showReasonModal}
         onClose={() => setShowReasonModal(false)}
         title="Motivo de Archivo"
       >
-        {/* Pasamos el texto directamente, sin envolverlo en ninguna etiqueta. */}
-        {currentReason}
+        <p className="text-gray-600 dark:text-gray-300 p-4 bg-gray-50 dark:bg-gray-800 rounded-md">
+          {currentReason}
+        </p>
       </Modal>
     </div>
   );
