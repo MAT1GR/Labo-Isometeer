@@ -458,7 +458,7 @@ export const startActivity = (req: Request, res: Response) => {
     if (!activity)
       throw new Error("La actividad ya fue iniciada o no se encontró.");
     db.prepare(
-      "UPDATE work_order_activities SET status = 'en_progreso', started_at = CURRENT_TIMESTAMP WHERE id = ?"
+      "UPDATE work_order_activities SET status = 'en_progreso', started_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id = ?"
     ).run(activityId);
     if (userId)
       addHistoryEntry(activity.work_order_id, userId, [
@@ -504,7 +504,7 @@ export const stopActivity = (req: Request, res: Response) => {
     if (!activity)
       throw new Error("La actividad no está en progreso o no existe.");
     db.prepare(
-      "UPDATE work_order_activities SET status = 'finalizada', completed_at = CURRENT_TIMESTAMP WHERE id = ?"
+      "UPDATE work_order_activities SET status = 'finalizada', completed_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id = ?"
     ).run(activityId);
     if (userId)
       addHistoryEntry(activity.work_order_id, userId, [
