@@ -26,11 +26,12 @@ import Facturacion from "./pages/Facturacion.tsx";
 import FacturaDetail from "./pages/FacturaDetail.tsx";
 import FacturaCreate from "./pages/FacturaCreate.tsx";
 import UserChart from "./pages/UserChart.tsx";
-
-// --- 1. IMPORTA LAS NUEVAS PÁGINAS ---
 import Presupuestos from "./pages/Presupuestos.tsx";
 import PresupuestoCreate from "./pages/PresupuestoCreate.tsx";
 import PresupuestoDetail from "./pages/PresupuestoDetail.tsx";
+
+// --- 1. IMPORTA LA NUEVA PÁGINA DE ESTADÍSTICAS ---
+import Estadisticas from "./pages/Estadisticas.tsx";
 
 const router = createBrowserRouter([
   {
@@ -62,6 +63,9 @@ const router = createBrowserRouter([
       { path: "/presupuestos/:id", element: <PresupuestoDetail /> },
       { path: "/presupuestos/editar/:id", element: <PresupuestoDetail /> },
       { path: "/usuarios/grafico", element: <UserChart /> },
+
+      // --- 2. AGREGA LA NUEVA RUTA AQUÍ ---
+      { path: "/estadisticas", element: <Estadisticas /> },
     ],
   },
   {

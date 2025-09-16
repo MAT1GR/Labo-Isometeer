@@ -3,7 +3,26 @@
 import { Router, Request, Response } from "express";
 import db from "../config/database";
 
+// Se importan los nuevos controladores
+import {
+  getEstadisticasCobranza,
+  getEstadisticasFacturacion,
+  getPagos,
+  getFacturas,
+  getEstadisticasOT,
+} from "../controllers/statistics.controller";
+
 const router = Router();
+
+// --- NUEVAS RUTAS PARA LA SECCIÓN DE ESTADÍSTICAS GENERALES ---
+
+router.get("/cobranza", getEstadisticasCobranza);
+router.get("/facturacion", getEstadisticasFacturacion);
+router.get("/pagos", getPagos);
+router.get("/facturas", getFacturas);
+router.get("/ot", getEstadisticasOT);
+
+// --- RUTAS EXISTENTES ---
 
 // [GET] /api/statistics/user/:id
 router.get("/user/:id", (req: Request, res: Response) => {
@@ -100,7 +119,7 @@ router.get("/user/:id", (req: Request, res: Response) => {
   }
 });
 
-// (El resto del archivo no se modifica)
+// [GET] /api/statistics/all
 router.get("/all", (req: Request, res: Response) => {
   try {
     const totalOTs = (

@@ -14,9 +14,8 @@ import {
   Award,
   Image,
   Receipt,
-  ListChecks,
-  ListChecksIcon,
   ClipboardListIcon,
+  BarChart3, // --- 1. IMPORTA EL NUEVO ÍCONO ---
 } from "lucide-react";
 import ThemeToggle from "./ui/ThemeToggle";
 import { cn } from "../lib/utils";
@@ -47,7 +46,7 @@ const SidebarNavigation: React.FC = () => {
       roles: ["director", "administracion", "administrador"],
     },
     {
-      icon: ClipboardListIcon, // O el ícono que prefieras
+      icon: ClipboardListIcon,
       label: "Presupuestos",
       path: "/presupuestos",
       roles: ["administracion", "administrador", "director"],
@@ -56,7 +55,14 @@ const SidebarNavigation: React.FC = () => {
       icon: Receipt,
       label: "Facturación",
       path: "/facturacion",
-      roles: ["administracion", "administrador", "director"], // Rol de director agregado para visualización
+      roles: ["administracion", "administrador", "director"],
+    },
+    // --- 2. AGREGA EL NUEVO OBJETO PARA ESTADÍSTICAS AQUÍ ---
+    {
+      icon: BarChart3,
+      label: "Estadísticas",
+      path: "/estadisticas",
+      roles: ["administrador", "director"],
     },
   ];
 
