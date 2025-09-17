@@ -57,19 +57,6 @@ router.get("/", (req, res) => {
         res.status(500).json({ error: "Error al obtener las facturas." });
     }
 });
-// [PATCH] /api/facturacion/:id/archive - Archivar una factura con motivo
-router.patch("/:id/archive", (req, res) => {
-    try {
-        const facturaId = req.params.id;
-        const { motivo_archivo } = req.body;
-        database_1.default.prepare(`UPDATE facturas SET estado = 'archivada', motivo_archivo = ? WHERE id = ?`).run(motivo_archivo, facturaId);
-        res.status(200).json({ message: "Factura archivada con éxito." });
-    }
-    catch (error) {
-        console.error("Error al archivar la factura:", error);
-        res.status(500).json({ error: "Error interno al archivar la factura." });
-    }
-});
 // [GET] /api/facturacion/:id - Obtener una factura por ID (VERSIÓN CORREGIDA)
 router.get("/:id", (req, res) => {
     try {
@@ -112,7 +99,6 @@ router.get("/:id", (req, res) => {
         res.status(500).json({ error: "Error interno al obtener la factura." });
     }
 });
-// ... (resto del archivo sin cambios)
 // [POST] /api/facturacion - Crear una nueva factura
 router.post("/", (req, res) => {
     const { numero_factura, monto, vencimiento, cliente_id, ot_ids = [], calculation_type = "manual", tipo, observaciones, moneda, } = req.body;
@@ -228,8 +214,8 @@ router.get("/cliente/:id", (req, res) => {
 router.patch("/:id/archive", (req, res) => {
     try {
         const facturaId = req.params.id;
-        // Asume que la solicitud de archivo significa que el valor se debe establecer en 1 (true)
-        database_1.default.prepare(`UPDATE facturas SET archivada = 1 WHERE id = ?`).run(facturaId);
+        const { motivo_archivo } = req.body;
+        database_1.default.prepare(`UPDATE facturas SET estado = 'archivada', motivo_archivo = ? WHERE id = ?`).run(motivo_archivo, facturaId);
         res.status(200).json({ message: "Factura archivada con éxito." });
     }
     catch (error) {
@@ -343,6 +329,61 @@ router.patch("/:id", (req, res) => {
         res
             .status(500)
             .json({ error: error.message || "Error interno al editar la factura." });
+    }
+});
+// --- NUEVAS RUTAS PARA DESARCHIVAR Y ELIMINAR ---
+// [PATCH] /api/facturacion/:id/unarchive - Desarchivar una factura
+router.patch("/:id/unarchive", (req, res) => {
+    try {
+        const facturaId = req.params.id;
+        // La factura vuelve al estado 'pagada', que es el estado previo a ser archivada.
+        // También limpiamos el motivo del archivo.
+        const info = database_1.default
+            .prepare(`UPDATE facturas SET estado = 'pagada', motivo_archivo = NULL WHERE id = ? AND estado = 'archivada'`)
+            .run(facturaId);
+        if (info.changes === 0) {
+            return res
+                .status(404)
+                .json({ error: "Factura no encontrada o no estaba archivada." });
+        }
+        res.status(200).json({ message: "Factura desarchivada con éxito." });
+    }
+    catch (error) {
+        console.error("Error al desarchivar la factura:", error);
+        res.status(500).json({ error: "Error interno al desarchivar la factura." });
+    }
+});
+// [DELETE] /api/facturacion/:id - Eliminar una factura permanentemente
+router.delete("/:id", (req, res) => {
+    const facturaId = req.params.id;
+    try {
+        // Es una buena práctica usar una transacción para asegurar que todas las operaciones se completen
+        const transaction = database_1.default.transaction(() => {
+            // Primero, borramos las relaciones en la tabla 'factura_ots'
+            database_1.default.prepare("DELETE FROM factura_ots WHERE factura_id = ?").run(facturaId);
+            // Luego, borramos los cobros asociados
+            database_1.default.prepare("DELETE FROM cobros WHERE factura_id = ?").run(facturaId);
+            // Finalmente, eliminamos la factura
+            const info = database_1.default
+                .prepare("DELETE FROM facturas WHERE id = ?")
+                .run(facturaId);
+            if (info.changes === 0) {
+                // Si no se borró nada, lanzamos un error para que la transacción haga un rollback
+                throw new Error("Factura no encontrada.");
+            }
+        });
+        transaction(); // Ejecutamos la transacción
+        res.status(200).json({ message: "Factura eliminada permanentemente." });
+    }
+    catch (error) {
+        console.error("Error al eliminar la factura:", error);
+        // Si el error es el que lanzamos nosotros, es un 404. Si no, es un 500.
+        if (error.message === "Factura no encontrada.") {
+            res.status(404).json({ error: error.message });
+        }
+        else {
+            res.status(500).json({ error: "Error interno al eliminar la factura." });
+        }
     }
 });
 exports.default = router;

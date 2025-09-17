@@ -6,7 +6,16 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const database_1 = __importDefault(require("../config/database"));
+// Se importan los nuevos controladores
+const statistics_controller_1 = require("../controllers/statistics.controller");
 const router = (0, express_1.Router)();
+// --- NUEVAS RUTAS PARA LA SECCIÓN DE ESTADÍSTICAS GENERALES ---
+router.get("/cobranza", statistics_controller_1.getEstadisticasCobranza);
+router.get("/facturacion", statistics_controller_1.getEstadisticasFacturacion);
+router.get("/pagos", statistics_controller_1.getPagos);
+router.get("/facturas", statistics_controller_1.getFacturas);
+router.get("/ot", statistics_controller_1.getEstadisticasOT);
+// --- RUTAS EXISTENTES ---
 // [GET] /api/statistics/user/:id
 router.get("/user/:id", (req, res) => {
     try {
@@ -86,7 +95,7 @@ router.get("/user/:id", (req, res) => {
             .json({ error: "Error al obtener las estadísticas del usuario." });
     }
 });
-// (El resto del archivo no se modifica)
+// [GET] /api/statistics/all
 router.get("/all", (req, res) => {
     try {
         const totalOTs = database_1.default.prepare("SELECT COUNT(*) as count FROM work_orders").get().count;

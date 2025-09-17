@@ -59,6 +59,9 @@ const LoadingSkeleton = () => (
   </div>
 );
 
+// Definimos el tipo para el período
+type Periodo = "semanal" | "mensual" | "anual";
+
 const Estadisticas = () => {
   // --- Estados tipados para mayor seguridad y autocompletado ---
   const [estadisticasCobranza, setEstadisticasCobranza] =
@@ -70,6 +73,7 @@ const Estadisticas = () => {
     null
   );
   const [loading, setLoading] = useState(true);
+  const [periodo, setPeriodo] = useState<Periodo>("mensual"); // Estado inicial
   const { theme } = useTheme();
 
   // Hook para cargar todos los datos de forma concurrente
@@ -77,11 +81,12 @@ const Estadisticas = () => {
     const fetchEstadisticas = async () => {
       try {
         setLoading(true);
+        // Pasamos el período a las funciones del servicio
         const [cobranza, facturacion, pagosData, otData] = await Promise.all([
-          getEstadisticasCobranza(),
-          getEstadisticasFacturacion(),
-          getPagos(),
-          getEstadisticasOT(),
+          getEstadisticasCobranza(periodo),
+          getEstadisticasFacturacion(periodo),
+          getPagos(periodo),
+          getEstadisticasOT(periodo),
         ]);
 
         setEstadisticasCobranza(cobranza);
@@ -96,7 +101,7 @@ const Estadisticas = () => {
     };
 
     fetchEstadisticas();
-  }, []);
+  }, [periodo]); // Se ejecuta cada vez que el período cambia
 
   // --- CONFIGURACIÓN DINÁMICA DE GRÁFICOS PARA MODO OSCURO ---
   const textColor = theme === "dark" ? "#E5E7EB" : "#1F2937";
@@ -175,13 +180,35 @@ const Estadisticas = () => {
     ],
   };
 
+  // --- Componente para los botones de filtro ---
+  const BotonesFiltro = () => (
+    <div className="flex bg-gray-100 dark:bg-gray-900 p-1 rounded-lg">
+      {(["semanal", "mensual", "anual"] as Periodo[]).map((p) => (
+        <button
+          key={p}
+          onClick={() => setPeriodo(p)}
+          className={`px-3 py-1.5 text-sm font-semibold rounded-md transition-all duration-300 ${
+            periodo === p
+              ? "bg-blue-600 text-white shadow-md"
+              : "text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700/50"
+          }`}
+        >
+          {p.charAt(0).toUpperCase() + p.slice(1)}
+        </button>
+      ))}
+    </div>
+  );
+
   // --- RENDERIZADO DEL COMPONENTE ---
   if (loading) {
     return (
       <div className="container mx-auto p-4">
-        <h1 className="text-3xl font-bold mb-6 text-gray-900 dark:text-gray-100">
-          Estadísticas
-        </h1>
+        <div className="flex justify-between items-center mb-6">
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">
+            Estadísticas
+          </h1>
+          <BotonesFiltro />
+        </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
           <LoadingSkeleton />
           <LoadingSkeleton />
@@ -194,7 +221,10 @@ const Estadisticas = () => {
 
   return (
     <div className="container mx-auto p-4 text-gray-900 dark:text-gray-100">
-      <h1 className="text-3xl font-bold mb-6">Estadísticas</h1>
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-3xl font-bold">Estadísticas</h1>
+        <BotonesFiltro />
+      </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         <div className="bg-white dark:bg-gray-800 p-5 rounded-xl shadow-md">
