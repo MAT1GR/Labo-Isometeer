@@ -1,3 +1,5 @@
+// RUTA: consultar/src/components/Layout.tsx
+
 import React, { useState, Fragment } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
@@ -15,11 +17,15 @@ import {
   Image,
   Receipt,
   ClipboardListIcon,
-  BarChart3, // --- 1. IMPORTA EL NUEVO ÍCONO ---
+  BarChart3,
+  Keyboard, // --- 1. IMPORTA EL ÍCONO DE TECLADO ---
 } from "lucide-react";
 import ThemeToggle from "./ui/ThemeToggle";
 import { cn } from "../lib/utils";
 import Notifications from "./ui/Notifications";
+import { useHotkeys } from "react-hotkeys-hook"; // --- 2. IMPORTA EL HOOK DE ATAJOS ---
+import { getShortcuts } from "../config/shortcuts"; // --- 3. IMPORTA LA CONFIGURACIÓN DE ATAJOS ---
+import { useTheme } from "../contexts/ThemeContext";
 
 const SidebarNavigation: React.FC = () => {
   const { user, logout, canManageAdminPanel } = useAuth();
@@ -57,12 +63,18 @@ const SidebarNavigation: React.FC = () => {
       path: "/facturacion",
       roles: ["administracion", "administrador", "director"],
     },
-    // --- 2. AGREGA EL NUEVO OBJETO PARA ESTADÍSTICAS AQUÍ ---
     {
       icon: BarChart3,
       label: "Estadísticas",
       path: "/estadisticas",
       roles: ["administrador", "director"],
+    },
+    // --- 4. AGREGA EL NUEVO OBJETO PARA ATAJOS DE TECLADO AQUÍ ---
+    {
+      icon: Keyboard,
+      label: "Atajos de Teclado",
+      path: "/atajos",
+      roles: ["empleado", "director", "administracion", "administrador"], // Visible para todos
     },
   ];
 
@@ -215,6 +227,42 @@ const SidebarNavigation: React.FC = () => {
 const Layout: React.FC = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const location = useLocation();
+  const navigate = useNavigate();
+  const { toggleTheme } = useTheme();
+
+  // --- 5. IMPLEMENTACIÓN DE LOS ATAJOS GLOBALES ---
+  const [shortcuts] = useState(getShortcuts());
+
+  useHotkeys(
+    shortcuts.CREATE_NEW_OT.keys,
+    () => navigate("/ot/crear"),
+    { preventDefault: true },
+    [navigate, shortcuts]
+  );
+  useHotkeys(
+    shortcuts.GO_TO_DASHBOARD.keys,
+    () => navigate("/"),
+    { preventDefault: true },
+    [navigate, shortcuts]
+  );
+  useHotkeys(
+    shortcuts.GO_TO_OTS.keys,
+    () => navigate("/ot"),
+    { preventDefault: true },
+    [navigate, shortcuts]
+  );
+  useHotkeys(
+    shortcuts.GO_TO_CLIENTS.keys,
+    () => navigate("/clientes"),
+    { preventDefault: true },
+    [navigate, shortcuts]
+  );
+  useHotkeys(
+    shortcuts.TOGGLE_THEME.keys,
+    toggleTheme,
+    { preventDefault: true },
+    [toggleTheme, shortcuts]
+  );
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
@@ -224,6 +272,7 @@ const Layout: React.FC = () => {
           className="relative z-50 lg:hidden"
           onClose={setSidebarOpen}
         >
+          {/* ... Contenido del Dialog (sin cambios) ... */}
           <Transition.Child
             as={Fragment}
             enter="transition-opacity ease-linear duration-300"

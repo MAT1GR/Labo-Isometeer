@@ -8,7 +8,7 @@ import "./index.css";
 import { AuthProvider } from "./contexts/AuthContext.tsx";
 import { ThemeProvider } from "./contexts/ThemeContext.tsx";
 
-// ... (importaciones de otras páginas)
+// --- (importaciones de otras páginas) ---
 import Login from "./pages/Login.tsx";
 import Dashboard from "./pages/Dashboard.tsx";
 import Clientes from "./pages/Clientes.tsx";
@@ -29,9 +29,9 @@ import UserChart from "./pages/UserChart.tsx";
 import Presupuestos from "./pages/Presupuestos.tsx";
 import PresupuestoCreate from "./pages/PresupuestoCreate.tsx";
 import PresupuestoDetail from "./pages/PresupuestoDetail.tsx";
-
-// --- 1. IMPORTA LA NUEVA PÁGINA DE ESTADÍSTICAS ---
 import Estadisticas from "./pages/Estadisticas.tsx";
+// --- 1. IMPORTA LA NUEVA PÁGINA DE ATAJOS ---
+import AtajosDeTeclado from "./pages/AtajosDeTeclado.tsx";
 
 const router = createBrowserRouter([
   {
@@ -63,9 +63,10 @@ const router = createBrowserRouter([
       { path: "/presupuestos/:id", element: <PresupuestoDetail /> },
       { path: "/presupuestos/editar/:id", element: <PresupuestoDetail /> },
       { path: "/usuarios/grafico", element: <UserChart /> },
-
-      // --- 2. AGREGA LA NUEVA RUTA AQUÍ ---
       { path: "/estadisticas", element: <Estadisticas /> },
+
+      // --- 2. AGREGA LA NUEVA RUTA PARA LOS ATAJOS ---
+      { path: "/atajos", element: <AtajosDeTeclado /> },
     ],
   },
   {
