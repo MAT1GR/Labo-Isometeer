@@ -18,17 +18,17 @@ import {
   Receipt,
   ClipboardListIcon,
   BarChart3,
-  Keyboard, // --- 1. IMPORTA EL ÍCONO DE TECLADO ---
+  Keyboard,
 } from "lucide-react";
 import ThemeToggle from "./ui/ThemeToggle";
 import { cn } from "../lib/utils";
 import Notifications from "./ui/Notifications";
-import { useHotkeys } from "react-hotkeys-hook"; // --- 2. IMPORTA EL HOOK DE ATAJOS ---
-import { getShortcuts } from "../config/shortcuts"; // --- 3. IMPORTA LA CONFIGURACIÓN DE ATAJOS ---
+import { useHotkeys } from "react-hotkeys-hook";
+import { getShortcuts } from "../config/shortcuts";
 import { useTheme } from "../contexts/ThemeContext";
 
 const SidebarNavigation: React.FC = () => {
-  const { user, logout, canManageAdminPanel } = useAuth();
+  const { user, logout, canManageAdminPanel, canCreateContent } = useAuth(); // <-- Se añade canCreateContent
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -69,12 +69,11 @@ const SidebarNavigation: React.FC = () => {
       path: "/estadisticas",
       roles: ["administrador", "director"],
     },
-    // --- 4. AGREGA EL NUEVO OBJETO PARA ATAJOS DE TECLADO AQUÍ ---
     {
       icon: Keyboard,
       label: "Atajos de Teclado",
       path: "/atajos",
-      roles: ["empleado", "director", "administracion", "administrador"], // Visible para todos
+      roles: ["empleado", "director", "administracion", "administrador"],
     },
   ];
 
@@ -229,16 +228,25 @@ const Layout: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { toggleTheme } = useTheme();
+  const { canCreateContent } = useAuth(); // <-- 1. OBTÉN LA FUNCIÓN DE PERMISOS
 
-  // --- 5. IMPLEMENTACIÓN DE LOS ATAJOS GLOBALES ---
   const [shortcuts] = useState(getShortcuts());
 
+  // --- CORRECCIÓN DE ROLES AQUÍ ---
+  // El atajo para crear una OT ahora solo se activa si el usuario tiene permiso.
   useHotkeys(
     shortcuts.CREATE_NEW_OT.keys,
-    () => navigate("/ot/crear"),
+    () => {
+      if (canCreateContent()) {
+        // <-- 2. AÑADE LA VERIFICACIÓN
+        navigate("/ot/crear");
+      }
+    },
     { preventDefault: true },
-    [navigate, shortcuts]
+    [navigate, shortcuts, canCreateContent]
   );
+
+  // Los atajos de navegación general no necesitan verificación de roles
   useHotkeys(
     shortcuts.GO_TO_DASHBOARD.keys,
     () => navigate("/"),
@@ -272,7 +280,6 @@ const Layout: React.FC = () => {
           className="relative z-50 lg:hidden"
           onClose={setSidebarOpen}
         >
-          {/* ... Contenido del Dialog (sin cambios) ... */}
           <Transition.Child
             as={Fragment}
             enter="transition-opacity ease-linear duration-300"
