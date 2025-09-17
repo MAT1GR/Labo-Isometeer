@@ -26,9 +26,10 @@ import { AnimatePresence, motion } from "framer-motion";
 import MultiUserSelect from "../components/ui/MultiUserSelect";
 
 export interface OTFilters {
-  client_id?: number;
+  searchTerm?: string;
+  clientId?: number;
   status?: string;
-  assigned_to?: number;
+  assignedToId?: number;
   authorized?: boolean;
   start_date?: string;
   end_date?: string;
@@ -133,7 +134,7 @@ const OT: React.FC = () => {
   const handleSaveAssignees = async (otId: number, userIds: number[]) => {
     if (!user) return;
     try {
-      const currentOT = await otService.getOTById(otId.toString());
+      const currentOT = await otService.getOTById(otId);
       if (!currentOT.activities || currentOT.activities.length === 0) {
         alert("Esta OT no tiene actividades para asignar usuarios.");
         return;
@@ -313,8 +314,6 @@ const OT: React.FC = () => {
                     <td className="px-6 py-4">{ot.client_name}</td>
                     <td
                       className="px-6 py-4 group"
-                      // --- ¡LA SOLUCIÓN ESTÁ AQUÍ! ---
-                      // Detenemos la propagación del clic para que no active el `onClick` de la fila (`<tr>`)
                       onClick={(e) => {
                         e.stopPropagation();
                         if (canViewAdminContent()) {

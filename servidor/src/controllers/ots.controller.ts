@@ -31,9 +31,8 @@ export const generateIdHandler = (req: Request, res: Response) => {
   }
 };
 
-// CÓDIGO CORREGIDO
 export const getMisOts = (req: Request, res: Response) => {
-  const { userId } = req.params; // <--- TOMA EL ID DEL PARÁMETRO DE LA URL
+  const { userId } = req.params;
   if (!userId) {
     return res.status(400).json({ error: "Falta el ID de usuario en la URL." });
   }
@@ -60,7 +59,7 @@ export const getMisOts = (req: Request, res: Response) => {
       ORDER BY ot.created_at DESC
     `;
     const stmt: Statement = db.prepare(query);
-    const ots = stmt.all(userId); // Usa el userId de la URL en la consulta
+    const ots = stmt.all(userId);
     res.status(200).json(ots);
   } catch (error) {
     console.error("Error en GET /ots/asignadas:", error);

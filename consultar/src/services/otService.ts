@@ -53,9 +53,10 @@ export interface WorkOrder {
 }
 
 export interface OTFilters {
-  client_id?: number;
+  searchTerm?: string;
+  clientId?: number;
+  assignedToId?: number;
   status?: string;
-  assigned_to?: number;
   authorized?: boolean;
   start_date?: string;
   end_date?: string;
@@ -82,15 +83,19 @@ const getAllOTs = async (
     const params = new URLSearchParams();
     if (user.role) params.append("role", user.role);
     if (user.id) params.append("user_id", user.id.toString());
-    if (filters.client_id)
-      params.append("clientId", filters.client_id.toString());
+
+    // --- Nombres de parámetros corregidos para coincidir con el backend ---
+    if (filters.searchTerm) params.append("searchTerm", filters.searchTerm);
+    if (filters.clientId)
+      params.append("clientId", filters.clientId.toString());
     if (filters.status) params.append("status", filters.status);
-    if (filters.assigned_to)
-      params.append("assignedTo", filters.assigned_to.toString());
+    if (filters.assignedToId)
+      params.append("assignedToId", filters.assignedToId.toString());
     if (filters.authorized !== undefined)
       params.append("authorized", filters.authorized.toString());
     if (filters.start_date) params.append("startDate", filters.start_date);
     if (filters.end_date) params.append("endDate", filters.end_date);
+
     const response = await axiosInstance.get("/ots", { params });
     return response.data;
   } catch (error) {

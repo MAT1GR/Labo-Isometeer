@@ -1,4 +1,4 @@
-// RUTA: /cliente/src/components/OTFilters.tsx
+// RUTA: consultar/src/components/OTFilters.tsx
 
 import React from "react";
 import { Client } from "../services/clientService";
