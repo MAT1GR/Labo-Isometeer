@@ -109,12 +109,13 @@ export const useOTDetailForm = () => {
           estimated_delivery_date: ot.estimated_delivery_date
             ? new Date(ot.estimated_delivery_date).toISOString().split("T")[0]
             : "",
+          // Se asegura que `assigned_users` esté presente en los datos del formulario
           activities: ot.activities?.map((act) => ({
             ...act,
-            assigned_to: act.assigned_users?.map((u: User) => u.id) || [],
+            assigned_users: act.assigned_users || [],
           })),
         };
-        reset(formattedOt);
+        reset(formattedOt as WorkOrder);
       } catch (err: any) {
         console.error("Error cargando datos de la OT:", err);
         setError("No se pudieron cargar los datos de la Orden de Trabajo.");
@@ -150,6 +151,11 @@ export const useOTDetailForm = () => {
         user_id: user.id,
         role: user.role,
         contact_id: data.contact_id ? Number(data.contact_id) : undefined,
+        // Asegura que el backend reciba el formato correcto
+        activities: data.activities?.map((act) => ({
+          ...act,
+          assigned_to: (act.assigned_users || []).map((u: User) => u.id),
+        })),
       };
       await otService.updateOT(Number(id), dataToSubmit);
       mutate(["/ot", user]);
@@ -158,6 +164,18 @@ export const useOTDetailForm = () => {
       alert(error.message || "Hubo un error al guardar los cambios.");
       setIsSaving(false);
     }
+  };
+
+  // --- FUNCIÓN CORREGIDA Y CENTRALIZADA AQUÍ ---
+  // Esta es la función clave que soluciona el problema de guardado.
+  const handleActivityAssignmentChange = (index: number, userIds: number[]) => {
+    // Busca los objetos de usuario completos a partir de los IDs
+    const selectedUsers = users.filter((u) => userIds.includes(u.id));
+    // Actualiza el campo 'assigned_users' en el estado del formulario para la actividad correcta
+    setValue(`activities.${index}.assigned_users`, selectedUsers as any, {
+      shouldDirty: true, // Marca el formulario como modificado
+      shouldValidate: true, // Activa la validación si es necesario
+    });
   };
 
   const handleFacturaCreated = () => {
@@ -259,5 +277,6 @@ export const useOTDetailForm = () => {
     handleStartActivity,
     handleStopActivity,
     getAvailableActivities,
+    handleActivityAssignmentChange, // Se exporta la función para que el formulario la use
   };
 };

@@ -1,8 +1,8 @@
-// RUTA: servidor/src/routes/work_orders.routes.ts (Corregido)
+// RUTA: servidor/src/routes/work_orders.routes.ts
 
 import { Router } from "express";
 import db from "../config/database";
-import * as sseService from "../services/sseService"; // <-- CORREGIDO: Se utiliza una importación de espacio de nombres
+import { sseService } from "../services/sseService";
 
 const router = Router();
 
@@ -71,7 +71,6 @@ router.get("/", (req, res) => {
     baseQuery += " WHERE " + whereClauses.join(" AND ");
   }
 
-  // Filtrado por estado de facturación
   if (facturada !== undefined) {
     const havingClause =
       facturada === "true" ? "HAVING facturada = 1" : "HAVING facturada = 0";
@@ -161,7 +160,6 @@ router.post("/", (req, res) => {
   }
 
   const transaction = db.transaction(() => {
-    // 1. Generar el custom_id
     const year = new Date().getFullYear();
     const lastOT = db
       .prepare(
@@ -179,11 +177,10 @@ router.post("/", (req, res) => {
     }
     const customId = `${year}-${String(nextId).padStart(4, "0")}`;
 
-    // 2. Insertar la orden de trabajo principal
     const stmt = db.prepare(
       `INSERT INTO work_orders 
         (custom_id, date, type, client_id, contact_id, product, brand, model, seal_number, observations, certificate_expiry, estimated_delivery_date, created_by, disposition, authorized, contract_type, moneda) 
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     );
 
     const info = stmt.run(
@@ -207,7 +204,6 @@ router.post("/", (req, res) => {
     );
     const workOrderId = info.lastInsertRowid;
 
-    // 3. Insertar las actividades
     const activityStmt = db.prepare(
       "INSERT INTO work_order_activities (work_order_id, activity, norma, precio_sin_iva) VALUES (?, ?, ?, ?)"
     );
@@ -220,7 +216,6 @@ router.post("/", (req, res) => {
       );
     }
 
-    // 4. Crear notificación
     const directorAndAdminUsers = db
       .prepare(
         "SELECT id FROM users WHERE role = 'director' OR role = 'administrador'"
@@ -232,7 +227,6 @@ router.post("/", (req, res) => {
 
     for (const user of directorAndAdminUsers as { id: number }[]) {
       if (user.id !== created_by) {
-        // No notificar al creador
         notificationStmt.run(
           user.id,
           `Se ha creado una nueva OT (${customId}) y requiere tu autorización.`,
@@ -241,8 +235,8 @@ router.post("/", (req, res) => {
       }
     }
 
-    // Enviar evento SSE
-    sseService.send({
+    // --- CORRECCIÓN 1: Se usa 'sendToAll' en lugar de 'send' ---
+    sseService.sendToAll({
       type: "ot_created",
       message: `Nueva OT ${customId} creada.`,
       ot_id: workOrderId,
@@ -262,50 +256,10 @@ router.post("/", (req, res) => {
 
 // Actualizar una orden de trabajo
 router.patch("/:id", (req, res) => {
-  const {
-    date,
-    type,
-    client_id,
-    contact_id,
-    product,
-    brand,
-    model,
-    seal_number,
-    observations,
-    collaborator_observations,
-    certificate_expiry,
-    estimated_delivery_date,
-    status,
-    disposition,
-    authorized,
-    contract_type,
-    activities, // Array de actividades actualizado
-  } = req.body;
+  const { activities, ...otFields } = req.body;
   const workOrderId = req.params.id;
 
   const transaction = db.transaction(() => {
-    // 1. Actualizar la OT principal
-    const otFields: any = {};
-    if (date) otFields.date = date;
-    if (type) otFields.type = type;
-    if (client_id) otFields.client_id = client_id;
-    if (contact_id !== undefined) otFields.contact_id = contact_id;
-    if (product) otFields.product = product;
-    if (brand !== undefined) otFields.brand = brand;
-    if (model !== undefined) otFields.model = model;
-    if (seal_number !== undefined) otFields.seal_number = seal_number;
-    if (observations !== undefined) otFields.observations = observations;
-    if (collaborator_observations !== undefined)
-      otFields.collaborator_observations = collaborator_observations;
-    if (certificate_expiry !== undefined)
-      otFields.certificate_expiry = certificate_expiry;
-    if (estimated_delivery_date !== undefined)
-      otFields.estimated_delivery_date = estimated_delivery_date;
-    if (status) otFields.status = status;
-    if (disposition) otFields.disposition = disposition;
-    if (authorized !== undefined) otFields.authorized = authorized ? 1 : 0;
-    if (contract_type) otFields.contract_type = contract_type;
-
     if (Object.keys(otFields).length > 0) {
       const setClause = Object.keys(otFields)
         .map((key) => `${key} = ?`)
@@ -316,7 +270,6 @@ router.patch("/:id", (req, res) => {
       );
     }
 
-    // 2. Sincronizar actividades (borrar y recrear es más simple aquí)
     if (activities) {
       db.prepare(
         "DELETE FROM work_order_activities WHERE work_order_id = ?"
@@ -344,26 +297,22 @@ router.patch("/:id", (req, res) => {
       }
     }
 
-    // Obtener la OT actualizada para la notificación y el SSE
     const updatedOT = db
       .prepare("SELECT custom_id, created_by FROM work_orders WHERE id = ?")
       .get(workOrderId) as { custom_id: string; created_by: number };
 
-    // 3. Crear notificación si se autoriza
-    if (authorized === true) {
+    if (otFields.authorized === true) {
       const message = `La OT ${updatedOT.custom_id} ha sido autorizada.`;
       const notificationStmt = db.prepare(
         "INSERT INTO notifications (user_id, message, ot_id) VALUES (?, ?, ?)"
       );
-      // Notificar al creador de la OT
       notificationStmt.run(updatedOT.created_by, message, workOrderId);
 
-      // Enviar evento SSE
-      sseService.send({
+      // --- CORRECCIÓN 2: Se usa 'sendToUser' en lugar de 'send' ---
+      sseService.sendToUser(updatedOT.created_by, {
         type: "ot_authorized",
         message,
         ot_id: workOrderId,
-        recipient_id: updatedOT.created_by,
       });
     }
 

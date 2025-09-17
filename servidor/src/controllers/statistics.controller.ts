@@ -70,11 +70,11 @@ export const getEstadisticasCobranza = (req: Request, res: Response) => {
 };
 
 export const getEstadisticasFacturacion = (req: Request, res: Response) => {
-  // --- MODIFICACIÓN: Se obtiene el período de la consulta ---
   const period = req.query.period as string;
   const dateRange = getDateRange(period);
+  // --- CORRECCIÓN: Cambiado 'fecha_emision' por 'fecha' ---
   const whereClause = dateRange
-    ? `WHERE fecha_emision BETWEEN '${dateRange.start}' AND '${dateRange.end}'`
+    ? `WHERE fecha BETWEEN '${dateRange.start}' AND '${dateRange.end}'`
     : "";
 
   try {
@@ -88,9 +88,10 @@ export const getEstadisticasFacturacion = (req: Request, res: Response) => {
       (
         db
           .prepare(
+            // --- CORRECCIÓN: Cambiado 'fecha_emision' por 'fecha' ---
             `SELECT SUM(monto) as pendientes FROM facturas WHERE estado = 'pendiente' ${
               dateRange
-                ? `AND fecha_emision BETWEEN '${dateRange.start}' AND '${dateRange.end}'`
+                ? `AND fecha BETWEEN '${dateRange.start}' AND '${dateRange.end}'`
                 : ""
             }`
           )
@@ -102,7 +103,7 @@ export const getEstadisticasFacturacion = (req: Request, res: Response) => {
           .prepare(
             `SELECT SUM(monto) as vencidas FROM facturas WHERE estado = 'vencida' ${
               dateRange
-                ? `AND fecha_emision BETWEEN '${dateRange.start}' AND '${dateRange.end}'`
+                ? `AND fecha BETWEEN '${dateRange.start}' AND '${dateRange.end}'`
                 : ""
             }`
           )
@@ -115,7 +116,6 @@ export const getEstadisticasFacturacion = (req: Request, res: Response) => {
 };
 
 export const getPagos = (req: Request, res: Response) => {
-  // --- MODIFICACIÓN: Se obtiene el período de la consulta ---
   const period = req.query.period as string;
   const dateRange = getDateRange(period);
 
@@ -133,7 +133,6 @@ export const getPagos = (req: Request, res: Response) => {
 
   query += " ORDER BY c.fecha DESC LIMIT 8";
   try {
-    // CORRECCIÓN: Se cambió 'c.numero_recibo' por 'c.identificacion_cobro' y se le da un alias para que el frontend funcione.
     const rows = db.prepare(query).all(params);
     res.json(rows);
   } catch (error: unknown) {
@@ -144,7 +143,8 @@ export const getPagos = (req: Request, res: Response) => {
 export const getFacturas = (req: Request, res: Response) => {
   try {
     const rows = db
-      .prepare("SELECT * FROM facturas ORDER BY fecha_emision DESC LIMIT 29")
+      // --- CORRECCIÓN: Cambiado 'fecha_emision' por 'fecha' ---
+      .prepare("SELECT * FROM facturas ORDER BY fecha DESC LIMIT 29")
       .all();
     res.json(rows);
   } catch (error: unknown) {
@@ -153,15 +153,15 @@ export const getFacturas = (req: Request, res: Response) => {
 };
 
 export const getEstadisticasOT = (req: Request, res: Response) => {
-  // --- MODIFICACIÓN: Se obtiene el período de la consulta ---
   const period = req.query.period as string;
   const dateRange = getDateRange(period);
 
   const cobranzaWhere = dateRange
     ? `AND c.fecha BETWEEN '${dateRange.start}' AND '${dateRange.end}'`
     : "";
+  // --- CORRECCIÓN: Cambiado 'f.fecha_emision' por 'f.fecha' ---
   const facturacionWhere = dateRange
-    ? `AND f.fecha_emision BETWEEN '${dateRange.start}' AND '${dateRange.end}'`
+    ? `AND f.fecha BETWEEN '${dateRange.start}' AND '${dateRange.end}'`
     : "";
 
   try {
@@ -192,8 +192,6 @@ export const getEstadisticasOT = (req: Request, res: Response) => {
       )
       .all();
 
-    // --- CORRECCIÓN AQUÍ ---
-    // Se cambió el estado 'abierta' por 'en progreso'
     const otsAbiertasRow = db
       .prepare(
         "SELECT COUNT(*) as count FROM work_orders WHERE status = 'en progreso'"

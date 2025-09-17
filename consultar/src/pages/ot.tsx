@@ -17,17 +17,16 @@ import {
   Filter,
   ChevronLeft,
   ChevronRight,
-  Pencil,
-} from "lucide-react";
+} from "lucide-react"; // Se quitó el ícono de Pencil
 import useSWR, { mutate } from "swr";
 import ConfirmationModal from "../components/ui/ConfirmationModal";
 import OTFiltersComponent from "../components/OTFilters";
 import { AnimatePresence, motion } from "framer-motion";
-import MultiUserSelect from "../components/ui/MultiUserSelect";
 
+// Se mantiene la interfaz de filtros por si se usa en otro lado.
 export interface OTFilters {
   searchTerm?: string;
-  clientId?: number;
+  clientName?: string;
   status?: string;
   assignedToId?: number;
   authorized?: boolean;
@@ -49,8 +48,10 @@ const OT: React.FC = () => {
   const [filters, setFilters] = useState<OTFilters>({});
   const [showFilters, setShowFilters] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
-  const [editingOtId, setEditingOtId] = useState<number | null>(null);
-  const [tempSelectedUserIds, setTempSelectedUserIds] = useState<number[]>([]);
+
+  // --- ELIMINADO: Se quitan los estados para la edición en línea ---
+  // const [editingOtId, setEditingOtId] = useState<number | null>(null);
+  // const [tempSelectedUserIds, setTempSelectedUserIds] = useState<number[]>([]);
 
   const { data: clients } = useSWR<Client[]>(
     "/clients",
@@ -131,36 +132,7 @@ const OT: React.FC = () => {
     }
   };
 
-  const handleSaveAssignees = async (otId: number, userIds: number[]) => {
-    if (!user) return;
-    try {
-      const currentOT = await otService.getOTById(otId);
-      if (!currentOT.activities || currentOT.activities.length === 0) {
-        alert("Esta OT no tiene actividades para asignar usuarios.");
-        return;
-      }
-
-      const updatedActivities = currentOT.activities.map((activity, index) => {
-        const existingUserIds = activity.assigned_users?.map((u) => u.id) || [];
-        if (index === 0) {
-          return { ...activity, assigned_to: userIds };
-        }
-        return { ...activity, assigned_to: existingUserIds };
-      });
-
-      const payload = {
-        ...currentOT,
-        activities: updatedActivities,
-        user_id: user.id,
-      };
-      await otService.updateOT(otId, payload);
-      mutate(swrKey);
-    } catch (error: any) {
-      alert(error.message || "Error al asignar la OT.");
-    } finally {
-      setEditingOtId(null);
-    }
-  };
+  // --- ELIMINADO: La función handleSaveAssignees ya no es necesaria aquí ---
 
   const activeFilterCount = useMemo(
     () =>
@@ -312,47 +284,12 @@ const OT: React.FC = () => {
                       {ot.custom_id || `Interno #${ot.id}`}
                     </td>
                     <td className="px-6 py-4">{ot.client_name}</td>
-                    <td
-                      className="px-6 py-4 group"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (canViewAdminContent()) {
-                          if (editingOtId !== ot.id) {
-                            const initialUserIds = [
-                              ...new Set(
-                                ot.activities?.flatMap(
-                                  (act) =>
-                                    act.assigned_users?.map((u) => u.id) ?? []
-                                ) ?? []
-                              ),
-                            ];
-                            setTempSelectedUserIds(initialUserIds);
-                            setEditingOtId(ot.id);
-                          }
-                        }
-                      }}
-                    >
-                      {editingOtId === ot.id ? (
-                        <div className="min-w-[250px]">
-                          <MultiUserSelect
-                            users={users || []}
-                            selectedUserIds={tempSelectedUserIds}
-                            onChange={setTempSelectedUserIds}
-                            onBlur={() =>
-                              handleSaveAssignees(ot.id, tempSelectedUserIds)
-                            }
-                            autoFocus
-                          />
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-2">
-                          <span>{ot.assigned_to_name || "Sin asignar"}</span>
-                          {canViewAdminContent() && (
-                            <Pencil className="h-3 w-3 text-gray-400 invisible group-hover:visible" />
-                          )}
-                        </div>
-                      )}
+
+                    {/* --- SIMPLIFICADO: Celda de "Asignado a" solo muestra texto --- */}
+                    <td className="px-6 py-4">
+                      {ot.assigned_to_name || "Sin asignar"}
                     </td>
+
                     <td className="px-6 py-4">
                       <span
                         className={`px-2 inline-flex text-sm leading-5 font-semibold rounded-full uppercase ${getStatusColor(

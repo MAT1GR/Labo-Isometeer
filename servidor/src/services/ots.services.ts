@@ -1,181 +1,207 @@
 // RUTA: servidor/src/services/ots.services.ts
 
 import db from "../config/database";
-import {
-  addHistoryEntry,
-  createAndSendNotification,
-  generateCustomId,
-} from "../helpers/ots.helpers";
+import { addHistoryEntry, generateCustomId } from "../helpers/ots.helpers";
 
 /**
- * Servicio para crear una nueva Orden de Trabajo.
+ * Crea una nueva Orden de Trabajo (OT) en la base de datos.
  */
-export const createNewOt = (body: any) => {
-  const { activities = [], created_by, factura_ids = [], ...otData } = body;
-
-  const insertOTStmt = db.prepare(
-    `INSERT INTO work_orders (
-    custom_id, date, type, client_id, contact_id, product, brand, model,
-    seal_number, observations, certificate_expiry, estimated_delivery_date, collaborator_observations, created_by, status,
-    quotation_amount, quotation_details, disposition, contract_type, moneda
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-  );
-  const insertActivityStmt = db.prepare(
-    "INSERT INTO work_order_activities (work_order_id, activity, norma, precio_sin_iva) VALUES (?, ?, ?, ?)"
-  );
-  const insertAssignmentStmt = db.prepare(
-    "INSERT INTO work_order_activity_assignments (activity_id, user_id) VALUES (?, ?)"
-  );
-  const insertFacturaLinkStmt = db.prepare(
-    "INSERT INTO factura_ots (factura_id, ot_id) VALUES (?, ?)"
-  );
+export const createNewOt = (otData: any) => {
+  const {
+    activities,
+    user_id,
+    seal_entity,
+    seal_number,
+    factura_ids,
+    ...mainOtData
+  } = otData;
 
   const createTransaction = db.transaction(() => {
-    const final_custom_id = generateCustomId(
-      otData.date,
-      otData.type,
-      otData.client_id
-    );
-    const info = insertOTStmt.run(
-      final_custom_id,
-      otData.date,
-      otData.type,
-      otData.client_id,
-      otData.contact_id,
-      otData.product,
-      otData.brand,
-      otData.model,
-      otData.seal_number,
-      otData.observations,
-      otData.certificate_expiry,
-      otData.estimated_delivery_date,
-      otData.collaborator_observations,
-      created_by,
-      "pendiente",
-      otData.quotation_amount,
-      otData.quotation_details,
-      otData.disposition,
-      otData.contract_type,
-      otData.moneda
-    );
-    const otId = info.lastInsertRowid as number;
+    if (!mainOtData.custom_id) {
+      mainOtData.custom_id = generateCustomId(
+        mainOtData.date,
+        mainOtData.type,
+        mainOtData.client_id
+      );
+    }
 
-    for (const act of activities) {
-      if (act.activity) {
-        const activityInfo = insertActivityStmt.run(
+    const mainColumns = Object.keys(mainOtData).join(", ");
+    const mainPlaceholders = Object.keys(mainOtData)
+      .map(() => "?")
+      .join(", ");
+    const mainValues = Object.values(mainOtData);
+
+    const otInsertResult = db
+      .prepare(
+        `INSERT INTO work_orders (${mainColumns}) VALUES (${mainPlaceholders})`
+      )
+      .run(mainValues);
+
+    const otId = otInsertResult.lastInsertRowid;
+
+    if (activities && Array.isArray(activities)) {
+      const activityStmt = db.prepare(
+        "INSERT INTO work_order_activities (work_order_id, activity, norma, precio_sin_iva) VALUES (?, ?, ?, ?)"
+      );
+      const assignmentStmt = db.prepare(
+        "INSERT INTO work_order_activity_assignments (activity_id, user_id) VALUES (?, ?)"
+      );
+
+      for (const activity of activities) {
+        const activityInsertResult = activityStmt.run(
           otId,
-          act.activity,
-          act.norma,
-          act.precio_sin_iva
+          activity.activity,
+          activity.norma,
+          activity.precio_sin_iva
         );
-        const activityId = activityInfo.lastInsertRowid;
-        if (act.assigned_to && Array.isArray(act.assigned_to)) {
-          for (const userId of act.assigned_to) {
-            insertAssignmentStmt.run(activityId, userId);
+        const activityId = activityInsertResult.lastInsertRowid;
+
+        if (activity.assigned_to && Array.isArray(activity.assigned_to)) {
+          for (const userId of activity.assigned_to) {
+            assignmentStmt.run(activityId, userId);
           }
         }
       }
     }
-    if (factura_ids && Array.isArray(factura_ids)) {
-      for (const factura_id of factura_ids) {
-        insertFacturaLinkStmt.run(factura_id, otId);
-      }
+
+    if (user_id) {
+      addHistoryEntry(Number(otId), user_id, ["Se creó la Orden de Trabajo."]);
     }
-    addHistoryEntry(otId, created_by, ["Se creó la Orden de Trabajo."]);
-    return { id: otId };
+
+    return { id: otId, ...mainOtData };
   });
 
   return createTransaction();
 };
 
 /**
- * Servicio para actualizar una Orden de Trabajo existente.
+ * Actualiza una Orden de Trabajo existente.
  */
-export const updateExistingOt = (id: string, body: any) => {
-  const { activities = [], user_id, factura_ids = [], ...otData } = body;
-
-  const oldOT: any = db
-    .prepare("SELECT * FROM work_orders WHERE id = ?")
-    .get(id);
-  if (!oldOT) throw new Error("OT no encontrada");
-
-  const updateStmt = db.prepare(
-    `UPDATE work_orders SET date=?, type=?, product=?, brand=?, model=?, seal_number=?, observations=?, certificate_expiry=?, estimated_delivery_date=?, status=?, quotation_amount=?, quotation_details=?, disposition=?, contract_type=?, collaborator_observations=?, contact_id=?, updated_at=CURRENT_TIMESTAMP, moneda=? WHERE id=?`
-  );
-  const deleteActivitiesStmt = db.prepare(
-    "DELETE FROM work_order_activities WHERE work_order_id = ?"
-  );
-  const insertActivityStmt = db.prepare(
-    "INSERT INTO work_order_activities (work_order_id, activity, norma, precio_sin_iva) VALUES (?, ?, ?, ?)"
-  );
-  const insertAssignmentStmt = db.prepare(
-    "INSERT INTO work_order_activity_assignments (activity_id, user_id) VALUES (?, ?)"
-  );
-  const deleteFacturaLinksStmt = db.prepare(
-    "DELETE FROM factura_ots WHERE ot_id = ?"
-  );
-  const insertFacturaLinkStmt = db.prepare(
-    "INSERT INTO factura_ots (factura_id, ot_id) VALUES (?, ?)"
-  );
+export const updateExistingOt = (id: string, otData: any) => {
+  // --- CORRECCIÓN INTELIGENTE ---
+  // Se excluyen los objetos y arrays que no son columnas directas.
+  const {
+    activities,
+    user_id,
+    client,
+    facturas,
+    factura_ids,
+    assigned_users,
+    ...mainOtData
+  } = otData;
 
   const updateTransaction = db.transaction(() => {
-    const changes: string[] = [];
-    if (oldOT.product !== otData.product)
-      changes.push(
-        `Producto cambió de "${oldOT.product || "N/A"}" a "${
-          otData.product || "N/A"
-        }".`
+    const originalOt = db
+      .prepare("SELECT * FROM work_orders WHERE id = ?")
+      .get(id);
+    if (!originalOt) {
+      throw new Error("OT no encontrada");
+    }
+
+    // Filtra los campos para actualizar solo los que existen en la tabla.
+    const fieldsToUpdate = Object.keys(mainOtData)
+      .filter((key) => originalOt.hasOwnProperty(key)) // Comprueba si la columna existe en la tabla
+      .map((key) => `${key} = ?`)
+      .join(", ");
+
+    if (fieldsToUpdate) {
+      const values = Object.keys(mainOtData)
+        .filter((key) => originalOt.hasOwnProperty(key))
+        .map((key) => mainOtData[key]);
+
+      const stmt = db.prepare(
+        `UPDATE work_orders SET ${fieldsToUpdate}, updated_at = CURRENT_TIMESTAMP WHERE id = ?`
       );
-    if (oldOT.observations !== otData.observations)
-      changes.push("Se modificaron las observaciones generales.");
-    if (changes.length > 0) addHistoryEntry(parseInt(id), user_id, changes);
+      stmt.run(...values, id);
+    }
 
-    updateStmt.run(
-      otData.date,
-      otData.type,
-      otData.product,
-      otData.brand,
-      otData.model,
-      otData.seal_number,
-      otData.observations,
-      otData.certificate_expiry,
-      otData.estimated_delivery_date,
-      otData.status,
-      otData.quotation_amount,
-      otData.quotation_details,
-      otData.disposition,
-      otData.contract_type,
-      otData.collaborator_observations,
-      otData.contact_id,
-      otData.moneda,
-      id
-    );
+    // Lógica para actualizar actividades y asignaciones (ya estaba correcta)
+    if (activities && Array.isArray(activities)) {
+      const upsertActivityStmt = db.prepare(
+        `INSERT INTO work_order_activities (id, work_order_id, activity, norma, precio_sin_iva) 
+             VALUES (@id, @work_order_id, @activity, @norma, @precio_sin_iva)
+             ON CONFLICT(id) DO UPDATE SET 
+               activity=excluded.activity, 
+               norma=excluded.norma, 
+               precio_sin_iva=excluded.precio_sin_iva`
+      );
+      const deleteAssignmentsStmt = db.prepare(
+        "DELETE FROM work_order_activity_assignments WHERE activity_id = ?"
+      );
+      const insertAssignmentStmt = db.prepare(
+        "INSERT INTO work_order_activity_assignments (activity_id, user_id) VALUES (?, ?)"
+      );
 
-    deleteActivitiesStmt.run(id);
-    for (const act of activities) {
-      if (act.activity) {
-        const activityInfo = insertActivityStmt.run(
-          id,
-          act.activity,
-          act.norma,
-          act.precio_sin_iva
-        );
-        const activityId = activityInfo.lastInsertRowid;
-        if (act.assigned_to && Array.isArray(act.assigned_to)) {
-          for (const userId of act.assigned_to) {
-            insertAssignmentStmt.run(activityId, userId);
+      for (const activity of activities) {
+        let activityId = activity.id;
+
+        if (!activityId || activityId === 0) {
+          const newActivityResult = db
+            .prepare(
+              `INSERT INTO work_order_activities (work_order_id, activity, norma, precio_sin_iva) 
+                   VALUES (?, ?, ?, ?)`
+            )
+            .run(
+              id,
+              activity.activity,
+              activity.norma,
+              activity.precio_sin_iva
+            );
+          activityId = newActivityResult.lastInsertRowid;
+        } else {
+          upsertActivityStmt.run({
+            id: activityId,
+            work_order_id: parseInt(id),
+            activity: activity.activity,
+            norma: activity.norma,
+            precio_sin_iva: activity.precio_sin_iva,
+          });
+        }
+
+        if (activityId && Array.isArray(activity.assigned_users)) {
+          deleteAssignmentsStmt.run(activityId);
+          for (const user of activity.assigned_users) {
+            insertAssignmentStmt.run(activityId, user.id);
           }
         }
       }
     }
 
-    deleteFacturaLinksStmt.run(id);
-    if (factura_ids && Array.isArray(factura_ids)) {
-      for (const factura_id of factura_ids) {
-        insertFacturaLinkStmt.run(factura_id, id);
+    if (user_id) {
+      const updatedOt = db
+        .prepare("SELECT * FROM work_orders WHERE id = ?")
+        .get(id);
+      const changes = getChanges(originalOt, updatedOt);
+      if (changes.length > 0) {
+        addHistoryEntry(parseInt(id), user_id, changes);
       }
     }
   });
 
   updateTransaction();
+  return { message: "OT actualizada con éxito." };
 };
+
+/**
+ * Compara dos objetos y devuelve un array de strings con los cambios.
+ */
+function getChanges(original: any, updated: any): string[] {
+  const changes: string[] = [];
+  const ignoredKeys = new Set(["updated_at", "created_at"]);
+
+  for (const key in updated) {
+    if (ignoredKeys.has(key)) continue;
+
+    const originalValue = original[key] ?? "";
+    const updatedValue = updated[key] ?? "";
+
+    if (originalValue !== updatedValue) {
+      changes.push(
+        `Campo '${key}' cambiado de '${originalValue || "vacío"}' a '${
+          updatedValue || "vacío"
+        }'.`
+      );
+    }
+  }
+  return changes;
+}
