@@ -170,7 +170,7 @@ export const getOtById = (req: Request, res: Response) => {
         }));
       const facturas = db
         .prepare(
-          `SELECT f.id, f.numero_factura, f.monto 
+          `SELECT f.id, f.numero_factura, f.monto
            FROM facturas f
            JOIN factura_ots fo ON f.id = fo.factura_id
            WHERE fo.ot_id = ?`

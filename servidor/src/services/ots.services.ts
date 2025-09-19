@@ -78,8 +78,6 @@ export const createNewOt = (otData: any) => {
  * Actualiza una Orden de Trabajo existente.
  */
 export const updateExistingOt = (id: string, otData: any) => {
-  // --- CORRECCIÓN INTELIGENTE ---
-  // Se excluyen los objetos y arrays que no son columnas directas.
   const {
     activities,
     user_id,
@@ -98,9 +96,30 @@ export const updateExistingOt = (id: string, otData: any) => {
       throw new Error("OT no encontrada");
     }
 
-    // Filtra los campos para actualizar solo los que existen en la tabla.
+    const getActivities = (otId: string) => {
+      return db
+        .prepare(
+          `SELECT wa.id, wa.activity, wa.norma, wa.precio_sin_iva,
+             json_group_array(json_object('id', u.id, 'name', u.name)) as assigned_users
+             FROM work_order_activities wa
+             LEFT JOIN work_order_activity_assignments waa ON wa.id = waa.activity_id
+             LEFT JOIN users u ON waa.user_id = u.id
+             WHERE wa.work_order_id = ?
+             GROUP BY wa.id`
+        )
+        .all(otId)
+        .map((act: any) => ({
+          ...act,
+          assigned_users: JSON.parse(act.assigned_users).filter(
+            (u: any) => u.id !== null
+          ),
+        }));
+    };
+
+    const originalActivities = getActivities(id);
+
     const fieldsToUpdate = Object.keys(mainOtData)
-      .filter((key) => originalOt.hasOwnProperty(key)) // Comprueba si la columna existe en la tabla
+      .filter((key) => originalOt.hasOwnProperty(key))
       .map((key) => `${key} = ?`)
       .join(", ");
 
@@ -115,8 +134,26 @@ export const updateExistingOt = (id: string, otData: any) => {
       stmt.run(...values, id);
     }
 
-    // Lógica para actualizar actividades y asignaciones (ya estaba correcta)
     if (activities && Array.isArray(activities)) {
+      const incomingActivityIds = new Set(
+        activities.map((a) => a.id).filter((id) => id)
+      );
+      const activitiesToDelete = originalActivities.filter(
+        (oa) => !incomingActivityIds.has(oa.id)
+      );
+
+      const deleteActivityStmt = db.prepare(
+        "DELETE FROM work_order_activities WHERE id = ?"
+      );
+      const deleteAssignmentsStmt = db.prepare(
+        "DELETE FROM work_order_activity_assignments WHERE activity_id = ?"
+      );
+
+      for (const activity of activitiesToDelete) {
+        deleteAssignmentsStmt.run(activity.id);
+        deleteActivityStmt.run(activity.id);
+      }
+
       const upsertActivityStmt = db.prepare(
         `INSERT INTO work_order_activities (id, work_order_id, activity, norma, precio_sin_iva) 
              VALUES (@id, @work_order_id, @activity, @norma, @precio_sin_iva)
@@ -125,9 +162,7 @@ export const updateExistingOt = (id: string, otData: any) => {
                norma=excluded.norma, 
                precio_sin_iva=excluded.precio_sin_iva`
       );
-      const deleteAssignmentsStmt = db.prepare(
-        "DELETE FROM work_order_activity_assignments WHERE activity_id = ?"
-      );
+
       const insertAssignmentStmt = db.prepare(
         "INSERT INTO work_order_activity_assignments (activity_id, user_id) VALUES (?, ?)"
       );
@@ -158,8 +193,12 @@ export const updateExistingOt = (id: string, otData: any) => {
           });
         }
 
+        const deleteAssignmentsForActivityStmt = db.prepare(
+          "DELETE FROM work_order_activity_assignments WHERE activity_id = ?"
+        );
+
         if (activityId && Array.isArray(activity.assigned_users)) {
-          deleteAssignmentsStmt.run(activityId);
+          deleteAssignmentsForActivityStmt.run(activityId);
           for (const user of activity.assigned_users) {
             insertAssignmentStmt.run(activityId, user.id);
           }
@@ -171,7 +210,15 @@ export const updateExistingOt = (id: string, otData: any) => {
       const updatedOt = db
         .prepare("SELECT * FROM work_orders WHERE id = ?")
         .get(id);
-      const changes = getChanges(originalOt, updatedOt);
+      const mainChanges = getChanges(originalOt, updatedOt);
+
+      const updatedActivities = getActivities(id);
+      const activityChanges = getActivityChanges(
+        originalActivities,
+        updatedActivities
+      );
+
+      const changes = [...mainChanges, ...activityChanges];
       if (changes.length > 0) {
         addHistoryEntry(parseInt(id), user_id, changes);
       }
@@ -187,7 +234,7 @@ export const updateExistingOt = (id: string, otData: any) => {
  */
 function getChanges(original: any, updated: any): string[] {
   const changes: string[] = [];
-  const ignoredKeys = new Set(["updated_at", "created_at"]);
+  const ignoredKeys = new Set(["updated_at", "created_at", "activities"]);
 
   for (const key in updated) {
     if (ignoredKeys.has(key)) continue;
@@ -203,5 +250,76 @@ function getChanges(original: any, updated: any): string[] {
       );
     }
   }
+  return changes;
+}
+
+/**
+ * Compara dos arrays de actividades y devuelve un array de strings con los cambios.
+ */
+function getActivityChanges(original: any[], updated: any[]): string[] {
+  const changes: string[] = [];
+  const originalMap = new Map(original.map((a) => [a.id, a]));
+  const updatedMap = new Map(updated.map((a) => [a.id, a]));
+
+  // Detectar actividades agregadas y modificadas
+  for (const updatedActivity of updated) {
+    const originalActivity = originalMap.get(updatedActivity.id);
+
+    if (!originalActivity) {
+      changes.push(`Se agregó la actividad: "${updatedActivity.activity}".`);
+      // No 'continue' para que también registre las asignaciones de la nueva actividad
+    }
+
+    const activityNameForLog =
+      updatedActivity.activity ||
+      (originalActivity ? originalActivity.activity : "Actividad desconocida");
+
+    // Comparar campos si la actividad ya existía
+    if (originalActivity) {
+      if (originalActivity.activity !== updatedActivity.activity) {
+        changes.push(
+          `Actividad "${originalActivity.activity}" renombrada a "${updatedActivity.activity}".`
+        );
+      }
+      if (originalActivity.norma !== updatedActivity.norma) {
+        changes.push(
+          `Norma de "${activityNameForLog}" cambiada a "${updatedActivity.norma}".`
+        );
+      }
+      if (originalActivity.precio_sin_iva !== updatedActivity.precio_sin_iva) {
+        changes.push(
+          `Precio de "${activityNameForLog}" cambiado a ${updatedActivity.precio_sin_iva}.`
+        );
+      }
+    }
+
+    const originalUsers = new Map(
+      (originalActivity?.assigned_users || []).map((u: any) => [u.id, u.name])
+    );
+    const updatedUsers = new Map(
+      (updatedActivity.assigned_users || []).map((u: any) => [u.id, u.name])
+    );
+
+    for (const [userId, userName] of updatedUsers) {
+      if (!originalUsers.has(userId)) {
+        changes.push(`Usuario ${userName} asignado a "${activityNameForLog}".`);
+      }
+    }
+    for (const [userId, userName] of originalUsers) {
+      if (!updatedUsers.has(userId)) {
+        changes.push(
+          `Usuario ${userName} desasignado de "${activityNameForLog}".`
+        );
+      }
+    }
+  }
+
+  // Detectar actividades eliminadas
+  for (const originalActivity of original) {
+    if (!updatedMap.has(originalActivity.id)) {
+      changes.push(`Se eliminó la actividad: "${originalActivity.activity}".`);
+    }
+  }
+
   return changes;
 }

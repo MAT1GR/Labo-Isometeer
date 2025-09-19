@@ -12,7 +12,7 @@ export interface Shortcuts {
 // Aquí defines todas las acciones y sus atajos por defecto
 export const defaultShortcuts: Shortcuts = {
   CREATE_NEW_OT: { keys: "alt+n", description: "Crear nueva Orden de Trabajo" },
-  SAVE_FORM: { keys: "ctrl+s", description: "Guardar formulario actual" },
+  SAVE_FORM: { keys: "alt+s", description: "Guardar formulario actual" },
   GO_TO_DASHBOARD: { keys: "alt+d", description: "Ir al Dashboard" },
   GO_TO_OTS: { keys: "alt+o", description: "Ir a Órdenes de Trabajo" },
   GO_TO_CLIENTS: { keys: "alt+c", description: "Ir a Clientes" },
