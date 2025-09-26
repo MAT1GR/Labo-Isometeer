@@ -1,6 +1,6 @@
 // RUTA: servidor/src/controllers/facturacion.controller.ts
 
-import { Request, Response } from "express";
+import e, { Request, Response } from "express";
 import db from "../config/database";
 
 // NOTA: Si ya tienes otras funciones en este archivo, déjalas como están.
@@ -58,3 +58,25 @@ export const deleteFactura = (req: Request, res: Response) => {
 // export const getAllFacturas = (req: Request, res: Response) => { ... };
 // export const getFacturaById = (req: Request, res: Response) => { ... };
 // etc.
+export const getAllFacturas = (req: Request, res: Response) => {
+  try {
+    const facturas = db.prepare("SELECT * FROM facturas").all();
+    res.json(facturas);
+  } catch (error) {
+    res.status(500).json({ error: "Error al obtener las facturas." });
+  }
+};
+
+export const getFacturaById = (req: Request, res: Response) => {
+  const { id } = req.params;
+  try {
+    const factura = db.prepare("SELECT * FROM facturas WHERE id = ?").get(id);
+    if (factura) {
+      res.json(factura);
+    } else {
+      res.status(404).json({ error: "Factura no encontrada." });
+    }
+  } catch (error) {
+    res.status(500).json({ error: "Error al obtener la factura." });
+  }
+};

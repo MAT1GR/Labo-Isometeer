@@ -73,7 +73,7 @@ const SidebarNavigation: React.FC = () => {
       icon: Keyboard,
       label: "Atajos de Teclado",
       path: "/atajos",
-      roles: ["empleado", "director", "administracion", "administrador"],
+      roles: ["director", "administracion", "administrador"],
     },
   ];
 

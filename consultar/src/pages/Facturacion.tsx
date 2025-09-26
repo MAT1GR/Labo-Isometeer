@@ -398,7 +398,6 @@ const Facturacion: React.FC = () => {
         />
       </ConfirmationModal>
 
-      {/* --- NUEVO MODAL PARA CONFIRMAR ELIMINACIÓN --- */}
       <ConfirmationModal
         isOpen={isDeleteModalOpen}
         title="Eliminar Factura Permanentemente"
@@ -406,7 +405,6 @@ const Facturacion: React.FC = () => {
         onConfirm={handleConfirmDelete}
         onClose={() => setIsDeleteModalOpen(false)}
         confirmText="Sí, Eliminar"
-        confirmVariant="danger"
       />
 
       <Modal

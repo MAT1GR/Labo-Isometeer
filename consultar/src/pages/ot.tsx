@@ -22,6 +22,7 @@ import useSWR, { mutate } from "swr";
 import ConfirmationModal from "../components/ui/ConfirmationModal";
 import OTFiltersComponent from "../components/OTFilters";
 import { AnimatePresence, motion } from "framer-motion";
+import { id } from "date-fns/locale";
 
 // Se mantiene la interfaz de filtros por si se usa en otro lado.
 export interface OTFilters {
@@ -49,10 +50,6 @@ const OT: React.FC = () => {
   const [showFilters, setShowFilters] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
 
-  // --- ELIMINADO: Se quitan los estados para la edición en línea ---
-  // const [editingOtId, setEditingOtId] = useState<number | null>(null);
-  // const [tempSelectedUserIds, setTempSelectedUserIds] = useState<number[]>([]);
-
   const { data: clients } = useSWR<Client[]>(
     "/clients",
     clientService.getAllClients
@@ -69,7 +66,7 @@ const OT: React.FC = () => {
     if (canViewAdminContent()) {
       return otService.getAllOTs(user, filters);
     } else {
-      return otService.getMisOts(user.id);
+      return otService.getMisOts(user?.id || 0);
     }
   });
 
@@ -249,7 +246,7 @@ const OT: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200 dark:bg-gray-800 dark:divide-gray-700">
-                {paginatedOts.map((ot) => (
+                {paginatedOts.map((ot: WorkOrder) => (
                   <tr
                     key={ot.id}
                     onClick={() => navigate(`/ot/editar/${ot.id}`)}

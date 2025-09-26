@@ -1,10 +1,12 @@
 // RUTA: consultar/src/services/otService.ts
 
+import { ReactNode } from "react";
 import axiosInstance from "../api/axiosInstance";
 import { User } from "./auth";
 
 // Interfaces
 export interface Activity {
+  name: ReactNode;
   precio_sin_iva: number;
   assigned_users: any;
   activity: any;
@@ -22,6 +24,8 @@ export interface Activity {
 }
 
 export interface WorkOrder {
+  product: ReactNode;
+  facturada: any;
   moneda: string;
   client: any;
   date: any;

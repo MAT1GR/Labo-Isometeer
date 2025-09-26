@@ -30,7 +30,6 @@ import Presupuestos from "./pages/Presupuestos.tsx";
 import PresupuestoCreate from "./pages/PresupuestoCreate.tsx";
 import PresupuestoDetail from "./pages/PresupuestoDetail.tsx";
 import Estadisticas from "./pages/Estadisticas.tsx";
-// --- 1. IMPORTA LA NUEVA PÁGINA DE ATAJOS ---
 import AtajosDeTeclado from "./pages/AtajosDeTeclado.tsx";
 
 const router = createBrowserRouter([
@@ -64,8 +63,6 @@ const router = createBrowserRouter([
       { path: "/presupuestos/editar/:id", element: <PresupuestoDetail /> },
       { path: "/usuarios/grafico", element: <UserChart /> },
       { path: "/estadisticas", element: <Estadisticas /> },
-
-      // --- 2. AGREGA LA NUEVA RUTA PARA LOS ATAJOS ---
       { path: "/atajos", element: <AtajosDeTeclado /> },
     ],
   },
