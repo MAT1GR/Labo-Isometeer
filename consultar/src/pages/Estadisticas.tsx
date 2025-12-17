@@ -171,7 +171,7 @@ const Estadisticas = () => {
           "#fb7185",
           "#60a5fa",
           "#facc15",
-          "#4ade80",
+          "#a855f7",
           "#c084fc",
         ],
         borderColor: theme === "dark" ? "#1f2937" : "#ffffff",

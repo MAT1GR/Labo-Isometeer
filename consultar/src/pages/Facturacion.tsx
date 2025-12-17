@@ -153,7 +153,7 @@ const Facturacion: React.FC = () => {
   if (!facturas) return <div>Cargando facturas...</div>;
 
   return (
-    <div className="container mx-auto p-4">
+    <div className="container mx-auto p-4 py-10">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold">Gestión de Facturación</h1>
         <div className="flex items-center gap-2">
@@ -186,62 +186,62 @@ const Facturacion: React.FC = () => {
         />
       </div>
 
-      <Card>
+      <div className="bg-card text-card-foreground shadow-xl border border-border rounded-lg overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-            <thead className="bg-gray-50 dark:bg-gray-800">
+          <table className="min-w-full divide-y divide-border">
+            <thead className="bg-muted/50">
               <tr>
                 <th
                   scope="col"
-                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider"
+                  className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider"
                 >
                   Factura #
                 </th>
                 <th
                   scope="col"
-                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider"
+                  className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider"
                 >
                   Cliente
                 </th>
                 <th
                   scope="col"
-                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider"
+                  className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider"
                 >
                   Tipo
                 </th>
                 <th
                   scope="col"
-                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider"
+                  className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider"
                 >
                   Monto Total
                 </th>
                 <th
                   scope="col"
-                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider"
+                  className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider"
                 >
                   Fecha Creación
                 </th>
                 <th
                   scope="col"
-                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider"
+                  className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider"
                 >
                   Vencimiento
                 </th>
                 <th
                   scope="col"
-                  className="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider"
+                  className="px-6 py-3 text-center text-xs font-medium text-muted-foreground uppercase tracking-wider"
                 >
                   Estado
                 </th>
                 <th
                   scope="col"
-                  className="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider"
+                  className="px-6 py-3 text-center text-xs font-medium text-muted-foreground uppercase tracking-wider"
                 >
                   Acciones
                 </th>
               </tr>
             </thead>
-            <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
+            <tbody className="bg-card divide-y divide-border">
               {facturas.length > 0 ? (
                 facturas.map((factura) => {
                   const statusStyles: { [key: string]: string } = {
@@ -257,41 +257,41 @@ const Facturacion: React.FC = () => {
                   return (
                     <tr
                       key={factura.id}
-                      className="hover:bg-gray-50 dark:hover:bg-gray-800/50 cursor-pointer"
+                      className="hover:bg-muted/50 cursor-pointer"
                     >
                       <td
                         onClick={() => navigate(`/facturacion/${factura.id}`)}
-                        className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white"
+                        className="px-6 py-4 whitespace-nowrap text-sm font-medium"
                       >
                         {factura.numero_factura}
                       </td>
                       <td
                         onClick={() => navigate(`/facturacion/${factura.id}`)}
-                        className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300"
+                        className="px-6 py-4 whitespace-nowrap text-sm"
                       >
                         {factura.cliente_name}
                       </td>
                       <td
                         onClick={() => navigate(`/facturacion/${factura.id}`)}
-                        className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300"
+                        className="px-6 py-4 whitespace-nowrap text-sm"
                       >
                         {factura.tipo}
                       </td>
                       <td
                         onClick={() => navigate(`/facturacion/${factura.id}`)}
-                        className="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-500 dark:text-gray-300"
+                        className="px-6 py-4 whitespace-nowrap text-sm font-mono"
                       >
                         {formatCurrency(factura.monto, factura.moneda)}
                       </td>
                       <td
                         onClick={() => navigate(`/facturacion/${factura.id}`)}
-                        className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300"
+                        className="px-6 py-4 whitespace-nowrap text-sm"
                       >
                         {formatDateTime(factura.created_at)}
                       </td>
                       <td
                         onClick={() => navigate(`/facturacion/${factura.id}`)}
-                        className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300"
+                        className="px-6 py-4 whitespace-nowrap text-sm"
                       >
                         {formatDateTime(factura.vencimiento)}
                       </td>
@@ -370,7 +370,7 @@ const Facturacion: React.FC = () => {
                 <tr>
                   <td
                     colSpan={8}
-                    className="px-6 py-4 text-center text-sm text-gray-500 dark:text-gray-400"
+                    className="px-6 py-4 text-center text-sm text-muted-foreground"
                   >
                     No se encontraron facturas con los filtros seleccionados.
                   </td>
@@ -379,7 +379,7 @@ const Facturacion: React.FC = () => {
             </tbody>
           </table>
         </div>
-      </Card>
+      </div>
 
       <ConfirmationModal
         isOpen={showArchiveModal}

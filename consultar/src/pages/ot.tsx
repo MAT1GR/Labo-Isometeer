@@ -1,30 +1,45 @@
-// RUTA: consultar/src/pages/ot.tsx
-
 import React, { useState, useMemo, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { otService, WorkOrder } from "../services/otService";
 import { clientService, Client } from "../services/clientService";
 import { authService, User } from "../services/auth";
 import { useAuth } from "../contexts/AuthContext";
-import Card from "../components/ui/Card";
-import Button from "../components/ui/Button";
+import { Button } from "../components/ui/button";
+import { Badge } from "../components/ui/badge";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "../components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "../components/ui/alert-dialog";
 import {
   PlusCircle,
   Briefcase,
-  Trash2,
   CheckSquare,
   XSquare,
   Filter,
   ChevronLeft,
   ChevronRight,
-} from "lucide-react"; // Se quitó el ícono de Pencil
+  Settings,
+  LayoutList,
+  Users as UsersIcon,
+} from "lucide-react";
 import useSWR, { mutate } from "swr";
-import ConfirmationModal from "../components/ui/ConfirmationModal";
 import OTFiltersComponent from "../components/OTFilters";
 import { AnimatePresence, motion } from "framer-motion";
-import { id } from "date-fns/locale";
+import DashboardWorkload from "../components/DashboardWorkload";
 
-// Se mantiene la interfaz de filtros por si se usa en otro lado.
 export interface OTFilters {
   searchTerm?: string;
   clientName?: string;
@@ -42,10 +57,7 @@ const OT: React.FC = () => {
     useAuth();
   const navigate = useNavigate();
   const topOfListRef = useRef<HTMLDivElement>(null);
-
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [otToDelete, setOtToDelete] = useState<number | null>(null);
-
+  const [activeView, setActiveView] = useState<"list" | "workload">("list");
   const [filters, setFilters] = useState<OTFilters>({});
   const [showFilters, setShowFilters] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
@@ -87,25 +99,12 @@ const OT: React.FC = () => {
     return ots.slice(startIndex, startIndex + OTS_PER_PAGE);
   }, [ots, currentPage]);
 
-  const handleDeleteRequest = (otId: number) => {
-    setOtToDelete(otId);
-    setIsModalOpen(true);
-  };
-
-  const handleCloseModal = () => {
-    setOtToDelete(null);
-    setIsModalOpen(false);
-  };
-
-  const handleConfirmDelete = async () => {
-    if (otToDelete === null) return;
+  const handleDelete = async (otId: number) => {
     try {
-      await otService.deleteOT(otToDelete);
+      await otService.deleteOT(otId);
       mutate(swrKey);
     } catch (err: any) {
       alert(err.message || "Error al eliminar la OT.");
-    } finally {
-      handleCloseModal();
     }
   };
 
@@ -128,8 +127,6 @@ const OT: React.FC = () => {
       alert(error.message || "Error al cambiar el estado de autorización.");
     }
   };
-
-  // --- ELIMINADO: La función handleSaveAssignees ya no es necesaria aquí ---
 
   const activeFilterCount = useMemo(
     () =>
@@ -159,159 +156,215 @@ const OT: React.FC = () => {
   if (error) return <div>Error al cargar las órdenes de trabajo.</div>;
 
   return (
-    <>
-      <ConfirmationModal
-        isOpen={isModalOpen}
-        onClose={handleCloseModal}
-        onConfirm={handleConfirmDelete}
-        title="Eliminar Orden de Trabajo"
-        message="¿Estás seguro de que quieres eliminar esta OT? Esta acción no se puede deshacer."
-      />
-      <div ref={topOfListRef}>
-        <div className="flex justify-between items-center mb-6">
-          <h1 className="text-3xl font-bold">
-            {canViewAdminContent()
-              ? "Órdenes de Trabajo"
-              : "Mis Tareas Asignadas"}
-          </h1>
-          <div className="flex items-center gap-2">
-            {canViewAdminContent() && (
-              <Button
-                variant="outline"
-                onClick={() => setShowFilters(!showFilters)}
-              >
-                <Filter className="mr-2 h-4 w-4" /> Filtrar
-                {activeFilterCount > 0 && (
-                  <span className="ml-2 bg-blue-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
-                    {activeFilterCount}
-                  </span>
-                )}
-              </Button>
-            )}
-            {canCreateContent() && (
-              <Button onClick={() => navigate("/ot/crear")}>
-                <PlusCircle className="mr-2 h-4 w-4" /> Crear Nueva OT
-              </Button>
-            )}
-          </div>
-        </div>
-
-        <AnimatePresence>
-          {showFilters && canViewAdminContent() && (
-            <motion.div
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: "auto", opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              transition={{ duration: 0.3, ease: "easeInOut" }}
-              className="overflow-hidden"
+    <div className="flex flex-col h-full" ref={topOfListRef}>
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-3xl font-bold">
+          {canViewAdminContent()
+            ? "Órdenes de Trabajo"
+            : "Mis Tareas Asignadas"}
+        </h1>
+        <div className="flex items-center gap-2">
+          {canViewAdminContent() && (
+            <Button
+              variant="outline"
+              onClick={() => setShowFilters(!showFilters)}
             >
-              <OTFiltersComponent
-                filters={filters}
-                setFilters={setFilters}
-                clients={clients || []}
-                users={users || []}
-                onClose={() => setShowFilters(false)}
-              />
-            </motion.div>
+              <Filter className="mr-2 h-4 w-4" /> Filtrar
+              {activeFilterCount > 0 && (
+                <span className="ml-2 bg-primary text-primary-foreground text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                  {activeFilterCount}
+                </span>
+              )}
+            </Button>
           )}
-        </AnimatePresence>
+          {canCreateContent() && (
+            <Button onClick={() => navigate("/ot/crear")}>
+              <PlusCircle className="mr-2 h-4 w-4" /> Crear Nueva OT
+            </Button>
+          )}
+        </div>
+      </div>
 
-        <Card>
+      <div className="flex items-center gap-2 mb-6">
+        <Button
+          variant={activeView === "list" ? "secondary" : "ghost"}
+          onClick={() => setActiveView("list")}
+        >
+          <LayoutList className="h-4 w-4 mr-2" />
+          Listado de OTs
+        </Button>
+        <Button
+          variant={activeView === "workload" ? "secondary" : "ghost"}
+          onClick={() => setActiveView("workload")}
+        >
+          <UsersIcon className="h-4 w-4 mr-2" />
+          Carga de Usuarios
+        </Button>
+      </div>
+
+      <AnimatePresence>
+        {showFilters && canViewAdminContent() && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.3, ease: "easeInOut" }}
+            className="overflow-hidden"
+          >
+            <OTFiltersComponent
+              filters={filters}
+              setFilters={setFilters}
+              clients={clients || []}
+              users={users || []}
+              onClose={() => setShowFilters(false)}
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {activeView === 'list' && (
+      <div className="flex-grow bg-card text-card-foreground shadow-xl border border-border rounded-lg overflow-hidden h-full">
+        <div className="overflow-y-auto h-full">
           {isLoading ? (
             <div className="text-center py-12">Cargando...</div>
           ) : paginatedOts && paginatedOts.length > 0 ? (
-            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-              <thead className="bg-gray-50 dark:bg-gray-700">
+            <table className="min-w-full divide-y divide-border">
+              <thead className="bg-muted/50 sticky top-0">
                 <tr>
                   {canAuthorizeOT() && (
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
                       Auth
                     </th>
                   )}
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
                     ID de OT
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
                     Cliente
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
                     Asignado a
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
                     Estado
                   </th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">
-                    Acciones
+                  <th className="px-6 py-3 text-right text-xs font-medium text-muted-foreground uppercase">
+                    <Settings size={16} className="mx-auto" />
                   </th>
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-gray-200 dark:bg-gray-800 dark:divide-gray-700">
-                {paginatedOts.map((ot: WorkOrder) => (
-                  <tr
-                    key={ot.id}
-                    onClick={() => navigate(`/ot/editar/${ot.id}`)}
-                    className={`cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-600 ${
-                      !ot.authorized && canViewAdminContent()
-                        ? "bg-orange-50 dark:bg-orange-900/20"
-                        : ""
-                    }`}
-                  >
-                    {canAuthorizeOT() && (
-                      <td className="px-6 py-4">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleToggleAuthorization(ot);
-                          }}
-                          title={ot.authorized ? "Desautorizar" : "Autorizar"}
-                        >
-                          {ot.authorized ? (
-                            <span title="Autorizada">
-                              <CheckSquare className="h-5 w-5 text-green-500" />
-                            </span>
-                          ) : (
-                            <span title="Pendiente de autorización">
-                              <XSquare className="h-5 w-5 text-red-500" />
-                            </span>
-                          )}
-                        </button>
-                      </td>
-                    )}
-                    <td className="px-6 py-4 font-medium">
-                      {ot.custom_id || `Interno #${ot.id}`}
-                    </td>
-                    <td className="px-6 py-4">{ot.client_name}</td>
-
-                    {/* --- SIMPLIFICADO: Celda de "Asignado a" solo muestra texto --- */}
-                    <td className="px-6 py-4">
-                      {ot.assigned_to_name || "Sin asignar"}
-                    </td>
-
-                    <td className="px-6 py-4">
-                      <span
-                        className={`px-2 inline-flex text-sm leading-5 font-semibold rounded-full uppercase ${getStatusColor(
-                          ot.status
-                        )}`}
-                      >
-                        {ot.status.replace("_", " ")}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-right space-x-2">
-                      {canViewAdminContent() && (
-                        <Button
-                          size="sm"
-                          variant="danger"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDeleteRequest(ot.id);
-                          }}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+              <tbody className="bg-card divide-y divide-border">
+                <AnimatePresence>
+                  {paginatedOts.map((ot: WorkOrder) => (
+                    <motion.tr
+                      key={ot.id}
+                      layout
+                      initial={{ opacity: 0, y: -10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, x: -40 }}
+                      transition={{ duration: 0.25, ease: "easeInOut" }}
+                      onClick={() => navigate(`/ot/editar/${ot.id}`)}
+                      className={`cursor-pointer hover:bg-muted/50 ${
+                        !ot.authorized && canViewAdminContent()
+                          ? "bg-orange-50 dark:bg-orange-900/20"
+                          : ""
+                      }`}
+                    >
+                      {canAuthorizeOT() && (
+                        <td className="px-6 py-4">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleToggleAuthorization(ot);
+                            }}
+                            title={ot.authorized ? "Desautorizar" : "Autorizar"}
+                          >
+                            {ot.authorized ? (
+                              <span title="Autorizada">
+                                <CheckSquare className="h-5 w-5 text-green-500" />
+                              </span>
+                            ) : (
+                              <span title="Pendiente de autorización">
+                                <XSquare className="h-5 w-5 text-red-500" />
+                              </span>
+                            )}
+                          </button>
+                        </td>
                       )}
-                    </td>
-                  </tr>
-                ))}
+                      <td className="px-6 py-4 font-medium">
+                        {ot.custom_id || `Interno #${ot.id}`}
+                      </td>
+                      <td className="px-6 py-4">{ot.client_name}</td>
+                      <td className="px-6 py-4">
+                        {ot.assigned_to_name || "Sin asignar"}
+                      </td>
+                      <td className="px-6 py-4">
+                        <Badge
+                          variant="outline"
+                          className={getStatusColor(ot.status)}
+                        >
+                          {ot.status.replace("_", " ")}
+                        </Badge>
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                         <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <ChevronRight className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            {canAuthorizeOT() && (
+                              <DropdownMenuItem
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleToggleAuthorization(ot)
+                                }}
+                              >
+                                {ot.authorized ? "Desautorizar" : "Autorizar"}
+                              </DropdownMenuItem>
+                            )}
+                             <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <DropdownMenuItem
+                                  onSelect={(e) => e.preventDefault()}
+                                  className="text-destructive"
+                                   disabled={!canViewAdminContent()}
+                                >
+                                  Eliminar
+                                </DropdownMenuItem>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    Esta acción eliminará la OT permanentemente. No podrás deshacerla.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                  <AlertDialogAction
+                                    onClick={async (e) => {
+                                      e.stopPropagation();
+                                      await handleDelete(ot.id);
+                                    }}
+                                    className="bg-destructive hover:bg-destructive/90"
+                                  >
+                                    Eliminar
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </td>
+                    </motion.tr>
+                  ))}
+                </AnimatePresence>
               </tbody>
             </table>
           ) : (
@@ -333,34 +386,37 @@ const OT: React.FC = () => {
               </p>
             </div>
           )}
-        </Card>
-        {totalPages > 1 && (
-          <div className="flex justify-center items-center gap-4 mt-6">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
-              disabled={currentPage === 1}
-            >
-              <ChevronLeft className="h-4 w-4 mr-1" /> Anterior
-            </Button>
-            <span className="text-sm text-gray-600 dark:text-gray-400">
-              Página {currentPage} de {totalPages}
-            </span>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() =>
-                setCurrentPage((prev) => Math.min(prev + 1, totalPages))
-              }
-              disabled={currentPage === totalPages}
-            >
-              Siguiente <ChevronRight className="h-4 w-4 ml-1" />
-            </Button>
-          </div>
-        )}
+        </div>
       </div>
-    </>
+      )}
+      {activeView === 'workload' && ots && <DashboardWorkload ot={ots} />}
+
+      {totalPages > 1 && activeView === 'list' && (
+        <div className="flex justify-center items-center gap-4 mt-6">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+            disabled={currentPage === 1}
+          >
+            <ChevronLeft className="h-4 w-4 mr-1" /> Anterior
+          </Button>
+          <span className="text-sm text-muted-foreground">
+            Página {currentPage} de {totalPages}
+          </span>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() =>
+              setCurrentPage((prev) => Math.min(prev + 1, totalPages))
+            }
+            disabled={currentPage === totalPages}
+          >
+            Siguiente <ChevronRight className="h-4 w-4 ml-1" />
+          </Button>
+        </div>
+      )}
+    </div>
   );
 };
 

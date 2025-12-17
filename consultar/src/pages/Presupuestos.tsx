@@ -48,7 +48,7 @@ const Presupuestos: React.FC = () => {
   if (!presupuestos) return <div>Cargando presupuestos...</div>;
 
   return (
-    <div>
+    <div className="space-y-6 py-10">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold">Presupuestos</h1>
         <div className="flex items-center gap-2">

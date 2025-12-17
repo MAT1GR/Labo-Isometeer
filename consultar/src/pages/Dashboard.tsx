@@ -100,7 +100,7 @@ const AdminDirectorDashboard: React.FC = () => {
     return [
       { name: "Pendientes", value: stats.pendingOT, fill: "#f59e0b" },
       { name: "En Progreso", value: stats.inProgressOT, fill: "#3b82f6" },
-      { name: "Finalizadas", value: stats.completedOT, fill: "#22c55e" },
+      { name: "Finalizadas", value: stats.completedOT, fill: "#a855f7" },
       { name: "Facturadas", value: stats.billedOT, fill: "#4f46e5" },
       { name: "Cerradas", value: stats.paidInvoices, fill: "#8b5cf6" },
     ].filter((item) => item.value > 0);
@@ -160,7 +160,7 @@ const AdminDirectorDashboard: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 py-10">
       <div className="flex flex-wrap justify-between items-center gap-4">
         <h1 className="text-3xl font-bold">Dashboard General</h1>
         <FilterButtons />
@@ -190,7 +190,7 @@ const AdminDirectorDashboard: React.FC = () => {
             <Card>
               <div className="flex justify-between items-center">
                 <p className="text-sm font-medium">Ingresos</p>
-                <TrendingUp className="h-6 w-6 text-green-500" />
+                <TrendingUp className="h-6 w-6 text-purple-500" />
               </div>
               <p className="text-3xl font-bold">
                 {formatCurrency(stats?.totalRevenue || 0)}
@@ -443,7 +443,7 @@ const EmpleadoDashboard: React.FC = () => {
   );
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 py-10">
       <div>
         <h1 className="text-3xl font-bold">¡Hola, {user?.name}!</h1>
         <p className="mt-1 text-gray-600 dark:text-gray-300">
@@ -470,7 +470,7 @@ const EmpleadoDashboard: React.FC = () => {
           title="Finalizadas"
           count={completed.length}
           icon={CheckCircle2}
-          colorClasses="bg-gradient-to-br from-green-500 to-green-600"
+          colorClasses="bg-gradient-to-br from-purple-500 to-purple-600"
           onClick={() => scrollTo(completedRef)}
         />
       </div>
@@ -518,7 +518,7 @@ const EmpleadoDashboard: React.FC = () => {
           </div>
         </Card>
         <Card ref={completedRef} className="scroll-mt-24">
-          <h3 className="text-xl font-semibold text-green-600 dark:text-green-400 mb-3">
+          <h3 className="text-xl font-semibold text-purple-600 dark:text-purple-400 mb-3">
             <CheckCircle2 className="inline-block mr-2" />
             Finalizadas
           </h3>
