@@ -20,10 +20,16 @@ import { fetcher } from "../api/axiosInstance";
 import * as XLSX from "xlsx";
 import ConfirmationModal from "../components/ui/ConfirmationModal";
 import Input from "../components/ui/Input";
+import { useTitle } from "../contexts/TitleContext";
 
 const CLIENTS_PER_PAGE = 50;
 
 const Clientes: React.FC = () => {
+  const { setTitle } = useTitle();
+  useEffect(() => {
+    setTitle("Gestión de Clientes");
+  }, [setTitle]);
+
   const {
     data: clients,
     error,
@@ -58,11 +64,7 @@ const Clientes: React.FC = () => {
     setCurrentPage(1);
   }, [searchTerm]);
 
-  useEffect(() => {
-    if (topOfListRef.current) {
-      topOfListRef.current.scrollIntoView({ behavior: "smooth" });
-    }
-  }, [currentPage]);
+
 
   const totalPages = Math.ceil(filteredClients.length / CLIENTS_PER_PAGE);
   const paginatedClients = useMemo(() => {
@@ -212,9 +214,7 @@ const Clientes: React.FC = () => {
         message="¿Estás seguro de que quieres eliminar este cliente? Se eliminarán también todas sus Órdenes de Trabajo asociadas. Esta acción no se puede deshacer."
       />
       <div className="space-y-6 py-10" ref={topOfListRef}>
-        <div className="flex justify-between items-center">
-          <h1 className="text-3xl font-bold">Gestión de Clientes</h1>
-          <div className="flex gap-2">
+        <div className="flex justify-end gap-2">
             <Button
               variant="secondary"
               onClick={() => fileInputRef.current?.click()}
@@ -232,7 +232,6 @@ const Clientes: React.FC = () => {
               accept=".xlsx, .xls"
             />
           </div>
-        </div>
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
           <Input
@@ -264,7 +263,7 @@ const Clientes: React.FC = () => {
               </thead>
               <tbody className="bg-card divide-y divide-border">
                 {paginatedClients?.map((client) => (
-                  <tr key={client.id} className="cursor-pointer hover:bg-muted/50" onClick={() => navigate(`/clientes/editar/${client.id}`)}>
+                  <tr key={client.id} className="cursor-pointer hover:bg-muted/50" onDoubleClick={() => navigate(`/clientes/editar/${client.id}`)}>
                     <td className="px-6 py-4">{client.code}</td>
                     <td className="px-6 py-4">
                       {client.client_number

@@ -1,4 +1,4 @@
-import React, { useState, Fragment } from "react";
+import React, { useState, Fragment, useEffect } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { Dialog, Transition } from "@headlessui/react";
@@ -18,6 +18,7 @@ import {
   BarChart3,
   Keyboard,
   ChevronLeft,
+  Activity,
 } from "lucide-react";
 import ThemeToggle from "./ui/ThemeToggle";
 import { cn } from "../lib/utils";
@@ -25,6 +26,7 @@ import Notifications from "./ui/Notifications";
 import { useHotkeys } from "react-hotkeys-hook";
 import { getShortcuts } from "../config/shortcuts";
 import { useTheme } from "../contexts/ThemeContext";
+import { useTitle } from "../contexts/TitleContext";
 import { Button } from "./ui/button";
 import clsx from "clsx";
 
@@ -43,13 +45,19 @@ const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ isCollapsed, togg
       icon: Home,
       label: "Dashboard",
       path: "/",
-      roles: ["empleado", "director", "administracion", "administrador"],
+      roles: ["empleado", "administracion"],
     },
     {
       icon: Briefcase,
       label: "Órdenes de Trabajo",
       path: "/ot",
       roles: ["empleado", "director", "administracion", "administrador"],
+    },
+    {
+      icon: Activity,
+      label: "Carga de Usuarios",
+      path: "/carga-de-usuarios",
+      roles: ["administrador", "director", "administracion"],
     },
     {
       icon: Users,
@@ -239,7 +247,12 @@ const Layout: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { toggleTheme } = useTheme();
-  const { canCreateContent } = useAuth(); 
+  const { canCreateContent } = useAuth();
+  const { title } = useTitle();
+
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [location.pathname]);
 
   const [shortcuts] = useState(getShortcuts());
 
@@ -309,11 +322,8 @@ const Layout: React.FC = () => {
           >
             <Menu className="h-6 w-6" />
           </Button>
-          <div className="flex-1 text-lg font-semibold leading-6 text-foreground">
-            {location.pathname.split('/').pop() || 'Dashboard'}
-          </div>
+          <div className="flex-1 text-lg font-semibold leading-6 text-foreground">{title}</div>
         </div>
-
         <main className="flex-1 h-full">
           <div
             key={location.pathname}

@@ -1,9 +1,7 @@
-// RUTA: consultar/src/components/ui/Modal.tsx
+// consultar/src/components/ui/Modal.tsx
 
 import React from "react";
-import { cn } from "../../lib/utils";
 import { X } from "lucide-react";
-import { AnimatePresence, motion } from "framer-motion";
 
 interface ModalProps {
   isOpen: boolean;
@@ -13,47 +11,28 @@ interface ModalProps {
 }
 
 const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children }) => {
+  if (!isOpen) return null;
+
   return (
-    <AnimatePresence>
-      {isOpen && (
-        <motion.div
-          className="fixed inset-1 z-50 flex items-center justify-center p-4 backdrop-blur-sm"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.3 }}
-          onClick={onClose}
-        >
-          <motion.div
-            className={cn(
-              "relative w-full max-w-lg rounded-lg bg-white p-6 shadow-xl dark:bg-gray-800"
-            )}
-            initial={{ scale: 0.95, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            exit={{ scale: 0.95, opacity: 0 }}
-            transition={{ type: "spring", damping: 20, stiffness: 300 }}
-            onClick={(e) => e.stopPropagation()}
+    <div className="fixed inset-0 bg-black bg-opacity-60 flex justify-center items-center z-50 p-4">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col">
+        {/* Modal Header */}
+        <div className="flex justify-between items-center p-4 border-b border-gray-200 dark:border-gray-700">
+          <h2 className="text-xl font-bold text-gray-800 dark:text-white">{title}</h2>
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
           >
-            {/* Modal Header */}
-            <div className="flex items-center justify-between border-b pb-3 dark:border-gray-700">
-              <h3 className="text-xl font-semibold dark:text-gray-100">
-                {title}
-              </h3>
-              <button
-                onClick={onClose}
-                className="rounded-md p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-500 dark:hover:bg-gray-700 dark:hover:text-gray-300"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-            {/* Modal Body */}
-            <div className="py-4 text-gray-700 dark:text-gray-300">
-              {children}
-            </div>
-          </motion.div>
-        </motion.div>
-      )}
-    </AnimatePresence>
+            <X size={20} />
+          </button>
+        </div>
+
+        {/* Modal Body */}
+        <div className="flex-grow overflow-y-auto p-4">
+          {children}
+        </div>
+      </div>
+    </div>
   );
 };
 

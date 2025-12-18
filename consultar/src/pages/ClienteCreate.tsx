@@ -1,6 +1,6 @@
 // RUTA: /cliente/src/pages/ClienteCreate.tsx
 
-import React from "react";
+import React, { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useForm, useFieldArray } from "react-hook-form";
 import { clientService, Client } from "../services/clientService";
@@ -8,9 +8,15 @@ import Input from "../components/ui/Input";
 import Button from "../components/ui/Button";
 import { ArrowLeft, Save, PlusCircle, Trash2 } from "lucide-react";
 import { mutate } from "swr";
+import { useTitle } from "../contexts/TitleContext";
 
 const ClienteCreate: React.FC = () => {
   const navigate = useNavigate();
+  const { setTitle } = useTitle();
+  useEffect(() => {
+    setTitle("Agregar Nuevo Cliente");
+  }, [setTitle]);
+
   const {
     register,
     handleSubmit,
@@ -47,10 +53,8 @@ const ClienteCreate: React.FC = () => {
       onSubmit={handleSubmit(onSubmit)}
       className="space-y-8 bg-gray-50 dark:bg-gray-900 p-6 rounded-lg"
     >
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold">Agregar Nuevo Cliente</h1>
-        <div className="flex gap-4">
-          <Button
+      <div className="flex justify-end gap-4 mb-6">
+        <Button
             type="button"
             variant="outline"
             onClick={() => navigate("/clientes")}
@@ -66,7 +70,6 @@ const ClienteCreate: React.FC = () => {
             {isSubmitting ? "Guardando..." : "Guardar Cliente"}
           </Button>
         </div>
-      </div>
       <div className="bg-white dark:bg-gray-800 dark:border dark:border-gray-700 p-6 rounded-lg shadow-sm space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           <Input

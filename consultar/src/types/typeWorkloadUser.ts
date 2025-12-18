@@ -5,7 +5,10 @@ export type typeWorkloadUser = {
   completedThisWeek:number,
   assignedOTs:number,
   activeOTs:number,
-  currentOTs:currentOTs[]
+  currentOTs:currentOTs[],
+  ots_pendientes: number,
+  ots_en_progreso: number,
+  ots_finalizadas: number,
 }
 
 type currentOTs= {

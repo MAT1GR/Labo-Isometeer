@@ -7,6 +7,7 @@ import App from "./App.tsx";
 import "./index.css";
 import { AuthProvider } from "./contexts/AuthContext.tsx";
 import { ThemeProvider } from "./contexts/ThemeContext.tsx";
+import { TitleProvider } from "./contexts/TitleContext.tsx";
 
 // --- (importaciones de otras páginas) ---
 import Login from "./pages/Login.tsx";
@@ -31,6 +32,7 @@ import PresupuestoCreate from "./pages/PresupuestoCreate.tsx";
 import PresupuestoDetail from "./pages/PresupuestoDetail.tsx";
 import Estadisticas from "./pages/Estadisticas.tsx";
 import AtajosDeTeclado from "./pages/AtajosDeTeclado.tsx";
+import CargaDeUsuarios from "./pages/CargaDeUsuarios.tsx";
 
 const router = createBrowserRouter([
   {
@@ -43,6 +45,7 @@ const router = createBrowserRouter([
       { path: "/clientes/editar/:id", element: <ClienteDetail /> },
       { path: "/clientes/:id", element: <ClienteDetail /> },
       { path: "/ot", element: <OT /> },
+      { path: "/carga-de-usuarios", element: <CargaDeUsuarios /> },
       { path: "/ot/crear", element: <OTCreate /> },
       { path: "/ot/editar/:id", element: <OTdetail /> },
       {
@@ -61,7 +64,6 @@ const router = createBrowserRouter([
       { path: "/presupuestos/crear", element: <PresupuestoCreate /> },
       { path: "/presupuestos/:id", element: <PresupuestoDetail /> },
       { path: "/presupuestos/editar/:id", element: <PresupuestoDetail /> },
-      { path: "/usuarios/grafico", element: <UserChart /> },
       { path: "/estadisticas", element: <Estadisticas /> },
       { path: "/atajos", element: <AtajosDeTeclado /> },
     ],
@@ -75,9 +77,11 @@ const router = createBrowserRouter([
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <ThemeProvider>
-      <AuthProvider>
-        <RouterProvider router={router} />
-      </AuthProvider>
+      <TitleProvider>
+        <AuthProvider>
+          <RouterProvider router={router} />
+        </AuthProvider>
+      </TitleProvider>
     </ThemeProvider>
   </React.StrictMode>
 );

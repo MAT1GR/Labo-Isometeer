@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Badge } from "./ui/badge";
-import { OT } from "../types/typeOT";
+import { WorkOrder } from "../services/otService";
 import transformOTsToWorkload from "../utilities/transformOTsToWorkload";
 import { typeWorkloadUser } from "../types/typeWorkloadUser";
 import { useGoToOT } from "../hooks/useGoToOT";
@@ -13,7 +13,7 @@ import {
 } from "./ui/dropdown-menu";
 const LOCAL_STORAGE_KEY = "dashboardUserOrder";
 
-function DashboardWorkload({ ot }: { ot: OT[] }) {
+function DashboardWorkload({ ot }: { ot: WorkOrder[] }) {
   const [workload, setWorkload] = useState<typeWorkloadUser[]>();
   const [order, setOrder] = useState<string[]>(() => {
     const saved = localStorage.getItem(LOCAL_STORAGE_KEY);
@@ -33,24 +33,21 @@ function DashboardWorkload({ ot }: { ot: OT[] }) {
   };
   useEffect(() => {
     const users = transformOTsToWorkload(ot);
+    if (order.length === 0 && users.length > 0) {
+      const newOrder = users.map(u => u.name).sort((a, b) => a.name.localeCompare(b.name));
+      setOrder(newOrder);
+    }
+  
     let sortedUsers = [...users];
-    // Si hay un orden guardado, aplicarlo
-    if (order.length) {
+    if (order.length > 0) {
       sortedUsers.sort((a, b) => {
         const indexA = order.indexOf(a.name);
         const indexB = order.indexOf(b.name);
-        // si no está en el array, lo ponemos al final
-        if (indexA === -1 && indexB === -1) return a.name.localeCompare(b.name);
         if (indexA === -1) return 1;
         if (indexB === -1) return -1;
         return indexA - indexB;
       });
-    } else {
-      // si no hay orden guardado, ordenar alfabéticamente
-      setOrder(sortedUsers.map((x) => x.name));
-      sortedUsers.sort((a, b) => a.name.localeCompare(b.name));
     }
-
     setWorkload(sortedUsers);
   }, [ot, order]);
   const moveUser = (
@@ -197,6 +194,11 @@ function DashboardWorkload({ ot }: { ot: OT[] }) {
                   </div>
                   <div className="text-xs text-gray-500">Completadas</div>
                 </div>
+              </div>
+              <div className="mt-4 text-xs text-gray-500">
+                <span className="font-semibold text-yellow-600">Pendientes:</span> {user.ots_pendientes} | 
+                <span className="font-semibold text-blue-600">En Progreso:</span> {user.ots_en_progreso} | 
+                <span className="font-semibold text-green-600">Finalizadas:</span> {user.ots_finalizadas}
               </div>
 
               {/* Current OTs */}

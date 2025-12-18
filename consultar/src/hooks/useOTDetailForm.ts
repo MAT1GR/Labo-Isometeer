@@ -41,6 +41,11 @@ export const useOTDetailForm = () => {
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [isCreateFacturaModalOpen, setCreateFacturaModalOpen] = useState(false);
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+
+  const toggleIsEditing = () => {
+    setIsEditing(prev => !prev);
+  };
 
   const watchedActivities = useWatch({ control, name: "activities" });
   const otType = useWatch({ control, name: "type" });
@@ -260,6 +265,7 @@ export const useOTDetailForm = () => {
     isEmployee,
     myActivities,
     isFormEditable,
+    isEditing,
     otMoneda,
     fields,
     canAuthorizeOT,
@@ -268,6 +274,7 @@ export const useOTDetailForm = () => {
     setCreateFacturaModalOpen,
     setIsExportModalOpen,
     setIsHistoryModalOpen,
+    toggleIsEditing,
     onSubmit: handleSubmit(onSubmit),
     handleFacturaCreated,
     handleOpenExportModal,
@@ -278,5 +285,6 @@ export const useOTDetailForm = () => {
     handleStopActivity,
     getAvailableActivities,
     handleActivityAssignmentChange, // Se exporta la función para que el formulario la use
+    loadData,
   };
 };

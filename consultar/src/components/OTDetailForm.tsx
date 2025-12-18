@@ -2,6 +2,7 @@
 
 import React from "react";
 import { useNavigate } from "react-router-dom";
+import { FormProvider } from "react-hook-form";
 import {
   ArrowLeft,
   Save,
@@ -29,7 +30,12 @@ import OTDetailEmployeeView from "./ot/OTDetailEmployeeView";
 import OTDetailActivities from "./ot/OTDetailActivities";
 import OTDetailInvoices from "./ot/OTDetailInvoices";
 
-const OTDetailForm: React.FC = () => {
+interface OTDetailFormProps {
+  toggleIsEditing: () => void;
+  isModal?: boolean;
+}
+
+const OTDetailForm: React.FC<OTDetailFormProps> = ({ toggleIsEditing, isModal = false }) => {
   const navigate = useNavigate();
   const {
     id,
@@ -54,7 +60,7 @@ const OTDetailForm: React.FC = () => {
     setCreateFacturaModalOpen,
     setIsExportModalOpen,
     setIsHistoryModalOpen,
-    onSubmit,
+    onSubmit, // This is already the handleSubmit(onSubmit) wrapped version
     handleFacturaCreated,
     handleOpenExportModal,
     handleAuthorize,
@@ -75,9 +81,16 @@ const OTDetailForm: React.FC = () => {
   if (!otData)
     return <div className="p-8 text-center">Cargando datos de la OT...</div>;
 
+  const handleFormSubmit = async (event: React.FormEvent) => {
+    await onSubmit(event);
+    if (!isSaving) { // Only toggle if save was successful (not currently saving)
+      toggleIsEditing();
+    }
+  };
+
   return (
-    <>
-      <NavigationPrompt when={isDirty && !isSaving} onSave={onSubmit} />
+    <FormProvider {...formMethods}>
+      <NavigationPrompt when={isDirty && !isSaving} onSave={handleFormSubmit} />
 
       {/* --- CORRECCIÓN: Se pasa el otData completo que el modal espera --- */}
       <CreateFacturaModal
@@ -98,48 +111,53 @@ const OTDetailForm: React.FC = () => {
           otId={Number(id)}
         />
       )}
-      <form onSubmit={onSubmit} className="space-y-6">
-        {/* --- Header --- */}
-        <div className="flex justify-between items-center flex-wrap gap-4">
-          <Button type="button" variant="ghost" onClick={() => navigate("/ot")}>
-            <ArrowLeft className="mr-2 h-5 w-5" /> Volver
-          </Button>
-          <div className="flex flex-col items-center">
-            <h1 className="text-2xl font-bold text-center">
-              Detalle de OT: {otData.custom_id || `#${otData.id}`}
-            </h1>
-            <div className="mt-1 text-sm font-semibold text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 px-3 py-1 rounded-full flex items-center gap-2">
-              <DollarSign size={14} />
-              <span>
-                Los montos se gestionan en{" "}
-                <strong>
-                  {otMoneda === "USD" ? "Dólares (USD)" : "Pesos (ARS)"}
-                </strong>
-              </span>
-            </div>
-          </div>
-          <div className="flex gap-2 flex-wrap items-center">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setIsHistoryModalOpen(true)}
-            >
-              <Clock className="mr-2 h-5 w-5" /> Historial
+      <form onSubmit={handleFormSubmit} className="space-y-6">
+        {/* --- Header (only if not in modal) --- */}
+        {!isModal && (
+          <div className="flex justify-between items-center flex-wrap gap-4">
+            <Button type="button" variant="ghost" onClick={() => navigate("/ot")}>
+              <ArrowLeft className="mr-2 h-5 w-5" /> Volver
             </Button>
-            {!isEmployee && (
+            <div className="flex flex-col items-center">
+              <h1 className="text-2xl font-bold text-center">
+                Detalle de OT: {otData.custom_id || `#${otData.id}`}
+              </h1>
+              <div className="mt-1 text-sm font-semibold text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 px-3 py-1 rounded-full flex items-center gap-2">
+                <DollarSign size={14} />
+                <span>
+                  Los montos se gestionan en{" "}
+                  <strong>
+                    {otMoneda === "USD" ? "Dólares (USD)" : "Pesos (ARS)"}
+                  </strong>
+                </span>
+              </div>
+            </div>
+            <div className="flex gap-2 flex-wrap items-center">
               <Button
                 type="button"
-                variant="secondary"
-                onClick={handleOpenExportModal}
+                variant="outline"
+                onClick={() => setIsHistoryModalOpen(true)}
               >
-                <Download className="mr-2 h-5 w-5" /> Exportar PDF
+                <Clock className="mr-2 h-5 w-5" /> Historial
               </Button>
-            )}
-            <Button type="submit" disabled={isSubmitting || !isDirty}>
-              <Save className="mr-2 h-5 w-5" /> Guardar
-            </Button>
+              {!isEmployee && (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={handleOpenExportModal}
+                >
+                  <Download className="mr-2 h-5 w-5" /> Exportar PDF
+                </Button>
+              )}
+              <Button type="button" variant="ghost" onClick={toggleIsEditing}>
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={isSubmitting || !isDirty}>
+                <Save className="mr-2 h-5 w-5" /> Guardar
+              </Button>
+            </div>
           </div>
-        </div>
+        )}
 
         {/* --- Action Buttons --- */}
         {!isEmployee && (
@@ -382,8 +400,19 @@ const OTDetailForm: React.FC = () => {
             </div>
           </Card>
         </div>
+        {/* --- Modal Footer --- */}
+        {isModal && (
+            <div className="flex justify-end gap-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                <Button type="button" variant="ghost" onClick={toggleIsEditing}>
+                Cancelar
+                </Button>
+                <Button type="submit" disabled={isSubmitting || !isDirty}>
+                <Save className="mr-2 h-5 w-5" /> Guardar Cambios
+                </Button>
+            </div>
+        )}
       </form>
-    </>
+    </FormProvider>
   );
 };
 

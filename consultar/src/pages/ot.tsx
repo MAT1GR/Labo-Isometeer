@@ -32,13 +32,10 @@ import {
   ChevronLeft,
   ChevronRight,
   Settings,
-  LayoutList,
-  Users as UsersIcon,
 } from "lucide-react";
 import useSWR, { mutate } from "swr";
 import OTFiltersComponent from "../components/OTFilters";
 import { AnimatePresence, motion } from "framer-motion";
-import DashboardWorkload from "../components/DashboardWorkload";
 
 export interface OTFilters {
   searchTerm?: string;
@@ -57,7 +54,6 @@ const OT: React.FC = () => {
     useAuth();
   const navigate = useNavigate();
   const topOfListRef = useRef<HTMLDivElement>(null);
-  const [activeView, setActiveView] = useState<"list" | "workload">("list");
   const [filters, setFilters] = useState<OTFilters>({});
   const [showFilters, setShowFilters] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
@@ -85,12 +81,6 @@ const OT: React.FC = () => {
   useEffect(() => {
     setCurrentPage(1);
   }, [filters, ots]);
-
-  useEffect(() => {
-    if (topOfListRef.current) {
-      topOfListRef.current.scrollIntoView({ behavior: "smooth" });
-    }
-  }, [currentPage]);
 
   const totalPages = ots ? Math.ceil(ots.length / OTS_PER_PAGE) : 0;
   const paginatedOts = useMemo(() => {
@@ -153,10 +143,17 @@ const OT: React.FC = () => {
     }
   };
 
+  const safeFormatDate = (dateString: string) => {
+    if (!dateString || isNaN(new Date(dateString).getTime())) {
+      return "N/A";
+    }
+    return new Date(dateString).toLocaleDateString();
+  };
+
   if (error) return <div>Error al cargar las órdenes de trabajo.</div>;
 
   return (
-    <div className="flex flex-col h-full" ref={topOfListRef}>
+    <div className="flex flex-col h-full py-10" ref={topOfListRef}>
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold">
           {canViewAdminContent()
@@ -185,23 +182,6 @@ const OT: React.FC = () => {
         </div>
       </div>
 
-      <div className="flex items-center gap-2 mb-6">
-        <Button
-          variant={activeView === "list" ? "secondary" : "ghost"}
-          onClick={() => setActiveView("list")}
-        >
-          <LayoutList className="h-4 w-4 mr-2" />
-          Listado de OTs
-        </Button>
-        <Button
-          variant={activeView === "workload" ? "secondary" : "ghost"}
-          onClick={() => setActiveView("workload")}
-        >
-          <UsersIcon className="h-4 w-4 mr-2" />
-          Carga de Usuarios
-        </Button>
-      </div>
-
       <AnimatePresence>
         {showFilters && canViewAdminContent() && (
           <motion.div
@@ -222,7 +202,6 @@ const OT: React.FC = () => {
         )}
       </AnimatePresence>
 
-      {activeView === 'list' && (
       <div className="flex-grow bg-card text-card-foreground shadow-xl border border-border rounded-lg overflow-hidden h-full">
         <div className="overflow-y-auto h-full">
           {isLoading ? (
@@ -240,10 +219,16 @@ const OT: React.FC = () => {
                     ID de OT
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
+                    Fecha Creación
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
+                    Tipo
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
                     Cliente
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
-                    Asignado a
+                    Producto
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
                     Estado
@@ -263,7 +248,7 @@ const OT: React.FC = () => {
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, x: -40 }}
                       transition={{ duration: 0.25, ease: "easeInOut" }}
-                      onClick={() => navigate(`/ot/editar/${ot.id}`)}
+                      onDoubleClick={() => navigate(`/ot/editar/${ot.id}`)}
                       className={`cursor-pointer hover:bg-muted/50 ${
                         !ot.authorized && canViewAdminContent()
                           ? "bg-orange-50 dark:bg-orange-900/20"
@@ -294,10 +279,12 @@ const OT: React.FC = () => {
                       <td className="px-6 py-4 font-medium">
                         {ot.custom_id || `Interno #${ot.id}`}
                       </td>
-                      <td className="px-6 py-4">{ot.client_name}</td>
                       <td className="px-6 py-4">
-                        {ot.assigned_to_name || "Sin asignar"}
+                        {safeFormatDate(ot.created_at)}
                       </td>
+                      <td className="px-6 py-4">{ot.type || 'N/A'}</td>
+                      <td className="px-6 py-4">{ot.client_name || 'N/A'}</td>
+                      <td className="px-6 py-4">{ot.product || 'N/A'}</td>
                       <td className="px-6 py-4">
                         <Badge
                           variant="outline"
@@ -388,10 +375,8 @@ const OT: React.FC = () => {
           )}
         </div>
       </div>
-      )}
-      {activeView === 'workload' && ots && <DashboardWorkload ot={ots} />}
 
-      {totalPages > 1 && activeView === 'list' && (
+      {totalPages > 1 && (
         <div className="flex justify-center items-center gap-4 mt-6">
           <Button
             variant="outline"

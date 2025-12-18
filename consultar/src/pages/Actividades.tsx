@@ -1,6 +1,7 @@
 // RUTA: /consultar/src/pages/AdminPuntajes.tsx
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { useTitle } from "../contexts/TitleContext";
 import { useForm } from "react-hook-form";
 import useSWR, { mutate } from "swr";
 import { adminService, ActivityPoint } from "../services/adminService";
@@ -16,6 +17,11 @@ type ActivityFormData = {
 };
 
 const Actividades: React.FC = () => {
+    const { setTitle } = useTitle();
+  useEffect(() => {
+    setTitle("Gestión de Actividades");
+  }, [setTitle]);
+
   const {
     data: activities,
     error,
@@ -96,17 +102,15 @@ const Actividades: React.FC = () => {
         message={`¿Estás seguro de que quieres eliminar la actividad "${activityToDelete?.activity}"?`}
       />
       <div className="space-y-6">
-        <div className="flex justify-between items-center">
-          <h1 className="text-3xl font-bold">Gestión de Actividades</h1>
-          {/* === INICIO: Botón Agregado === */}
-          {!isCreating && !editingId && (
-            <Button onClick={handleAddNew}>
-              <PlusCircle className="mr-2 h-4 w-4" /> Agregar Actividad
-            </Button>
-          )}
-          {/* === FIN: Botón Agregado === */}
-        </div>
-
+              <div className="flex justify-end">
+                {/* === INICIO: Botón Agregado === */}
+                {!isCreating && !editingId && (
+                  <Button onClick={handleAddNew}>
+                    <PlusCircle className="mr-2 h-4 w-4" /> Agregar Actividad
+                  </Button>
+                )}
+                {/* === FIN: Botón Agregado === */}
+              </div>
         {(isCreating || editingId) && (
           <Card>
             <form onSubmit={handleSubmit(onSubmit)}>

@@ -86,7 +86,11 @@ const Presupuestos: React.FC = () => {
       {presupuestos.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {presupuestos.map((p) => (
-            <Link to={`/presupuestos/${p.id}`} key={p.id} className="block">
+            <div
+              onDoubleClick={() => navigate(`/presupuestos/${p.id}`)}
+              key={p.id}
+              className="block"
+            >
               <Card className="hover:shadow-lg transition-shadow p-4 flex flex-col justify-between h-full">
                 <div className="mb-2">
                   <h2 className="text-lg font-semibold">Presupuesto #{p.id}</h2>
@@ -116,7 +120,7 @@ const Presupuestos: React.FC = () => {
                   )}
                 </div>
               </Card>
-            </Link>
+            </div>
           ))}
         </div>
       ) : (

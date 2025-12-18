@@ -236,13 +236,12 @@ const UserChart: React.FC = () => {
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold">Estadísticas de Usuario</h1>
+        <h1 className="text-3bxl font-bold">Estadísticas de Usuario</h1>
         <Button variant="outline" onClick={() => navigate("/usuarios")}>
           <ArrowLeft className="mr-2 h-4 w-4" />
           Volver a la Lista
         </Button>
       </div>
-
       {/* Agrega el componente de filtro de fecha aquí */}
       <DateRangeFilter onFilterChange={handleFilterChange} />
 

@@ -8,7 +8,7 @@ import { User } from "./auth";
 export interface Activity {
   name: ReactNode;
   precio_sin_iva: number;
-  assigned_users: any;
+  assigned_users: User[]; // Changed from 'any' to 'User[]'
   activity: any;
   status: string;
   started_at: string | null;
@@ -24,7 +24,8 @@ export interface Activity {
 }
 
 export interface WorkOrder {
-  product: ReactNode;
+  product: string;
+  type: string;
   facturada: any;
   moneda: string;
   client: any;
@@ -54,6 +55,11 @@ export interface WorkOrder {
   completion_date?: string | null;
   created_at: string;
   updated_at: string;
+  brand?: string;
+  model?: string;
+  seal_number?: string;
+  contract_type?: string;
+  observations?: string;
 }
 
 export interface OTFilters {

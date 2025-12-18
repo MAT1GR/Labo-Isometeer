@@ -1,12 +1,19 @@
 // RUTA: consultar/src/pages/AtajosDeTeclado.tsx
 
 import React, { useState, useEffect, useCallback } from "react";
+import { useTitle } from "../contexts/TitleContext";
 import { getShortcuts, defaultShortcuts, Shortcuts } from "../config/shortcuts";
 import Card from "../components/ui/Card";
 import Button from "../components/ui/Button";
 
 const AtajosDeTeclado: React.FC = () => {
+  const { setTitle } = useTitle();
   const [shortcuts, setShortcuts] = useState<Shortcuts>(getShortcuts());
+
+  useEffect(() => {
+    setTitle("Atajos de Teclado");
+  }, [setTitle]);
+  
   const [editingAction, setEditingAction] = useState<string | null>(null);
 
   // Hook para detectar la combinación de teclas cuando se está editando un atajo
@@ -68,8 +75,7 @@ const AtajosDeTeclado: React.FC = () => {
 
   return (
     <div className="container mx-auto p-4">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold">Atajos de Teclado</h1>
+      <div className="flex justify-end items-center mb-6">
         <div className="flex gap-2">
           <Button variant="outline" onClick={handleResetDefaults}>
             Restaurar Valores

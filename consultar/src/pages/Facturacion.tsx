@@ -258,45 +258,39 @@ const Facturacion: React.FC = () => {
                     <tr
                       key={factura.id}
                       className="hover:bg-muted/50 cursor-pointer"
+                      onDoubleClick={() => navigate(`/facturacion/${factura.id}`)}
                     >
                       <td
-                        onClick={() => navigate(`/facturacion/${factura.id}`)}
                         className="px-6 py-4 whitespace-nowrap text-sm font-medium"
                       >
                         {factura.numero_factura}
                       </td>
                       <td
-                        onClick={() => navigate(`/facturacion/${factura.id}`)}
                         className="px-6 py-4 whitespace-nowrap text-sm"
                       >
                         {factura.cliente_name}
                       </td>
                       <td
-                        onClick={() => navigate(`/facturacion/${factura.id}`)}
                         className="px-6 py-4 whitespace-nowrap text-sm"
                       >
                         {factura.tipo}
                       </td>
                       <td
-                        onClick={() => navigate(`/facturacion/${factura.id}`)}
                         className="px-6 py-4 whitespace-nowrap text-sm font-mono"
                       >
                         {formatCurrency(factura.monto, factura.moneda)}
                       </td>
                       <td
-                        onClick={() => navigate(`/facturacion/${factura.id}`)}
                         className="px-6 py-4 whitespace-nowrap text-sm"
                       >
                         {formatDateTime(factura.created_at)}
                       </td>
                       <td
-                        onClick={() => navigate(`/facturacion/${factura.id}`)}
                         className="px-6 py-4 whitespace-nowrap text-sm"
                       >
                         {formatDateTime(factura.vencimiento)}
                       </td>
                       <td
-                        onClick={() => navigate(`/facturacion/${factura.id}`)}
                         className="px-6 py-4 whitespace-nowrap text-center text-sm"
                       >
                         <span
