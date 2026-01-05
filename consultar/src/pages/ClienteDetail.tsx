@@ -8,10 +8,12 @@ import Input from "../components/ui/Input";
 import Button from "../components/ui/Button";
 import { ArrowLeft, Save, PlusCircle, Trash2 } from "lucide-react";
 import { mutate } from "swr";
+import { useTitle } from "../contexts/TitleContext";
 
 const ClienteDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { setTitle } = useTitle();
   const {
     register,
     handleSubmit,
@@ -32,6 +34,10 @@ const ClienteDetail: React.FC = () => {
     }
   }, [id, reset]);
 
+  useEffect(() => {
+    setTitle("Editando Cliente");
+  }, [setTitle]);
+
   const onSubmit = async (data: Client) => {
     try {
       await clientService.updateClient(Number(id), data);
@@ -44,10 +50,8 @@ const ClienteDetail: React.FC = () => {
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold">Editando Cliente</h1>
-        <div className="flex gap-4">
-          <Button
+      <div className="flex justify-end gap-4 mb-6">
+        <Button
             type="button"
             variant="outline"
             onClick={() => navigate("/clientes")}
@@ -62,7 +66,6 @@ const ClienteDetail: React.FC = () => {
             <Save className="h-5 w-5" />
             {isSubmitting ? "Guardando..." : "Guardar Cambios"}
           </Button>
-        </div>
       </div>
       <div className="bg-white dark:bg-gray-800 dark:border dark:border-gray-700 p-6 rounded-lg shadow-sm space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

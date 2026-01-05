@@ -30,6 +30,8 @@ import {
 } from "lucide-react";
 import { formatDate } from "../lib/utils";
 import UserSelect from "../components/ui/UserSelect";
+import DateRangeFilter from "../components/ui/DateRangeFilter"; // Importa el nuevo componente
+import { subMonths, endOfDay, formatISO } from "date-fns";
 
 const COLORS = [
   "#3b82f6",
@@ -41,12 +43,23 @@ const COLORS = [
   "#ef4444",
 ];
 
-const UserStatsPanel = ({ userId }: { userId: string }) => {
+const UserStatsPanel = ({
+  userId,
+  dateRange,
+}: {
+  userId: string;
+  dateRange: { startDate: string; endDate: string };
+}) => {
+  // Construye la URL con los parámetros de fecha
+  const statsUrl = userId
+    ? `/statistics/user/${userId}?startDate=${dateRange.startDate}&endDate=${dateRange.endDate}`
+    : null;
+
   const {
     data: statsData,
     error: statsError,
     isLoading: statsLoading,
-  } = useSWR(userId ? `/statistics/user/${userId}` : null, fetcher);
+  } = useSWR(statsUrl, fetcher);
   const navigate = useNavigate();
 
   if (statsLoading) return <div className="text-center py-8">Cargando...</div>;
@@ -57,6 +70,7 @@ const UserStatsPanel = ({ userId }: { userId: string }) => {
       </div>
     );
 
+  // ... (el resto del componente UserStatsPanel se mantiene igual)
   return (
     <div className="space-y-4">
       <Card>
@@ -66,7 +80,9 @@ const UserStatsPanel = ({ userId }: { userId: string }) => {
             <p className="text-sm text-gray-500 dark:text-gray-400">
               Puntos Totales
             </p>
-            <p className="text-2xl font-bold">{statsData.stats.totalPoints}</p>
+            <p className="text-2xl font-bold">
+              {statsData.stats.totalPoints || 0}
+            </p>
           </div>
         </div>
       </Card>
@@ -78,7 +94,7 @@ const UserStatsPanel = ({ userId }: { userId: string }) => {
               OTs Finalizadas
             </p>
             <p className="text-2xl font-bold">
-              {statsData.stats.totalOTsFinalizadas}
+              {statsData.stats.totalOTsFinalizadas || 0}
             </p>
           </div>
         </div>
@@ -91,7 +107,7 @@ const UserStatsPanel = ({ userId }: { userId: string }) => {
               Actividades Completadas
             </p>
             <p className="text-2xl font-bold">
-              {statsData.stats.totalCompletedActivities}
+              {statsData.stats.totalCompletedActivities || 0}
             </p>
           </div>
         </div>
@@ -164,14 +180,25 @@ const UserChart: React.FC = () => {
   const [user1Id, setUser1Id] = useState<string>("");
   const [user2Id, setUser2Id] = useState<string>("");
 
-  const { data: user1Data } = useSWR(
-    user1Id ? `/statistics/user/${user1Id}` : null,
-    fetcher
-  );
-  const { data: user2Data } = useSWR(
-    user2Id ? `/statistics/user/${user2Id}` : null,
-    fetcher
-  );
+  // Estado para el rango de fechas
+  const [dateRange, setDateRange] = useState({
+    startDate: formatISO(subMonths(new Date(), 1)), // Por defecto, el último mes
+    endDate: formatISO(endOfDay(new Date())),
+  });
+
+  const handleFilterChange = (startDate: string, endDate: string) => {
+    setDateRange({ startDate, endDate });
+  };
+
+  const user1Url = user1Id
+    ? `/statistics/user/${user1Id}?startDate=${dateRange.startDate}&endDate=${dateRange.endDate}`
+    : null;
+  const user2Url = user2Id
+    ? `/statistics/user/${user2Id}?startDate=${dateRange.startDate}&endDate=${dateRange.endDate}`
+    : null;
+
+  const { data: user1Data } = useSWR(user1Url, fetcher);
+  const { data: user2Data } = useSWR(user2Url, fetcher);
 
   const comparisonData = useMemo(() => {
     if (!user1Data && !user2Data) return [];
@@ -179,18 +206,24 @@ const UserChart: React.FC = () => {
     const data = [
       {
         name: "Puntos",
-        [user1Data?.user.name]: user1Data?.stats.totalPoints,
-        [user2Data?.user.name]: user2Data?.stats.totalPoints,
+        [user1Data?.user.name || "Usuario 1"]:
+          user1Data?.stats.totalPoints || 0,
+        [user2Data?.user.name || "Usuario 2"]:
+          user2Data?.stats.totalPoints || 0,
       },
       {
         name: "OTs Finalizadas",
-        [user1Data?.user.name]: user1Data?.stats.totalOTsFinalizadas,
-        [user2Data?.user.name]: user2Data?.stats.totalOTsFinalizadas,
+        [user1Data?.user.name || "Usuario 1"]:
+          user1Data?.stats.totalOTsFinalizadas || 0,
+        [user2Data?.user.name || "Usuario 2"]:
+          user2Data?.stats.totalOTsFinalizadas || 0,
       },
       {
         name: "Actividades",
-        [user1Data?.user.name]: user1Data?.stats.totalCompletedActivities,
-        [user2Data?.user.name]: user2Data?.stats.totalCompletedActivities,
+        [user1Data?.user.name || "Usuario 1"]:
+          user1Data?.stats.totalCompletedActivities || 0,
+        [user2Data?.user.name || "Usuario 2"]:
+          user2Data?.stats.totalCompletedActivities || 0,
       },
     ];
     return data;
@@ -203,12 +236,14 @@ const UserChart: React.FC = () => {
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold">Estadísticas de Usuario</h1>
+        <h1 className="text-3bxl font-bold">Estadísticas de Usuario</h1>
         <Button variant="outline" onClick={() => navigate("/usuarios")}>
           <ArrowLeft className="mr-2 h-4 w-4" />
           Volver a la Lista
         </Button>
       </div>
+      {/* Agrega el componente de filtro de fecha aquí */}
+      <DateRangeFilter onFilterChange={handleFilterChange} />
 
       <Card>
         <div className="flex flex-col md:flex-row gap-6 items-end">
@@ -274,12 +309,16 @@ const UserChart: React.FC = () => {
                 </Card>
               )}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {user1Id && <UserStatsPanel userId={user1Id} />}
-                {user2Id && <UserStatsPanel userId={user2Id} />}
+                {user1Id && (
+                  <UserStatsPanel userId={user1Id} dateRange={dateRange} />
+                )}
+                {user2Id && (
+                  <UserStatsPanel userId={user2Id} dateRange={dateRange} />
+                )}
               </div>
             </>
           )
-        : user1Id && <UserStatsPanel userId={user1Id} />}
+        : user1Id && <UserStatsPanel userId={user1Id} dateRange={dateRange} />}
     </div>
   );
 };

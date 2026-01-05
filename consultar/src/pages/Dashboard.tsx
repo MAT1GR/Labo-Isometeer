@@ -1,4 +1,4 @@
-// RUTA: /cliente/src/pages/Dashboard.tsx
+// RUTA: /consultar/src/pages/Dashboard.tsx
 
 import React, { useMemo, useRef, useState } from "react";
 import { useAuth } from "../contexts/AuthContext";
@@ -8,34 +8,30 @@ import Button from "../components/ui/Button";
 import {
   FileText,
   Users,
-  Smile,
-  BarChart3,
-  ListTodo,
   TrendingUp,
   PieChart as PieIcon,
-  Loader,
   AlertCircle,
   Clock,
   ChevronRight,
   Activity,
   CheckCircle2,
-  Award,
+  CalendarClock,
 } from "lucide-react";
 import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  LabelList,
-  PieChart,
-  Pie,
-  Cell,
   AreaChart,
   Area,
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  LabelList,
   Legend,
+  Pie,
+  PieChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
 } from "recharts";
 import { otService, UserSummaryItem } from "../services/otService";
 import useSWR from "swr";
@@ -49,7 +45,6 @@ interface DashboardStats {
   totalClients: number;
   totalRevenue: number;
   paidInvoices: number;
-  totalPoints: number;
   overdueInvoices: number;
   pendingOT: number;
   inProgressOT: number;
@@ -67,20 +62,28 @@ interface MonthlyRevenue {
   name: string;
   revenue: number;
 }
+interface UpcomingInvoice {
+  id: number;
+  numero_factura: string;
+  monto: number;
+  vencimiento: string;
+  cliente_name: string;
+}
 
 // --- VISTA PARA ADMINISTRADORES Y DIRECTORES ---
 const AdminDirectorDashboard: React.FC = () => {
-  const [period, setPeriod] = useState("week"); // State for the filter
+  const [period, setPeriod] = useState("week");
+  const navigate = useNavigate();
 
   const { data, error, isLoading } = useSWR<{
     stats: DashboardStats;
     recentOrders: RecentOrder[];
     monthlyRevenue: MonthlyRevenue[];
+    upcomingInvoices: UpcomingInvoice[];
   }>(`/dashboard/stats?period=${period}`, fetcher, {
-    keepPreviousData: true, // Evita parpadeos al cambiar de filtro
+    keepPreviousData: true,
   });
 
-  // Hooks always called before this conditional return
   if (error)
     return (
       <p>
@@ -97,7 +100,7 @@ const AdminDirectorDashboard: React.FC = () => {
     return [
       { name: "Pendientes", value: stats.pendingOT, fill: "#f59e0b" },
       { name: "En Progreso", value: stats.inProgressOT, fill: "#3b82f6" },
-      { name: "Finalizadas", value: stats.completedOT, fill: "#22c55e" },
+      { name: "Finalizadas", value: stats.completedOT, fill: "#a855f7" },
       { name: "Facturadas", value: stats.billedOT, fill: "#4f46e5" },
       { name: "Cerradas", value: stats.paidInvoices, fill: "#8b5cf6" },
     ].filter((item) => item.value > 0);
@@ -129,13 +132,6 @@ const AdminDirectorDashboard: React.FC = () => {
     </div>
   );
 
-  const periodTitle =
-    period === "week"
-      ? "esta semana"
-      : period === "month"
-      ? "este mes"
-      : "este año";
-
   const RADIAN = Math.PI / 180;
   const renderCustomizedLabel = ({
     cx,
@@ -164,7 +160,7 @@ const AdminDirectorDashboard: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 py-10">
       <div className="flex flex-wrap justify-between items-center gap-4">
         <h1 className="text-3xl font-bold">Dashboard General</h1>
         <FilterButtons />
@@ -194,18 +190,21 @@ const AdminDirectorDashboard: React.FC = () => {
             <Card>
               <div className="flex justify-between items-center">
                 <p className="text-sm font-medium">Ingresos</p>
-                <TrendingUp className="h-6 w-6 text-green-500" />
+                <TrendingUp className="h-6 w-6 text-purple-500" />
               </div>
               <p className="text-3xl font-bold">
                 {formatCurrency(stats?.totalRevenue || 0)}
               </p>
             </Card>
-            <Card>
+            <Card
+              className="cursor-pointer hover:shadow-lg transition-shadow"
+              onClick={() => navigate("/facturacion?estado=vencida")}
+            >
               <div className="flex justify-between items-center">
-                <p className="text-sm font-medium">Puntos Acumulados</p>
-                <Award className="h-6 w-6 text-yellow-500" />
+                <p className="text-sm font-medium">Facturas Vencidas</p>
+                <AlertCircle className="h-6 w-6 text-red-500" />
               </div>
-              <p className="text-3xl font-bold">{stats?.totalPoints}</p>
+              <p className="text-3xl font-bold">{stats?.overdueInvoices}</p>
             </Card>
           </div>
 
@@ -312,13 +311,47 @@ const AdminDirectorDashboard: React.FC = () => {
               </div>
             </Card>
           </div>
+
+          {data?.upcomingInvoices && data.upcomingInvoices.length > 0 && (
+            <Card>
+              <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+                <CalendarClock /> Próximas Facturas a Vencer
+              </h2>
+              <div className="space-y-3">
+                {data.upcomingInvoices.map((factura) => (
+                  <div
+                    key={factura.id}
+                    className="flex flex-wrap justify-between items-center p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                    onClick={() => navigate(`/facturacion/${factura.id}`)}
+                  >
+                    <div className="mb-2 sm:mb-0">
+                      <p className="font-semibold text-sm">
+                        {factura.cliente_name}
+                      </p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                        Factura #{factura.numero_factura}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-bold text-sm">
+                        {formatCurrency(factura.monto)}
+                      </p>
+                      <p className="text-xs text-yellow-600 dark:text-yellow-400">
+                        Vence: {formatDate(factura.vencimiento)}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          )}
         </>
       )}
     </div>
   );
 };
 
-// --- NUEVO DASHBOARD DEL EMPLEADO ---
+// --- DASHBOARD DEL EMPLEADO ---
 const EmpleadoDashboard: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -410,7 +443,7 @@ const EmpleadoDashboard: React.FC = () => {
   );
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 py-10">
       <div>
         <h1 className="text-3xl font-bold">¡Hola, {user?.name}!</h1>
         <p className="mt-1 text-gray-600 dark:text-gray-300">
@@ -437,7 +470,7 @@ const EmpleadoDashboard: React.FC = () => {
           title="Finalizadas"
           count={completed.length}
           icon={CheckCircle2}
-          colorClasses="bg-gradient-to-br from-green-500 to-green-600"
+          colorClasses="bg-gradient-to-br from-purple-500 to-purple-600"
           onClick={() => scrollTo(completedRef)}
         />
       </div>
@@ -485,7 +518,7 @@ const EmpleadoDashboard: React.FC = () => {
           </div>
         </Card>
         <Card ref={completedRef} className="scroll-mt-24">
-          <h3 className="text-xl font-semibold text-green-600 dark:text-green-400 mb-3">
+          <h3 className="text-xl font-semibold text-purple-600 dark:text-purple-400 mb-3">
             <CheckCircle2 className="inline-block mr-2" />
             Finalizadas
           </h3>
@@ -510,7 +543,19 @@ const EmpleadoDashboard: React.FC = () => {
 
 // --- Componente Principal del Dashboard ---
 const Dashboard: React.FC = () => {
-  const { canViewAdminContent } = useAuth();
+  const { user, canViewAdminContent } = useAuth();
+  const navigate = useNavigate();
+
+  React.useEffect(() => {
+    if (user?.role === "administrador" || user?.role === "director") {
+      navigate("/ot", { replace: true });
+    }
+  }, [user, navigate]);
+
+  if (user?.role === "administrador" || user?.role === "director") {
+    return null;
+  }
+
   return canViewAdminContent() ? (
     <AdminDirectorDashboard />
   ) : (

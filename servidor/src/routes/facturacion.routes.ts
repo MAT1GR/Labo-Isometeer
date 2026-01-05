@@ -1,169 +1,552 @@
+// RUTA: /servidor/src/routes/facturacion.routes.ts (Corregido)
+
 import { Router } from "express";
-import sqlite3 from "sqlite3";
+import db from "../config/database";
 
 const router = Router();
 
-// Función para conectar a la base de datos
-const connectDb = () => {
-  return new sqlite3.Database('./laboratorio.db');
-};
-// Obtener todas las facturas con filtros
-router.get("/", async (req, res) => {
-  const db = await connectDb();
-  const { clienteId, fechaDesde, fechaHasta, estado } = req.query;
-
-  let query = `
-    SELECT f.id, f.cliente_id, c.nombre as cliente_nombre, f.fecha_emision, f.fecha_vencimiento, f.total, f.estado
-    FROM facturas f
-    JOIN clientes c ON f.cliente_id = c.id
-    WHERE 1=1
-  `;
-  const params = [];
-
-  if (clienteId) {
-    query += " AND f.cliente_id = ?";
-    params.push(clienteId);
-  }
-  if (fechaDesde) {
-    query += " AND f.fecha_emision >= ?";
-    params.push(fechaDesde);
-  }
-  if (fechaHasta) {
-    query += " AND f.fecha_emision <= ?";
-    params.push(fechaHasta);
-  }
-  if (estado) {
-    query += " AND f.estado = ?";
-    params.push(estado);
-  }
-
+// [GET] /api/facturacion - OBTENER FACTURAS (AHORA CON FILTROS Y ESTADO DE ARCHIVO)
+router.get("/", (req, res) => {
   try {
-    const facturas = await db.all(query, params);
+    const today = new Date().toISOString().split("T")[0];
+    db.prepare(
+      `UPDATE facturas SET estado = 'vencida' WHERE vencimiento < ? AND estado = 'pendiente'`
+    ).run(today);
+
+    const { cliente_id, fecha_desde, fecha_hasta, estado } = req.query;
+    let baseQuery = `
+      SELECT 
+        f.id, f.numero_factura, f.monto, f.iva, f.vencimiento, f.estado, f.cliente_id, f.created_at, f.tipo, f.observaciones, f.motivo_archivo, f.moneda,
+        c.name as cliente_name,
+        (SELECT SUM(monto) FROM cobros WHERE factura_id = f.id) as pagado,
+        GROUP_CONCAT(ot.custom_id) as ots_asociadas
+      FROM facturas f
+      LEFT JOIN clients c ON f.cliente_id = c.id
+      LEFT JOIN factura_ots fo ON f.id = fo.factura_id
+      LEFT JOIN work_orders ot ON fo.ot_id = ot.id
+    `;
+
+    const whereClauses: string[] = [];
+    const params: any[] = [];
+
+    if (!estado) {
+      whereClauses.push("f.estado != 'archivada'");
+    } else {
+      whereClauses.push("f.estado = ?");
+      params.push(estado);
+    }
+
+    if (cliente_id) {
+      whereClauses.push("f.cliente_id = ?");
+      params.push(cliente_id);
+    }
+    if (fecha_desde) {
+      whereClauses.push("f.created_at >= ?");
+      params.push(fecha_desde);
+    }
+    if (fecha_hasta) {
+      whereClauses.push("f.created_at <= ?");
+      params.push(`${fecha_hasta}T23:59:59`);
+    }
+
+    if (whereClauses.length > 0) {
+      baseQuery += ` WHERE ${whereClauses.join(" AND ")}`;
+    }
+
+    baseQuery += " GROUP BY f.id ORDER BY f.created_at DESC";
+
+    const facturas = db.prepare(baseQuery).all(params);
     res.json(facturas);
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: "Error al obtener las facturas" });
+    console.error("Error al obtener las facturas:", error);
+    res.status(500).json({ error: "Error al obtener las facturas." });
   }
 });
 
-// Obtener una factura por ID
-router.get("/:id", async (req, res) => {
-  const db = await connectDb();
-  const { id } = req.params;
-
+// [GET] /api/facturacion/:id - Obtener una factura por ID (VERSIÓN CORREGIDA)
+router.get("/:id", (req, res) => {
   try {
-    const factura = await db.get(
-      "SELECT f.*, c.nombre as cliente_nombre FROM facturas f JOIN clientes c ON f.cliente_id = c.id WHERE f.id = ?",
-      [id]
-    );
-    if (factura) {
-      const detalles = await db.all(
-        "SELECT df.*, ot.id as ot_numero FROM detalles_factura df JOIN ots ot ON df.ot_id = ot.id WHERE df.factura_id = ?",
-        [id]
-      );
-      res.json({ ...factura, detalles });
-    } else {
-      res.status(404).json({ message: "Factura no encontrada" });
+    const facturaId = req.params.id;
+    const factura = db
+      .prepare(
+        "SELECT f.*, c.name as cliente_name FROM facturas f LEFT JOIN clients c ON f.cliente_id = c.id WHERE f.id = ?"
+      )
+      .get(facturaId);
+
+    if (!factura) {
+      return res.status(404).json({ error: "Factura no encontrada." });
     }
+
+    const fullFactura: any = { ...factura };
+
+    fullFactura.cobros = db
+      .prepare("SELECT * FROM cobros WHERE factura_id = ? ORDER BY fecha DESC")
+      .all(facturaId);
+
+    const ots = db
+      .prepare(
+        `
+      SELECT ot.id, ot.custom_id, ot.product 
+      FROM work_orders ot
+      JOIN factura_ots fo ON ot.id = fo.ot_id
+      WHERE fo.factura_id = ?
+    `
+      )
+      .all(facturaId) as {
+      id: number;
+      custom_id: string;
+      product: string;
+      activities?: any[];
+    }[];
+
+    if (ots && ots.length > 0) {
+      const otIds = ots.map((ot) => ot.id);
+      const placeholders = otIds.map(() => "?").join(",");
+
+      const allActivities = db
+        .prepare(
+          `SELECT work_order_id, activity as name, precio_sin_iva 
+         FROM work_order_activities 
+         WHERE work_order_id IN (${placeholders}) AND precio_sin_iva IS NOT NULL`
+        )
+        .all(...otIds) as {
+        work_order_id: number;
+        name: string;
+        precio_sin_iva: number;
+      }[];
+
+      ots.forEach((ot) => {
+        ot.activities = allActivities.filter(
+          (act) => act.work_order_id === ot.id
+        );
+      });
+    }
+
+    fullFactura.ots = ots;
+
+    res.json(fullFactura);
   } catch (error) {
-    console.error("Error al obtener la factura:", error);
-    res.status(500).json({ message: "Error al obtener la factura" });
+    console.error(
+      `Error al obtener la factura con ID ${req.params.id}:`,
+      error
+    );
+    res.status(500).json({ error: "Error interno al obtener la factura." });
   }
 });
 
-// Crear una nueva factura
-router.post("/", async (req, res) => {
-  const { cliente_id, fecha_emision, fecha_vencimiento, detalles, total } =
-    req.body;
+// [POST] /api/facturacion - Crear una nueva factura
+router.post("/", (req, res) => {
+  const {
+    numero_factura,
+    monto,
+    vencimiento,
+    cliente_id,
+    ot_ids = [],
+    calculation_type = "manual",
+    tipo,
+    observaciones,
+    moneda,
+  } = req.body;
 
-  // --- Validación de Entrada ---
-  if (
-    !cliente_id ||
-    !fecha_emision ||
-    !fecha_vencimiento ||
-    !detalles ||
-    !Array.isArray(detalles) ||
-    detalles.length === 0 ||
-    total === undefined
-  ) {
-    return res
-      .status(400)
-      .json({ message: "Datos de factura incompletos o inválidos." });
+  if (!numero_factura || !vencimiento || !cliente_id) {
+    return res.status(400).json({ message: "Faltan campos obligatorios." });
   }
 
-  const db = await connectDb();
-
   try {
-    // --- Transacción ---
-    await db.exec("BEGIN TRANSACTION");
+    const transaction = db.transaction(() => {
+      let montoNeto = 0;
+      let totalIva = 0;
 
-    const result = await db.run(
-      "INSERT INTO facturas (cliente_id, fecha_emision, fecha_vencimiento, total, estado) VALUES (?, ?, ?, ?, ?)",
-      [cliente_id, fecha_emision, fecha_vencimiento, total, "pendiente"]
-    );
-    const facturaId = (result as any).lastID;
+      if (calculation_type === "activities" && ot_ids.length > 0) {
+        const placeholders = ot_ids.map(() => "?").join(",");
+        const activitiesQuery = `
+          SELECT
+            wa.precio_sin_iva,
+            wo.type AS ot_type
+          FROM work_order_activities wa
+          JOIN work_orders wo ON wa.work_order_id = wo.id
+          WHERE wa.work_order_id IN (${placeholders})
+        `;
 
-    if (!facturaId) {
-      // Si lastID no se devuelve, algo salió mal con la inserción.
-      throw new Error("No se pudo crear la cabecera de la factura.");
-    }
+        const activities = db.prepare(activitiesQuery).all(...ot_ids) as {
+          precio_sin_iva: number;
+          ot_type: string;
+        }[];
 
-    const stmt = await db.prepare(
-      "INSERT INTO detalles_factura (factura_id, ot_id, descripcion, monto) VALUES (?, ?, ?, ?)"
-    );
-    for (const detalle of detalles) {
-      // Validación adicional dentro del bucle
-      if (
-        detalle.ot_id === undefined ||
-        detalle.descripcion === undefined ||
-        detalle.monto === undefined
-      ) {
-        throw new Error("El detalle de la factura es inválido.");
+        if (activities.length === 0) {
+          throw new Error(
+            "No se encontraron actividades con precio para las OTs seleccionadas."
+          );
+        }
+
+        for (const activity of activities) {
+          const precio = activity.precio_sin_iva || 0;
+          montoNeto += precio;
+          totalIva +=
+            precio * (activity.ot_type === "Produccion" ? 0.105 : 0.21);
+        }
+      } else {
+        montoNeto = Number(monto) || 0;
+        if (montoNeto <= 0) {
+          throw new Error(
+            "Para el cálculo manual, el monto debe ser mayor a cero."
+          );
+        }
+        totalIva = montoNeto * 0.21;
       }
-      await stmt.run(
-        facturaId,
-        detalle.ot_id,
-        detalle.descripcion,
-        detalle.monto
+
+      const montoFinal = montoNeto + totalIva;
+
+      const insertFacturaStmt = db.prepare(
+        "INSERT INTO facturas (numero_factura, monto, iva, vencimiento, estado, cliente_id, tipo, observaciones, moneda) VALUES (?, ?, ?, ?, 'pendiente', ?, ?, ?, ?)"
       );
-    }
-    await stmt.finalize();
+      const info = insertFacturaStmt.run(
+        numero_factura,
+        montoFinal,
+        totalIva,
+        vencimiento,
+        cliente_id,
+        tipo,
+        observaciones,
+        moneda
+      );
+      const facturaId = info.lastInsertRowid;
 
-    await db.exec("COMMIT");
+      if (ot_ids.length > 0) {
+        const linkStmt = db.prepare(
+          "INSERT INTO factura_ots (factura_id, ot_id) VALUES (?, ?)"
+        );
+        for (const ot_id of ot_ids) {
+          linkStmt.run(facturaId, ot_id);
+        }
+      }
+      return { id: facturaId };
+    });
 
-    res
-      .status(201)
-      .json({ id: facturaId, message: "Factura creada con éxito" });
-  } catch (error) {
-    await db.exec("ROLLBACK");
+    const result = transaction();
+    res.status(201).json(result);
+  } catch (error: any) {
     console.error("Error al crear la factura:", error);
-    // Enviar un mensaje de error más específico si es posible
-    const errorMessage =
-      error instanceof Error ? error.message : "Error interno del servidor.";
     res
       .status(500)
-      .json({ message: "Error al crear la factura.", error: errorMessage });
+      .json({ error: error.message || "Error interno al crear la factura." });
   }
 });
 
-// Actualizar el estado de una factura
-router.put("/:id/estado", async (req, res) => {
-  const db = await connectDb();
-  const { id } = req.params;
-  const { estado } = req.body;
-
-  if (!estado) {
-    return res.status(400).json({ message: "El estado es requerido" });
-  }
+// [POST] /api/facturacion/:id/cobros - AÑADIR UN COBRO (VERSIÓN FINAL)
+router.post("/:id/cobros", (req, res) => {
+  const {
+    monto,
+    medio_de_pago,
+    fecha,
+    identificacion_cobro,
+    ingresos_brutos,
+    iva,
+    impuesto_ganancias,
+    retencion_suss,
+  } = req.body;
+  const factura_id = req.params.id;
 
   try {
-    await db.run("UPDATE facturas SET estado = ? WHERE id = ?", [estado, id]);
-    res.json({ message: "Estado de la factura actualizado" });
+    const transaction = db.transaction(() => {
+      const stmt = db.prepare(
+        `INSERT INTO cobros 
+          (factura_id, monto, medio_de_pago, fecha, identificacion_cobro, ingresos_brutos, iva, impuesto_ganancias, retencion_suss) 
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      );
+      const fechaParaGuardar = fecha || new Date().toISOString();
+
+      const info = stmt.run(
+        factura_id,
+        monto,
+        medio_de_pago,
+        fechaParaGuardar,
+        identificacion_cobro || null, // Aseguramos que se inserte NULL si es undefined
+        ingresos_brutos || null,
+        iva || null,
+        impuesto_ganancias || null,
+        retencion_suss || null
+      );
+      const newCobroId = info.lastInsertRowid;
+
+      const totalPagadoResult = db
+        .prepare("SELECT SUM(monto) as total FROM cobros WHERE factura_id = ?")
+        .get(factura_id) as { total: number };
+      const totalPagado = totalPagadoResult.total || 0;
+
+      const facturaResult = db
+        .prepare("SELECT monto FROM facturas WHERE id = ?")
+        .get(factura_id) as { monto: number };
+      const montoFactura = facturaResult.monto;
+
+      if (totalPagado >= montoFactura) {
+        db.prepare("UPDATE facturas SET estado = 'pagada' WHERE id = ?").run(
+          factura_id
+        );
+      } else {
+        db.prepare("UPDATE facturas SET estado = 'pendiente' WHERE id = ?").run(
+          factura_id
+        );
+      }
+
+      return db.prepare("SELECT * FROM cobros WHERE id = ?").get(newCobroId);
+    });
+
+    const newCobro = transaction();
+    res.status(201).json(newCobro);
   } catch (error) {
-    console.error("Error al actualizar estado de la factura:", error);
+    console.error("Error al registrar el cobro:", error);
+    res.status(500).json({ error: "Error al registrar el cobro." });
+  }
+});
+
+// [GET] /api/facturacion/cliente/:id - Obtener facturas por ID de cliente
+router.get("/cliente/:id", (req, res) => {
+  try {
+    const facturas = db
+      .prepare(
+        `SELECT id, numero_factura, monto FROM facturas WHERE cliente_id = ? ORDER BY created_at DESC`
+      )
+      .all(req.params.id);
+    res.json(facturas);
+  } catch (error) {
     res
       .status(500)
-      .json({ message: "Error al actualizar el estado de la factura" });
+      .json({ error: "Error al obtener las facturas del cliente." });
+  }
+});
+
+// [PATCH] /api/facturacion/:id/archive - Archivar una factura
+router.patch("/:id/archive", (req, res) => {
+  try {
+    const facturaId = req.params.id;
+    const { motivo_archivo } = req.body;
+    db.prepare(
+      `UPDATE facturas SET estado = 'archivada', motivo_archivo = ? WHERE id = ?`
+    ).run(motivo_archivo, facturaId);
+    res.status(200).json({ message: "Factura archivada con éxito." });
+  } catch (error) {
+    console.error("Error al archivar la factura:", error);
+    res.status(500).json({ error: "Error interno al archivar la factura." });
+  }
+});
+
+// --- NUEVOS ENDPOINTS PARA GESTIÓN DE COBROS ---
+
+// [DELETE] /api/facturacion/:facturaId/cobros/:cobroId - Eliminar un cobro
+router.delete("/:facturaId/cobros/:cobroId", (req, res) => {
+  try {
+    const { facturaId, cobroId } = req.params;
+
+    const transaction = db.transaction(() => {
+      // 1. Eliminar el cobro de la tabla 'cobros'
+      const deleteStmt = db.prepare(
+        "DELETE FROM cobros WHERE id = ? AND factura_id = ?"
+      );
+      const result = deleteStmt.run(cobroId, facturaId);
+
+      if (result.changes === 0) {
+        throw new Error("Cobro no encontrado o ya eliminado.");
+      }
+
+      // 2. Recalcular el total pagado y actualizar el estado de la factura
+      const totalPagadoResult = db
+        .prepare("SELECT SUM(monto) as total FROM cobros WHERE factura_id = ?")
+        .get(facturaId) as { total: number };
+      const totalPagado = totalPagadoResult.total || 0;
+
+      const facturaResult = db
+        .prepare("SELECT monto FROM facturas WHERE id = ?")
+        .get(facturaId) as { monto: number };
+      const montoFactura = facturaResult.monto;
+
+      const newEstado = totalPagado >= montoFactura ? "pagada" : "pendiente";
+      db.prepare("UPDATE facturas SET estado = ? WHERE id = ?").run(
+        newEstado,
+        facturaId
+      );
+    });
+
+    transaction();
+    res.status(200).json({ message: "Cobro eliminado con éxito." });
+  } catch (error: any) {
+    console.error("Error al eliminar el cobro:", error);
+    res
+      .status(500)
+      .json({ error: error.message || "Error interno al eliminar el cobro." });
+  }
+});
+
+// [PATCH] /api/facturacion/:facturaId/cobros/:cobroId - Editar un cobro
+router.patch("/:facturaId/cobros/:cobroId", (req, res) => {
+  const { facturaId, cobroId } = req.params;
+  const {
+    monto,
+    medio_de_pago,
+    fecha,
+    identificacion_cobro,
+    ingresos_brutos,
+    iva,
+    impuesto_ganancias,
+    retencion_suss,
+  } = req.body;
+
+  try {
+    const transaction = db.transaction(() => {
+      const updateStmt = db.prepare(
+        `UPDATE cobros SET 
+           monto = ?, 
+           medio_de_pago = ?, 
+           fecha = ?, 
+           identificacion_cobro = ?, 
+           ingresos_brutos = ?, 
+           iva = ?, 
+           impuesto_ganancias = ?, 
+           retencion_suss = ? 
+         WHERE id = ? AND factura_id = ?`
+      );
+
+      const result = updateStmt.run(
+        monto,
+        medio_de_pago,
+        fecha,
+        identificacion_cobro || null,
+        ingresos_brutos || null,
+        iva || null,
+        impuesto_ganancias || null,
+        retencion_suss || null,
+        cobroId,
+        facturaId
+      );
+
+      if (result.changes === 0) {
+        throw new Error("Cobro no encontrado o no se realizaron cambios.");
+      }
+
+      // Recalcular el total pagado y actualizar el estado de la factura
+      const totalPagadoResult = db
+        .prepare("SELECT SUM(monto) as total FROM cobros WHERE factura_id = ?")
+        .get(facturaId) as { total: number };
+      const totalPagado = totalPagadoResult.total || 0;
+
+      const facturaResult = db
+        .prepare("SELECT monto FROM facturas WHERE id = ?")
+        .get(facturaId) as { monto: number };
+      const montoFactura = facturaResult.monto;
+
+      const newEstado = totalPagado >= montoFactura ? "pagada" : "pendiente";
+      db.prepare("UPDATE facturas SET estado = ? WHERE id = ?").run(
+        newEstado,
+        facturaId
+      );
+    });
+
+    transaction();
+    const updatedCobro = db
+      .prepare("SELECT * FROM cobros WHERE id = ?")
+      .get(cobroId);
+    res.status(200).json(updatedCobro);
+  } catch (error: any) {
+    console.error("Error al editar el cobro:", error);
+    res
+      .status(500)
+      .json({ error: error.message || "Error interno al editar el cobro." });
+  }
+});
+
+// [PATCH] /api/facturacion/:id - Editar campos de una factura
+router.patch("/:id", (req, res) => {
+  try {
+    const facturaId = req.params.id;
+    const { observaciones } = req.body;
+
+    if (observaciones === undefined) {
+      return res
+        .status(400)
+        .json({ error: "No se proporcionaron campos para actualizar." });
+    }
+
+    const stmt = db.prepare(
+      `UPDATE facturas SET observaciones = ? WHERE id = ?`
+    );
+    const result = stmt.run(observaciones, facturaId);
+
+    if (result.changes === 0) {
+      return res
+        .status(404)
+        .json({ error: "Factura no encontrada o no se realizaron cambios." });
+    }
+
+    const updatedFactura = db
+      .prepare("SELECT * FROM facturas WHERE id = ?")
+      .get(facturaId);
+    res.status(200).json(updatedFactura);
+  } catch (error: any) {
+    console.error("Error al editar la factura:", error);
+    res
+      .status(500)
+      .json({ error: error.message || "Error interno al editar la factura." });
+  }
+});
+
+// --- NUEVAS RUTAS PARA DESARCHIVAR Y ELIMINAR ---
+
+// [PATCH] /api/facturacion/:id/unarchive - Desarchivar una factura
+router.patch("/:id/unarchive", (req, res) => {
+  try {
+    const facturaId = req.params.id;
+    // La factura vuelve al estado 'pagada', que es el estado previo a ser archivada.
+    // También limpiamos el motivo del archivo.
+    const info = db
+      .prepare(
+        `UPDATE facturas SET estado = 'pagada', motivo_archivo = NULL WHERE id = ? AND estado = 'archivada'`
+      )
+      .run(facturaId);
+
+    if (info.changes === 0) {
+      return res
+        .status(404)
+        .json({ error: "Factura no encontrada o no estaba archivada." });
+    }
+
+    res.status(200).json({ message: "Factura desarchivada con éxito." });
+  } catch (error) {
+    console.error("Error al desarchivar la factura:", error);
+    res.status(500).json({ error: "Error interno al desarchivar la factura." });
+  }
+});
+
+// [DELETE] /api/facturacion/:id - Eliminar una factura permanentemente
+router.delete("/:id", (req, res) => {
+  const facturaId = req.params.id;
+  try {
+    // Es una buena práctica usar una transacción para asegurar que todas las operaciones se completen
+    const transaction = db.transaction(() => {
+      // Primero, borramos las relaciones en la tabla 'factura_ots'
+      db.prepare("DELETE FROM factura_ots WHERE factura_id = ?").run(facturaId);
+      // Luego, borramos los cobros asociados
+      db.prepare("DELETE FROM cobros WHERE factura_id = ?").run(facturaId);
+      // Finalmente, eliminamos la factura
+      const info = db
+        .prepare("DELETE FROM facturas WHERE id = ?")
+        .run(facturaId);
+
+      if (info.changes === 0) {
+        // Si no se borró nada, lanzamos un error para que la transacción haga un rollback
+        throw new Error("Factura no encontrada.");
+      }
+    });
+
+    transaction(); // Ejecutamos la transacción
+    res.status(200).json({ message: "Factura eliminada permanentemente." });
+  } catch (error: any) {
+    console.error("Error al eliminar la factura:", error);
+    // Si el error es el que lanzamos nosotros, es un 404. Si no, es un 500.
+    if (error.message === "Factura no encontrada.") {
+      res.status(404).json({ error: error.message });
+    } else {
+      res.status(500).json({ error: "Error interno al eliminar la factura." });
+    }
   }
 });
 

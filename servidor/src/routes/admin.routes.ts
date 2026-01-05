@@ -28,11 +28,9 @@ router.get("/puntajes", (req: Request, res: Response) => {
 router.post("/puntajes", (req: Request, res: Response) => {
   const { activity, points } = req.body;
   if (!activity || points === undefined) {
-    return res
-      .status(400)
-      .json({
-        error: "El nombre y los puntos de la actividad son requeridos.",
-      });
+    return res.status(400).json({
+      error: "El nombre y los puntos de la actividad son requeridos.",
+    });
   }
 
   try {

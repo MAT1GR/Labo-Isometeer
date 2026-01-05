@@ -1,4 +1,4 @@
-import React, { useState, Fragment, ReactNode } from "react"; // 1. Importar ReactNode
+import React, { useState, Fragment, useEffect } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { Dialog, Transition } from "@headlessui/react";
@@ -6,7 +6,6 @@ import {
   Home,
   Users,
   Briefcase,
-  FileText,
   LogOut,
   Menu,
   X,
@@ -15,13 +14,28 @@ import {
   Award,
   Image,
   Receipt,
+  ClipboardListIcon,
+  BarChart3,
+  Keyboard,
+  ChevronLeft,
+  Activity,
 } from "lucide-react";
 import ThemeToggle from "./ui/ThemeToggle";
 import { cn } from "../lib/utils";
 import Notifications from "./ui/Notifications";
+import { useHotkeys } from "react-hotkeys-hook";
+import { getShortcuts } from "../config/shortcuts";
+import { useTheme } from "../contexts/ThemeContext";
+import { useTitle } from "../contexts/TitleContext";
+import { Button } from "./ui/button";
+import clsx from "clsx";
 
-// ... (El componente SidebarNavigation se mantiene igual, no es necesario mostrarlo)
-const SidebarNavigation: React.FC = () => {
+interface SidebarNavigationProps {
+  isCollapsed: boolean;
+  toggleSidebar: () => void;
+}
+
+const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ isCollapsed, toggleSidebar }) => {
   const { user, logout, canManageAdminPanel } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
@@ -31,7 +45,7 @@ const SidebarNavigation: React.FC = () => {
       icon: Home,
       label: "Dashboard",
       path: "/",
-      roles: ["empleado", "director", "administracion", "administrador"],
+      roles: ["empleado", "administracion"],
     },
     {
       icon: Briefcase,
@@ -40,16 +54,40 @@ const SidebarNavigation: React.FC = () => {
       roles: ["empleado", "director", "administracion", "administrador"],
     },
     {
+      icon: Activity,
+      label: "Carga de Usuarios",
+      path: "/carga-de-usuarios",
+      roles: ["administrador", "director", "administracion"],
+    },
+    {
       icon: Users,
       label: "Clientes",
       path: "/clientes",
       roles: ["director", "administracion", "administrador"],
     },
     {
-      icon: Receipt, // --- AÑADIR ESTE BLOQUE ---
+      icon: ClipboardListIcon,
+      label: "Presupuestos",
+      path: "/presupuestos",
+      roles: ["administracion", "administrador", "director"],
+    },
+    {
+      icon: Receipt,
       label: "Facturación",
       path: "/facturacion",
-      roles: ["administracion", "administrador"],
+      roles: ["administracion", "administrador", "director"],
+    },
+    {
+      icon: BarChart3,
+      label: "Estadísticas",
+      path: "/estadisticas",
+      roles: ["administrador", "director"],
+    },
+    {
+      icon: Keyboard,
+      label: "Atajos de Teclado",
+      path: "/atajos",
+      roles: ["director", "administracion", "administrador"],
     },
   ];
 
@@ -86,34 +124,45 @@ const SidebarNavigation: React.FC = () => {
   };
 
   const isActivePath = (path: string) =>
-    location.pathname.startsWith(path) && path !== "/";
+    path !== "/" && location.pathname.startsWith(path);
 
   const isHomeActive = location.pathname === "/";
 
   return (
-    <div className="flex grow flex-col gap-y-5 bg-white dark:bg-gray-800 px-6 pb-4 shadow-sm border-r border-gray-200 dark:border-gray-700">
-      <div className="flex h-16 shrink-0 items-center gap-3">
+    <div className={clsx("flex grow flex-col gap-y-5 bg-background pb-4 shadow-sm border-r border-border transition-all duration-300 relative",
+      isCollapsed ? "px-2" : "px-6"
+    )}>
+      <Button
+        variant="ghost"
+        size="icon"
+        className={clsx("absolute top-3 right-[-1.25rem] z-50 p-2.5 text-foreground bg-background rounded-full shadow-md border border-border hidden lg:block", isCollapsed && "rotate-180")}
+        onClick={toggleSidebar}
+      >
+        <ChevronLeft className={clsx("h-5 w-5 transition-transform", isCollapsed && "rotate-180")} />
+      </Button>
+
+      <div className={clsx("flex h-16 shrink-0 items-center gap-3", isCollapsed && "justify-center")}>
         <img className="h-8 w-auto" src="/logo.png" alt="Logo de ISOMeter Go" />
-        <div>
-          <h1 className="text-lg font-bold text-blue-600 dark:text-blue-500">
+        <div className={clsx(isCollapsed && "hidden")}>
+          <h1 className="text-lg font-bold text-primary">
             ISOMeter Go
           </h1>
-          <p className="text-xs text-gray-500 dark:text-gray-400">
+          <p className="text-xs text-muted-foreground">
             Sistema de gestión interno
           </p>
         </div>
       </div>
 
-      <div className="bg-blue-50 dark:bg-gray-700/50 rounded-lg p-3 flex justify-between items-center">
-        <div>
-          <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
+      <div className={clsx("bg-muted rounded-lg p-3 flex justify-between items-center", isCollapsed && "p-2")}>
+        <div className={clsx(isCollapsed && "hidden")}>
+          <p className="text-sm font-medium text-foreground">
             {user?.name}
           </p>
-          <p className="text-xs text-gray-600 dark:text-gray-400 capitalize">
+          <p className="text-xs text-muted-foreground capitalize">
             {user?.role}
           </p>
         </div>
-        <div className="flex items-center gap-x-1">
+        <div className={clsx("flex items-center", isCollapsed ? "flex-col gap-y-2" : "gap-x-1")}>
           <ThemeToggle />
           <Notifications />
         </div>
@@ -125,22 +174,16 @@ const SidebarNavigation: React.FC = () => {
             <ul className="space-y-1">
               {filteredMenuItems.map((item) => (
                 <li key={item.path}>
-                  <button
-                    onClick={() => navigate(item.path)}
-                    className={cn(
-                      "group flex w-full items-center gap-x-3 rounded-md p-3 text-base font-medium leading-6 transition-colors",
-                      (
-                        item.path === "/"
-                          ? isHomeActive
-                          : isActivePath(item.path)
-                      )
-                        ? "bg-blue-50 text-blue-700 dark:bg-blue-900/50 dark:text-white"
-                        : "text-gray-700 hover:bg-gray-100 hover:text-blue-700 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-white"
+                  <Button
+                    variant={(item.path === "/" ? isHomeActive : isActivePath(item.path)) ? "secondary" : "ghost"}
+                    className={clsx("w-full gap-x-3 p-3 h-auto text-base",
+                      isCollapsed ? "justify-center" : "justify-start"
                     )}
+                    onClick={() => navigate(item.path)}
                   >
                     <item.icon className="h-6 w-6 shrink-0" />
-                    <span>{item.label}</span>
-                  </button>
+                    <span className={clsx(isCollapsed && "hidden")}>{item.label}</span>
+                  </Button>
                 </li>
               ))}
             </ul>
@@ -148,24 +191,22 @@ const SidebarNavigation: React.FC = () => {
 
           {canManageAdminPanel() && (
             <li>
-              <div className="text-xs font-semibold leading-6 text-gray-400">
-                Panel de Administrador
+              <div className={clsx("text-xs font-semibold leading-6 text-muted-foreground", isCollapsed && "text-center")}>
+                Admin
               </div>
               <ul className="mt-2 space-y-1">
                 {adminMenuItems.map((item) => (
                   <li key={item.path}>
-                    <button
-                      onClick={() => navigate(item.path)}
-                      className={cn(
-                        "group flex w-full items-center gap-x-3 rounded-md p-3 text-base font-medium leading-6 transition-colors",
-                        isActivePath(item.path)
-                          ? "bg-blue-50 text-blue-700 dark:bg-blue-900/50 dark:text-white"
-                          : "text-gray-700 hover:bg-gray-100 hover:text-blue-700 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-white"
+                    <Button
+                      variant={isActivePath(item.path) ? "secondary" : "ghost"}
+                      className={clsx("w-full gap-x-3 p-3 h-auto text-base",
+                        isCollapsed ? "justify-center" : "justify-start"
                       )}
+                      onClick={() => navigate(item.path)}
                     >
                       <item.icon className="h-6 w-6 shrink-0" />
-                      <span>{item.label}</span>
-                    </button>
+                      <span className={clsx(isCollapsed && "hidden")}>{item.label}</span>
+                    </Button>
                   </li>
                 ))}
               </ul>
@@ -173,25 +214,26 @@ const SidebarNavigation: React.FC = () => {
           )}
 
           <li className="mt-auto space-y-1">
-            <button
-              onClick={() => navigate("/perfil")}
-              className={cn(
-                "group flex w-full items-center gap-x-3 rounded-md p-3 text-base font-medium leading-6 transition-colors",
-                isActivePath("/perfil")
-                  ? "bg-blue-50 text-blue-700 dark:bg-blue-900/50 dark:text-white"
-                  : "text-gray-700 hover:bg-gray-100 hover:text-blue-700 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-white"
+            <Button
+              variant={isActivePath("/perfil") ? "secondary" : "ghost"}
+              className={clsx("w-full gap-x-3 p-3 h-auto text-base",
+                isCollapsed ? "justify-center" : "justify-start"
               )}
+              onClick={() => navigate("/perfil")}
             >
               <UserCircle className="h-6 w-6 shrink-0" />
-              <span>Perfil</span>
-            </button>
-            <button
+              <span className={clsx(isCollapsed && "hidden")}>Perfil</span>
+            </Button>
+            <Button
+              variant="ghost"
+              className={clsx("w-full gap-x-3 p-3 h-auto text-base text-destructive hover:bg-destructive/10 hover:text-destructive",
+                isCollapsed ? "justify-center" : "justify-start"
+              )}
               onClick={handleLogout}
-              className="group flex w-full items-center gap-x-3 rounded-md p-3 text-base font-medium leading-6 text-gray-700 hover:bg-gray-100 hover:text-red-700 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-red-500"
             >
               <LogOut className="h-6 w-6 shrink-0" />
-              <span>Cerrar Sesión</span>
-            </button>
+              <span className={clsx(isCollapsed && "hidden")}>Cerrar Sesión</span>
+            </Button>
           </li>
         </ul>
       </nav>
@@ -199,93 +241,95 @@ const SidebarNavigation: React.FC = () => {
   );
 };
 
-// 2. Definimos la interfaz para las props del Layout
-interface LayoutProps {
-  children: ReactNode; // <-- AQUÍ ESTÁ LA SOLUCIÓN
-}
-
-const Layout: React.FC<LayoutProps> = ({ children }) => {
-  // 3. Aplicamos la interfaz
+const Layout: React.FC = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const location = useLocation();
+  const navigate = useNavigate();
+  const { toggleTheme } = useTheme();
+  const { canCreateContent } = useAuth();
+  const { title } = useTitle();
+
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [location.pathname]);
+
+  const [shortcuts] = useState(getShortcuts());
+
+  useHotkeys(
+    shortcuts.CREATE_NEW_OT.keys,
+    () => {
+      if (canCreateContent()) {
+        navigate("/ot/crear");
+      }
+    },
+    { preventDefault: true },
+    [navigate, shortcuts, canCreateContent]
+  );
+
+  useHotkeys(
+    shortcuts.GO_TO_DASHBOARD.keys,
+    () => navigate("/"),
+    { preventDefault: true },
+    [navigate, shortcuts]
+  );
+  useHotkeys(
+    shortcuts.GO_TO_OTS.keys,
+    () => navigate("/ot"),
+    { preventDefault: true },
+    [navigate, shortcuts]
+  );
+  useHotkeys(
+    shortcuts.GO_TO_CLIENTS.keys,
+    () => navigate("/clientes"),
+    { preventDefault: true },
+    [navigate, shortcuts]
+  );
+  useHotkeys(
+    shortcuts.TOGGLE_THEME.keys,
+    toggleTheme,
+    { preventDefault: true },
+    [toggleTheme, shortcuts]
+  );
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+    <div className="min-h-screen bg-muted/40">
       <Transition.Root show={sidebarOpen} as={Fragment}>
         <Dialog
           as="div"
           className="relative z-50 lg:hidden"
           onClose={setSidebarOpen}
         >
-          <Transition.Child
-            as={Fragment}
-            enter="transition-opacity ease-linear duration-300"
-            enterFrom="opacity-0"
-            enterTo="opacity-100"
-            leave="transition-opacity ease-linear duration-300"
-            leaveFrom="opacity-100"
-            leaveTo="opacity-0"
-          >
-            <div className="fixed inset-0 bg-gray-900/80" />
-          </Transition.Child>
-
-          <div className="fixed inset-0 flex">
-            <Transition.Child
-              as={Fragment}
-              enter="transition ease-in-out duration-300 transform"
-              enterFrom="-translate-x-full"
-              enterTo="translate-x-0"
-              leave="transition ease-in-out duration-300 transform"
-              leaveFrom="translate-x-0"
-              leaveTo="-translate-x-full"
-            >
-              <Dialog.Panel className="relative mr-16 flex w-full max-w-xs flex-1">
-                <Transition.Child
-                  as={Fragment}
-                  enter="ease-in-out duration-300"
-                  enterFrom="opacity-0"
-                  enterTo="opacity-100"
-                  leave="ease-in-out duration-300"
-                  leaveFrom="opacity-100"
-                  leaveTo="opacity-0"
-                >
-                  <div className="absolute left-full top-0 flex w-16 justify-center pt-5">
-                    <button
-                      type="button"
-                      className="-m-2.5 p-2.5"
-                      onClick={() => setSidebarOpen(false)}
-                    >
-                      <X className="h-6 w-6 text-white" />
-                    </button>
-                  </div>
-                </Transition.Child>
-                <SidebarNavigation />
-              </Dialog.Panel>
-            </Transition.Child>
-          </div>
+          {/* ... (mobile sidebar dialog) ... */}
         </Dialog>
       </Transition.Root>
 
-      <div className="hidden lg:fixed lg:inset-y-0 lg:z-50 lg:flex lg:w-72 lg:flex-col">
-        <SidebarNavigation />
+      <div className={clsx("hidden lg:fixed lg:inset-y-0 lg:z-50 lg:flex lg:flex-col",
+        isSidebarCollapsed ? "w-20" : "w-72"
+      )}>
+        <SidebarNavigation isCollapsed={isSidebarCollapsed} toggleSidebar={() => setIsSidebarCollapsed(!isSidebarCollapsed)} />
       </div>
 
-      <div className="flex flex-1 flex-col lg:pl-72">
-        <div className="sticky top-0 z-40 flex h-16 shrink-0 items-center gap-x-4 border-b border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800 px-4 shadow-sm sm:gap-x-6 sm:px-6 lg:hidden">
-          <button
-            type="button"
-            className="-m-2.5 p-2.5 text-gray-700 dark:text-gray-300 lg:hidden"
+      <div className={clsx("flex flex-1 flex-col",
+        isSidebarCollapsed ? "lg:pl-20" : "lg:pl-72"
+      )}>
+        <div className="sticky top-0 z-40 flex h-16 shrink-0 items-center gap-x-4 border-b border-border bg-background px-4 shadow-sm sm:gap-x-6 sm:px-6">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="-m-2.5 p-2.5 text-foreground lg:hidden"
             onClick={() => setSidebarOpen(true)}
           >
             <Menu className="h-6 w-6" />
-          </button>
-          <div className="flex-1 text-lg font-semibold leading-6 text-gray-900 dark:text-white">
-            Dashboard
-          </div>
+          </Button>
+          <div className="flex-1 text-lg font-semibold leading-6 text-foreground">{title}</div>
         </div>
-
-        <main className="flex-1 py-10">
-          <div className="px-4 sm:px-6 lg:px-8">
-            {children} {/* 4. Renderizamos los hijos aquí */}
+        <main className="flex-1 h-full">
+          <div
+            key={location.pathname}
+            className="px-4 sm:px-6 lg:px-8 animate-fade-in h-full flex flex-col"
+          >
+            <Outlet />
           </div>
         </main>
       </div>
@@ -294,3 +338,4 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 };
 
 export default Layout;
+

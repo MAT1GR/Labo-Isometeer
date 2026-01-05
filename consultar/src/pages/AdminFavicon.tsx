@@ -1,12 +1,18 @@
 // RUTA: /cliente/src/pages/AdminFavicon.tsx
 
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
+import { useTitle } from "../contexts/TitleContext";
 import Card from "../components/ui/Card";
 import Button from "../components/ui/Button";
 import { Image, Upload, Save, AlertCircle } from "lucide-react";
 import { adminService } from "../services/adminService";
 
 const AdminFavicon: React.FC = () => {
+  const { setTitle } = useTitle();
+  useEffect(() => {
+    setTitle("Cambiar Favicon");
+  }, [setTitle]);
+
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string>("/logo.ico");
   const [isUploading, setIsUploading] = useState(false);
@@ -66,7 +72,7 @@ const AdminFavicon: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-3xl font-bold">Cambiar Favicon</h1>
+
       <Card>
         <div className="flex items-center gap-2 mb-4">
           <Image className="h-6 w-6 text-blue-600" />

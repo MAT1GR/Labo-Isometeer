@@ -20,10 +20,16 @@ import { fetcher } from "../api/axiosInstance";
 import * as XLSX from "xlsx";
 import ConfirmationModal from "../components/ui/ConfirmationModal";
 import Input from "../components/ui/Input";
+import { useTitle } from "../contexts/TitleContext";
 
 const CLIENTS_PER_PAGE = 50;
 
 const Clientes: React.FC = () => {
+  const { setTitle } = useTitle();
+  useEffect(() => {
+    setTitle("Gestión de Clientes");
+  }, [setTitle]);
+
   const {
     data: clients,
     error,
@@ -58,11 +64,7 @@ const Clientes: React.FC = () => {
     setCurrentPage(1);
   }, [searchTerm]);
 
-  useEffect(() => {
-    if (topOfListRef.current) {
-      topOfListRef.current.scrollIntoView({ behavior: "smooth" });
-    }
-  }, [currentPage]);
+
 
   const totalPages = Math.ceil(filteredClients.length / CLIENTS_PER_PAGE);
   const paginatedClients = useMemo(() => {
@@ -211,10 +213,8 @@ const Clientes: React.FC = () => {
         title="Eliminar Cliente"
         message="¿Estás seguro de que quieres eliminar este cliente? Se eliminarán también todas sus Órdenes de Trabajo asociadas. Esta acción no se puede deshacer."
       />
-      <div className="space-y-6" ref={topOfListRef}>
-        <div className="flex justify-between items-center">
-          <h1 className="text-3xl font-bold">Gestión de Clientes</h1>
-          <div className="flex gap-2">
+      <div className="space-y-6 py-10" ref={topOfListRef}>
+        <div className="flex justify-end gap-2">
             <Button
               variant="secondary"
               onClick={() => fileInputRef.current?.click()}
@@ -232,7 +232,6 @@ const Clientes: React.FC = () => {
               accept=".xlsx, .xls"
             />
           </div>
-        </div>
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
           <Input
@@ -243,55 +242,63 @@ const Clientes: React.FC = () => {
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
-        <Card>
-          <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-            <thead className="bg-gray-50 dark:bg-gray-700">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">
-                  Código Cliente
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">
-                  Nº Cliente
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">
-                  Empresa
-                </th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">
-                  Acciones
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200 dark:bg-gray-800 dark:divide-gray-700">
-              {paginatedClients?.map((client) => (
-                <tr key={client.id}>
-                  <td className="px-6 py-4">{client.code}</td>
-                  <td className="px-6 py-4">
-                    {client.client_number
-                      ? String(client.client_number).replace(/\.0$/, "")
-                      : "N/A"}
-                  </td>
-                  <td className="px-6 py-4 font-medium">{client.name}</td>
-                  <td className="px-6 py-4 text-right space-x-2">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => navigate(`/clientes/editar/${client.id}`)}
-                    >
-                      <Edit className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="danger"
-                      size="sm"
-                      onClick={() => handleDeleteRequest(client.id)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </td>
+        <div className="bg-card text-card-foreground shadow-xl border border-border rounded-lg overflow-hidden">
+          <div className="overflow-y-auto">
+            <table className="min-w-full divide-y divide-border">
+              <thead className="bg-muted/50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
+                    Código Cliente
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
+                    Nº Cliente
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
+                    Empresa
+                  </th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-muted-foreground uppercase">
+                    Acciones
+                  </th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </Card>
+              </thead>
+              <tbody className="bg-card divide-y divide-border">
+                {paginatedClients?.map((client) => (
+                  <tr key={client.id} className="cursor-pointer hover:bg-muted/50" onDoubleClick={() => navigate(`/clientes/editar/${client.id}`)}>
+                    <td className="px-6 py-4">{client.code}</td>
+                    <td className="px-6 py-4">
+                      {client.client_number
+                        ? String(client.client_number).replace(/\.0$/, "")
+                        : "N/A"}
+                    </td>
+                    <td className="px-6 py-4 font-medium">{client.name}</td>
+                    <td className="px-6 py-4 text-right space-x-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigate(`/clientes/editar/${client.id}`);
+                        }}
+                      >
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="danger"
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteRequest(client.id)
+                        }}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
         {totalPages > 1 && (
           <div className="flex justify-center items-center gap-4 mt-6">
             <Button
@@ -303,7 +310,7 @@ const Clientes: React.FC = () => {
               <ChevronLeft className="h-4 w-4 mr-1" />
               Anterior
             </Button>
-            <span className="text-sm text-gray-600 dark:text-gray-400">
+            <span className="text-sm text-muted-foreground">
               Página {currentPage} de {totalPages}
             </span>
             <Button

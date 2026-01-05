@@ -1,6 +1,6 @@
 // RUTA: /consultar/src/pages/Contratos.tsx
 
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import useSWR, { mutate } from "swr";
 import { fetcher } from "../api/axiosInstance";
 import { Contract, contractService } from "../services/contractService";
@@ -18,10 +18,16 @@ import {
 } from "lucide-react";
 import axiosInstance from "../api/axiosInstance";
 import ConfirmationModal from "../components/ui/ConfirmationModal";
+import { useTitle } from "../contexts/TitleContext";
 
 const staticBaseUrl = axiosInstance.defaults.baseURL?.replace("/api", "") || "";
 
 const Contratos: React.FC = () => {
+  const { setTitle } = useTitle();
+  useEffect(() => {
+    setTitle("Gestión de Contratos PDF");
+  }, [setTitle]);
+
   const {
     data: contracts,
     error,
@@ -135,8 +141,7 @@ const Contratos: React.FC = () => {
         message={`¿Estás seguro de que quieres eliminar el contrato "${contractToDelete?.name}"? Esta acción no se puede deshacer.`}
       />
       <div className="space-y-6">
-        <div className="flex justify-between items-center">
-          <h1 className="text-3xl font-bold">Gestión de Contratos PDF</h1>
+        <div className="flex justify-end">
           {!isCreating && (
             <Button
               onClick={() => {

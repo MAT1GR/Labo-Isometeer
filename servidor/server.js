@@ -4,17 +4,19 @@ const express = require("express");
 const cors = require("cors");
 const Database = require("better-sqlite3");
 
-// --- Configuración ---
 const app = express();
-const port = 4000; // El puerto por donde el servidor escuchará
-app.use(cors()); // Habilita CORS para todas las rutas
-app.use(express.json()); // Permite al servidor entender JSON
+app.use(cors());
+app.use(express.json());
+
+// 🔹 Variable de entorno simple
+const PROD = false; // cambia a true cuando estés en producción
+
+const host = PROD ? "192.168.0.150" : "localhost";
+const port = PROD ? 6001 : 6002;
 
 // --- Base de Datos ---
-// Esto crea el archivo 'empresa.db' si no existe
 const db = new Database("empresa.db");
 
-// Creamos la tabla 'productos' si no existe
 db.exec(`
     CREATE TABLE IF NOT EXISTS productos (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -24,9 +26,7 @@ db.exec(`
     )
 `);
 
-// --- API Endpoints (Las "consultas" que podrá hacer el cliente) ---
-
-// Endpoint para obtener todos los productos
+// --- API Endpoints ---
 app.get("/api/productos", (req, res) => {
   try {
     const stmt = db.prepare("SELECT * FROM productos");
@@ -38,7 +38,6 @@ app.get("/api/productos", (req, res) => {
 });
 
 // --- Iniciar Servidor ---
-app.listen(port, () => {
-  console.log(`✅ Servidor escuchando en http://localhost:${port}`);
-  console.log("Presiona CTRL+C para detener el servidor.");
+app.listen(port, host, () => {
+  console.log(`✅ Servidor escuchando en http://${host}:${port}`);
 });

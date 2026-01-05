@@ -22,6 +22,9 @@ router.post("/login", (req: Request, res: Response) => {
       return res.status(401).json({ error: "Credenciales inválidas." });
     }
 
+    // Mensaje en la consola del servidor
+    console.log(`El usuario ${userDb.email} ha iniciado sesión.`);
+
     const { password: _, ...userToSend } = userDb;
     res.status(200).json(userToSend);
   } catch (error) {

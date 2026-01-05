@@ -6,7 +6,7 @@ import { User, authService } from "../services/auth";
 interface AuthContextType {
   user: User | null;
   loading: boolean;
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<User>;
   logout: () => void;
   canAuthorizeOT: () => boolean;
   canCreateContent: () => boolean;
@@ -44,6 +44,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     const loggedInUser = await authService.login({ email, password });
     setUser(loggedInUser);
     localStorage.setItem("lab_user", JSON.stringify(loggedInUser));
+    return loggedInUser;
   };
 
   const logout = () => {

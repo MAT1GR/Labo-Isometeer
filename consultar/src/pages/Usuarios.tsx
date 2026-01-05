@@ -139,10 +139,7 @@ const Usuarios: React.FC = () => {
             >
               <Upload className="mr-2 h-4 w-4" /> Importar Usuarios
             </Button>
-            <Button onClick={() => navigate("/usuarios/grafico")}>
-              <BarChart2 className="mr-2 h-4 w-4" />
-              Ver Gráfico de Puntos
-            </Button>
+
             <input
               type="file"
               ref={fileInputRef}

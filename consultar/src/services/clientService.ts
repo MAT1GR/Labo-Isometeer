@@ -28,6 +28,9 @@ export interface Client {
 }
 
 class ClientService {
+  getAll() {
+    throw new Error("Method not implemented.");
+  }
   async getAllClients(): Promise<Client[]> {
     const response = await axiosInstance.get("/clients");
     return response.data;
@@ -61,6 +64,14 @@ class ClientService {
     const response = await axiosInstance.post("/clients/bulk-import", {
       clients,
     });
+    return response.data;
+  }
+
+  // NUEVO MÉTODO AGREGADO
+  async getMonthlyUserProduction() {
+    const response = await axiosInstance.get(
+      "/statistics/user-production-monthly"
+    );
     return response.data;
   }
 }
