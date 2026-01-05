@@ -163,10 +163,15 @@ export const useOTDetailForm = () => {
         })),
       };
       await otService.updateOT(Number(id), dataToSubmit);
-      mutate(["/ot", user]);
-      navigate("/ot");
+      mutate(["/ot", user]); // Update list cache
+      
+      // Update local view data and exit edit mode
+      await loadData(); 
+      setIsEditing(false);
+      
     } catch (error: any) {
       alert(error.message || "Hubo un error al guardar los cambios.");
+    } finally {
       setIsSaving(false);
     }
   };

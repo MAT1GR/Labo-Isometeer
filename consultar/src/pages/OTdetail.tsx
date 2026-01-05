@@ -20,22 +20,22 @@ const OTDetail: React.FC = () => {
 
   const handleConfirmAssignment = async (selectedIds: number[]) => {
     if (currentActivityId === null || !formProps.otData || !formProps.id) return;
-
-    const { formMethods, users, loadData } = formProps;
-    const { setValue, getValues } = formMethods;
-
-    const activityIndex = (getValues('activities') || []).findIndex(a => a.id === currentActivityId);
-
-    if (activityIndex === -1) return;
-
-    const selectedUsers = users.filter(u => selectedIds.includes(u.id));
-    setValue(`activities.${activityIndex}.assigned_users` as any, selectedUsers, { shouldDirty: true });
     
-    const updatedData = getValues();
-    
+    // Usamos la función expuesta por el hook
+    formProps.handleActivityAssignmentChange(
+        (formProps.otData.activities || []).findIndex(a => a.id === currentActivityId), 
+        selectedIds
+    );
+
+    // Guardar cambios inmediatamente (o podríamos dejar que el usuario guarde manualmente)
+    // En este flujo "in-line", es mejor que sea parte del guardado general,
+    // PERO la asignación de usuarios suele ser una acción independiente en la UI actual.
+    // Dado que eliminamos el Summary, la asignación ahora depende del Form.
+    // Si queremos mantener el comportamiento anterior de guardar asignación inmediatamente:
     try {
-        await otService.updateOT(Number(formProps.id), updatedData);
-        await loadData(); // Recargar datos para refrescar la UI
+        const { getValues } = formProps.formMethods;
+        await otService.updateOT(Number(formProps.id), getValues());
+        await formProps.loadData();
     } catch (error) {
         console.error("Failed to save user assignment:", error);
         alert("Error al guardar la asignación.");
@@ -59,24 +59,22 @@ const OTDetail: React.FC = () => {
 
   return (
     <>
-      <OTDetailSummary
-        otData={formProps.otData}
-        onEdit={formProps.toggleIsEditing}
-        onAuthorize={formProps.handleAuthorize}
-        onHistory={() => formProps.setIsHistoryModalOpen(true)}
-        onAssignUsers={handleOpenAssignmentModal}
-        canAuthorizeOT={formProps.canAuthorizeOT()}
-      />
-      
-      <Modal 
-        isOpen={formProps.isEditing} 
-        onClose={formProps.toggleIsEditing}
-        title={`Editando OT: ${formProps.otData.custom_id}`}
-      >
-        <div className="p-4">
-          <OTDetailForm {...formProps} toggleIsEditing={formProps.toggleIsEditing} isModal={true} />
-        </div>
-      </Modal>
+      {formProps.isEditing ? (
+        <OTDetailForm 
+            {...formProps} 
+            toggleIsEditing={formProps.toggleIsEditing} 
+            isModal={false} 
+        />
+      ) : (
+        <OTDetailSummary
+            otData={formProps.otData}
+            onEdit={formProps.toggleIsEditing}
+            onAuthorize={formProps.handleAuthorize}
+            onHistory={() => formProps.setIsHistoryModalOpen(true)}
+            onAssignUsers={handleOpenAssignmentModal}
+            canAuthorizeOT={formProps.canAuthorizeOT()}
+        />
+      )}
 
       {isAssignmentModalOpen && (
         <UserAssignmentModal

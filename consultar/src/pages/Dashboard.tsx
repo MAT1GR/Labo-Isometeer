@@ -543,7 +543,19 @@ const EmpleadoDashboard: React.FC = () => {
 
 // --- Componente Principal del Dashboard ---
 const Dashboard: React.FC = () => {
-  const { canViewAdminContent } = useAuth();
+  const { user, canViewAdminContent } = useAuth();
+  const navigate = useNavigate();
+
+  React.useEffect(() => {
+    if (user?.role === "administrador" || user?.role === "director") {
+      navigate("/ot", { replace: true });
+    }
+  }, [user, navigate]);
+
+  if (user?.role === "administrador" || user?.role === "director") {
+    return null;
+  }
+
   return canViewAdminContent() ? (
     <AdminDirectorDashboard />
   ) : (

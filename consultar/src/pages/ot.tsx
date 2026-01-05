@@ -79,6 +79,12 @@ const OT: React.FC = () => {
   });
 
   useEffect(() => {
+    if (ots) {
+      console.log("OTs data received in frontend:", ots);
+    }
+  }, [ots]);
+
+  useEffect(() => {
     setCurrentPage(1);
   }, [filters, ots]);
 
@@ -280,7 +286,7 @@ const OT: React.FC = () => {
                         {ot.custom_id || `Interno #${ot.id}`}
                       </td>
                       <td className="px-6 py-4">
-                        {safeFormatDate(ot.created_at)}
+                        {safeFormatDate(ot.date || ot.created_at)}
                       </td>
                       <td className="px-6 py-4">{ot.type || 'N/A'}</td>
                       <td className="px-6 py-4">{ot.client_name || 'N/A'}</td>
